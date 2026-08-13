@@ -6,6 +6,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import Redis from 'ioredis';
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
+import { PrismaModule } from './infrastructure/database/prisma.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { HealthController } from './health/health.controller';
         ),
       }),
     }),
+    PrismaModule,
   ],
   controllers: [HealthController],
   providers: [
