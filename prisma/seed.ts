@@ -1,8 +1,25 @@
 import { PrismaClient } from '@prisma/client';
+import * as argon2 from 'argon2';
+import { ARGON2_OPTIONS } from '../src/auth/constants/auth.constants';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const adminPasswordHash = await argon2.hash(
+    process.env.SEED_ADMIN_PASSWORD!,
+    ARGON2_OPTIONS,
+  );
+
+  await prisma.user.upsert({
+    where: { email: 'spacapilarleonicearenas@gmail.com' },
+    update: {},
+    create: {
+      email: 'spacapilarleonicearenas@gmail.com',
+      passwordHash: adminPasswordHash,
+      role: 'ADMIN',
+    },
+  });
+
   const spaCapilar = await prisma.category.upsert({
     where: { name: 'Spa Capilar' },
     update: {},

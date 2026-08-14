@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './infrastructure/database/prisma.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { PrismaModule } from './infrastructure/database/prisma.module';
       }),
     }),
     PrismaModule,
+    AuthModule,
   ],
   controllers: [HealthController],
   providers: [
