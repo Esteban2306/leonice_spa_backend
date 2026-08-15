@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Length,
   Max,
   Min,
   validateSync,
@@ -39,6 +40,10 @@ class EnvironmentVariables {
   @IsOptional()
   @IsInt()
   THROTTLE_LIMIT?: number;
+
+  @IsString()
+  @Length(64, 64)
+  ENCRYPTION_KEY: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

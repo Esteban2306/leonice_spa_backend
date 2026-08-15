@@ -49,6 +49,17 @@ enum ConsentType {
   AUTORIZACION_MENOR
 }
 
+enum HairLength {
+  CORTO
+  MEDIANO
+  LARGO
+}
+
+enum HairColor {
+  CLARO
+  OSCURO
+}
+
 model User {
   id                  String  @id() @default(uuid()) 
   email               String    @unique
@@ -75,6 +86,13 @@ model Client {
   allergies     String?  
   isPregnant    Boolean  @default(false) @map("is_pregnant")
   creditBalance Decimal  @default(0) @db.Decimal(10, 2) @map("credit_balance")
+
+
+  whatsappJid          String?     @unique @map("whatsapp_jid")
+  hairLength           HairLength? @map("hair_length")
+  hairColor            HairColor?  @map("hair_color")
+  hairProfileUpdatedAt DateTime?   @map("hair_profile_updated_at")
+
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

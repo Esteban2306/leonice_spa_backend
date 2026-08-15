@@ -8,6 +8,9 @@ import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './infrastructure/database/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { RedisModule } from './infrastructure/redis/redis.module';
+import { EncryptionModule } from './infrastructure/encryption/encryption.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
@@ -31,8 +34,11 @@ import { AuthModule } from './auth/auth.module';
         ),
       }),
     }),
+    EncryptionModule,
+    RedisModule,
     PrismaModule,
     AuthModule,
+    ClientsModule,
   ],
   controllers: [HealthController],
   providers: [
