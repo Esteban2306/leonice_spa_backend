@@ -6,14 +6,16 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
+import { StructuredLoggerService } from './common/logging/structured-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const config = app.get(ConfigService);
 
   const port = config.get<number>('PORT', 3000);
   const nodeEnv = config.get<string>('NODE_ENV', 'development');
 
+  app.useLogger(app.get(StructuredLoggerService));
   app.use(cookieParser());
   app.use(helmet());
   app.use(compression());

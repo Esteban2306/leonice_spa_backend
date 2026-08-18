@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard, seconds } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
@@ -11,6 +11,11 @@ import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { EncryptionModule } from './infrastructure/encryption/encryption.module';
 import { ClientsModule } from './clients/clients.module';
+import { ReservationsModule } from './reservations/reservations.module';
+import { ContextModule } from './common/context/context.module';
+import { LoggingModule } from './common/logging/logging.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
   imports: [
@@ -37,8 +42,11 @@ import { ClientsModule } from './clients/clients.module';
     EncryptionModule,
     RedisModule,
     PrismaModule,
+    ContextModule,
+    LoggingModule,
     AuthModule,
     ClientsModule,
+    ReservationsModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -46,6 +54,8 @@ import { ClientsModule } from './clients/clients.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })
 export class AppModule {}

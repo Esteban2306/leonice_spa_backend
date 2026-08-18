@@ -12,10 +12,10 @@ import {
 
 enum Environment {
   Development = 'development',
+  Test = 'test',
   Staging = 'staging',
   Production = 'production',
 }
-
 class EnvironmentVariables {
   @IsEnum(Environment)
   NODE_ENV: Environment;
