@@ -1,13 +1,12 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { Client } from '@prisma/client';
-import type Redis from 'ioredis';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EncryptionService } from '../../infrastructure/encryption/encryption.service';
-import { REDIS_CLIENT } from '../../infrastructure/redis/redis.module';
 import {
   CreateClientData,
   UpdateClientData,
 } from '../types/client-persistence.types';
+import { SafeCacheService } from 'src/infrastructure/redis/safe-cache.service';
 
 const JID_CACHE_PREFIX = 'client:jid:';
 const JID_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -21,7 +20,7 @@ export class ClientsRepository {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
-    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly cache: SafeCacheService,
   ) {}
 
   async findByPhone(phone: string) {
@@ -32,7 +31,8 @@ export class ClientsRepository {
   }
 
   async findByWhatsappJid(jid: string) {
-    const cachedId = await this.redis.get(JID_CACHE_PREFIX + jid);
+    const cacheKey = JID_CACHE_PREFIX + jid;
+    const cachedId = await this.cache.get<string>(cacheKey);
     if (cachedId) {
       const cached = await this.prisma.client.client.findUnique({
         where: { id: cachedId },
@@ -44,12 +44,7 @@ export class ClientsRepository {
       where: { whatsappJid: jid },
     });
     if (client) {
-      await this.redis.set(
-        JID_CACHE_PREFIX + jid,
-        client.id,
-        'EX',
-        JID_CACHE_TTL_SECONDS,
-      );
+      void this.cache.set(cacheKey, client.id, JID_CACHE_TTL_SECONDS);
       return this.decryptSensitive(client);
     }
     return null;
@@ -85,10 +80,9 @@ export class ClientsRepository {
     });
 
     if (client.whatsappJid) {
-      await this.redis.set(
+      void this.cache.set(
         JID_CACHE_PREFIX + client.whatsappJid,
         client.id,
-        'EX',
         JID_CACHE_TTL_SECONDS,
       );
     }
@@ -126,10 +120,9 @@ export class ClientsRepository {
     });
 
     if (typeof data.whatsappJid === 'string') {
-      await this.redis.set(
+      void this.cache.set(
         JID_CACHE_PREFIX + data.whatsappJid,
         current.id,
-        'EX',
         JID_CACHE_TTL_SECONDS,
       );
     }
