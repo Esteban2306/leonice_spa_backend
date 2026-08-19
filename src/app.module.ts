@@ -16,6 +16,7 @@ import { ContextModule } from './common/context/context.module';
 import { LoggingModule } from './common/logging/logging.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { ConduitModule } from './conduit/conduit.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     AuthModule,
     ClientsModule,
     ReservationsModule,
+    ConduitModule,
   ],
   controllers: [HealthController],
   providers: [
