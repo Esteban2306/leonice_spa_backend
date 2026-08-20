@@ -47,4 +47,14 @@ export class SafeCacheService {
       );
     }
   }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await this.policy.execute(() => this.redis.del(key));
+    } catch (error) {
+      this.logger.warn(
+        `Caché no disponible al invalidar "${key}": ${(error as Error).message}`,
+      );
+    }
+  }
 }

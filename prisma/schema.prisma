@@ -169,6 +169,7 @@ model Treatment {
   reservations    Reservation[]
   automationRules AutomationRule[]
   promotions      Promotion[]
+  recommendations TreatmentProductRecommendation[]
 
   @@unique([categoryId, name])
   @@map("treatments")
@@ -289,6 +290,7 @@ model Product {
 
   category ProductCategory  @relation(fields: [productCategoryId], references: [id])
   variants ProductVariant[]
+  recommendations TreatmentProductRecommendation[]
 
   @@index([productCategoryId])
   @@map("products")
@@ -308,4 +310,17 @@ model ProductVariant {
 
   @@unique([productId, brand, presentation])
   @@map("product_variants")
+}
+
+model TreatmentProductRecommendation {
+  id          String   @id @default(uuid())
+  treatmentId String   @map("treatment_id")
+  productId   String   @map("product_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  treatment Treatment @relation(fields: [treatmentId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@unique([treatmentId, productId])
+  @@map("treatment_product_recommendations")
 }

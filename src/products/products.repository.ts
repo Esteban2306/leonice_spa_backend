@@ -1,0 +1,138 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../infrastructure/database/prisma.service';
+import { CreateProductCategoryDto } from './dto/create-product-category.dto';
+import { UpdateProductCategoryDto } from './dto/update-product-category.dto';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { CreateProductVariantDto } from './dto/create-product-variant.dto';
+import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
+
+@Injectable()
+export class ProductsRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  // ---- Categorías de producto ----
+
+  findAllCategories() {
+    return this.prisma.client.productCategory.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  findCategoryByName(name: string) {
+    return this.prisma.client.productCategory.findUnique({ where: { name } });
+  }
+
+  findCategoryById(id: string) {
+    return this.prisma.client.productCategory.findUnique({ where: { id } });
+  }
+
+  createCategory(dto: CreateProductCategoryDto) {
+    return this.prisma.client.productCategory.create({ data: dto });
+  }
+
+  updateCategory(id: string, dto: UpdateProductCategoryDto) {
+    return this.prisma.client.productCategory.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  // ---- Productos ----
+
+  findAllActiveProducts() {
+    return this.prisma.client.product.findMany({
+      where: { isActive: true },
+      include: {
+        variants: { where: { isActive: true } },
+        category: { select: { id: true, name: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  findProductById(id: string) {
+    return this.prisma.client.product.findUnique({
+      where: { id },
+      include: {
+        variants: { where: { isActive: true } },
+        category: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  createProduct(dto: CreateProductDto) {
+    return this.prisma.client.product.create({ data: dto });
+  }
+
+  updateProduct(id: string, dto: UpdateProductDto) {
+    return this.prisma.client.product.update({ where: { id }, data: dto });
+  }
+
+  // ---- Variantes ----
+
+  findVariantById(id: string) {
+    return this.prisma.client.productVariant.findUnique({ where: { id } });
+  }
+
+  findVariantByProductBrandPresentation(
+    productId: string,
+    brand: string,
+    presentation: string,
+  ) {
+    return this.prisma.client.productVariant.findUnique({
+      where: {
+        productId_brand_presentation: { productId, brand, presentation },
+      },
+    });
+  }
+
+  createVariant(productId: string, dto: CreateProductVariantDto) {
+    return this.prisma.client.productVariant.create({
+      data: { ...dto, productId },
+    });
+  }
+
+  updateVariant(id: string, dto: UpdateProductVariantDto) {
+    return this.prisma.client.productVariant.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  // ---- Recomendaciones ----
+
+  findRecommendationsForTreatment(treatmentId: string) {
+    return this.prisma.client.treatmentProductRecommendation.findMany({
+      where: { treatmentId },
+      include: {
+        product: { include: { variants: { where: { isActive: true } } } },
+      },
+    });
+  }
+
+  findRecommendationById(id: string) {
+    return this.prisma.client.treatmentProductRecommendation.findUnique({
+      where: { id },
+    });
+  }
+
+  findRecommendation(treatmentId: string, productId: string) {
+    return this.prisma.client.treatmentProductRecommendation.findUnique({
+      where: { treatmentId_productId: { treatmentId, productId } },
+    });
+  }
+
+  createRecommendation(treatmentId: string, productId: string) {
+    return this.prisma.client.treatmentProductRecommendation.create({
+      data: { treatmentId, productId },
+    });
+  }
+
+  deleteRecommendation(id: string) {
+    return this.prisma.client.treatmentProductRecommendation.delete({
+      where: { id },
+    });
+  }
+}
