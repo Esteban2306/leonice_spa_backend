@@ -3,12 +3,7 @@ import { Prisma, ReservationStatus } from '@prisma/client';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
-
-const HOLDING_EXCLUDED_STATUSES: ReservationStatus[] = [
-  ReservationStatus.CANCELADA,
-  ReservationStatus.NO_SHOW,
-  ReservationStatus.REPROGRAMADA,
-];
+import { HOLDING_EXCLUDED_STATUSES } from '../domain/reservation-status.constants';
 
 interface AttemptToHoldSlotParams {
   categoryId: string;
@@ -109,6 +104,23 @@ export class AvailabilityRepository {
 
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      return fn(tx);
+    });
+  }
+
+  async withCategoriesLock<T>(
+    categoryIds: string[],
+    date: Date,
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    const dayKey = date.toISOString().slice(0, 10);
+    const sortedUniqueIds = [...new Set(categoryIds)].sort();
+
+    return this.prisma.client.$transaction(async (tx) => {
+      for (const categoryId of sortedUniqueIds) {
+        const lockKey = `${dayKey}:${categoryId}`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      }
       return fn(tx);
     });
   }

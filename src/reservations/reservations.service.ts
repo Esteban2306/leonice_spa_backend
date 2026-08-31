@@ -4,8 +4,18 @@ import { AvailabilityRepository } from './repositories/availability.repository';
 import { getOperatingWindowsForDate } from './domain/operating-hours';
 import { generateAvailableSlots } from './domain/availability-calculator';
 import { SafeCacheService } from 'src/infrastructure/redis/safe-cache.service';
+import { ReservationsRepository } from './repositories/reservations.repository';
+import { formatLocalTime } from './domain/format-local-time';
+import { FindReservationsQueryDto } from './dto/find-reservations-query.dto';
+import { getDayBoundaries } from './domain/day-boundaries';
+import { groupReservationsForDisplay } from './domain/group-reservations-for-display';
 
 const AVAILABILITY_CACHE_TTL_SECONDS = 10;
+
+export interface AvailabilitySlot {
+  iso: string;
+  localTime: string;
+}
 
 @Injectable()
 export class ReservationsService {
@@ -13,23 +23,46 @@ export class ReservationsService {
     private readonly prisma: PrismaService,
     private readonly availabilityRepository: AvailabilityRepository,
     private readonly cache: SafeCacheService,
+    private readonly reservationsRepository: ReservationsRepository,
   ) {}
 
   async getAvailability(
     treatmentId: string,
     dateStr: string,
-  ): Promise<string[]> {
+  ): Promise<AvailabilitySlot[]> {
     const cacheKey = `availability:${treatmentId}:${dateStr}`;
 
-    const cached = await this.cache.get<string[]>(cacheKey);
+    const cached = await this.cache.get<AvailabilitySlot[]>(cacheKey);
     if (cached) return cached;
 
     const slots = await this.computeAvailability(treatmentId, dateStr);
-    const isoSlots = slots.map((s) => s.toISOString());
+    const shaped: AvailabilitySlot[] = slots.map((s) => ({
+      iso: s.toISOString(),
+      localTime: formatLocalTime(s),
+    }));
 
-    void this.cache.set(cacheKey, isoSlots, AVAILABILITY_CACHE_TTL_SECONDS);
+    void this.cache.set(cacheKey, shaped, AVAILABILITY_CACHE_TTL_SECONDS);
+    return shaped;
+  }
 
-    return isoSlots;
+  async getById(id: string) {
+    const reservation = await this.reservationsRepository.findById(id);
+    if (!reservation) throw new NotFoundException('Reserva no encontrada');
+    return reservation;
+  }
+
+  async findMany(query: FindReservationsQueryDto) {
+    const dayBoundaries = query.date
+      ? getDayBoundaries(new Date(`${query.date}T00:00:00`))
+      : undefined;
+    const reservations = await this.reservationsRepository.findMany({
+      dayStart: dayBoundaries?.dayStart,
+      dayEnd: dayBoundaries?.dayEnd,
+      status: query.status,
+      categoryId: query.categoryId,
+      clientId: query.clientId,
+    });
+    return groupReservationsForDisplay(reservations);
   }
 
   private async computeAvailability(
