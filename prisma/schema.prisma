@@ -122,7 +122,7 @@ model ConsentRecord {
 model Category {
   id           String   @id @default(uuid())
   name         String   @unique
-  cooldownDays Int      @map("cooldown_days")
+  isPrincipal Boolean  @default(false) @map("is_principal")
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -165,14 +165,51 @@ model Treatment {
   createdAt               DateTime @default(now()) @map("created_at")
   updatedAt               DateTime @updatedAt @map("updated_at")
 
+hasHairVariablePricing Boolean @default(false) @map("has_hair_variable_pricing")
+
   category        Category         @relation(fields: [categoryId], references: [id])
   reservations    Reservation[]
   automationRules AutomationRule[]
   promotions      Promotion[]
   recommendations TreatmentProductRecommendation[]
 
+  hairLengthPricing   TreatmentHairLengthPricing[]
+  hairColorSurcharges TreatmentHairColorSurcharge[]
+  
   @@unique([categoryId, name])
   @@map("treatments")
+}
+
+model TreatmentHairLengthPricing {
+  id              String     @id @default(uuid())
+  treatmentId     String     @map("treatment_id")
+  hairLength      HairLength @map("hair_length")
+  price           Decimal    @db.Decimal(10, 2)
+  durationMinutes Int        @map("duration_minutes")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  treatment Treatment @relation(fields: [treatmentId], references: [id])
+
+  @@unique([treatmentId, hairLength])
+  @@index([treatmentId])
+  @@map("treatment_hair_length_pricing")
+}
+
+model TreatmentHairColorSurcharge {
+  id                   String    @id @default(uuid())
+  treatmentId          String    @map("treatment_id")
+  hairColor            HairColor @map("hair_color")
+  surcharge            Decimal   @default(0) @db.Decimal(10, 2)
+  extraDurationMinutes Int       @default(0) @map("extra_duration_minutes")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  treatment Treatment @relation(fields: [treatmentId], references: [id])
+
+  @@unique([treatmentId, hairColor])
+  @@index([treatmentId])
+  @@map("treatment_hair_color_surcharge")
 }
 
 model Reservation {
@@ -184,6 +221,8 @@ model Reservation {
 
   status  ReservationStatus @default(SOLICITUD_INICIADA)
   channel ReservationChannel
+
+  comboGroupId String? @map("combo_group_id")
 
   scheduledStart DateTime @map("scheduled_start")
   scheduledEnd   DateTime @map("scheduled_end")
@@ -212,6 +251,7 @@ model Reservation {
   deposit   DepositRecord?
 
   @@index([categoryId, status, scheduledStart, scheduledEnd])
+  @@index([comboGroupId])
   @@index([clientId, categoryId, status])
   @@map("reservations")
 }

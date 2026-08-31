@@ -23,19 +23,19 @@ async function main() {
   const spaCapilar = await prisma.category.upsert({
     where: { name: 'Spa Capilar' },
     update: {},
-    create: { name: 'Spa Capilar', cooldownDays: 8 },
+    create: { name: 'Spa Capilar', isPrincipal: true },
   });
 
   const spaCoreano = await prisma.category.upsert({
     where: { name: 'Spa Coreano' },
     update: {},
-    create: { name: 'Spa Coreano', cooldownDays: 0 },
+    create: { name: 'Spa Coreano' },
   });
 
   const unas = await prisma.category.upsert({
     where: { name: 'Uñas' },
     update: {},
-    create: { name: 'Uñas', cooldownDays: 0 },
+    create: { name: 'Uñas' },
   });
 
   await prisma.capacityPool.upsert({
