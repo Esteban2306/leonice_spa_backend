@@ -1,35 +1,54 @@
 import {
+  Reservation,
+  ReservationChannel,
+  ReservationStatus,
+} from '@prisma/client';
+import {
   groupReservationsForDisplay,
   isEffectivelyConsecutive,
 } from './group-reservations-for-display';
+import { Decimal } from '@prisma/client/runtime/library';
 
-interface FakeReservation {
-  id: string;
-  clientId: string;
-  comboGroupId: string | null;
-  scheduledStart: Date;
-  scheduledEnd: Date;
-  status: string;
-  finalPrice: { toString: () => string };
+export type ReservationWithRelations = Reservation & {
   client: { id: string; name: string; phone: string };
   treatment: { id: string; name: string };
   category: { id: string; name: string };
+};
+interface FakeReservationOverrides {
+  id: string;
+  clientId?: string;
+  comboGroupId?: string | null;
+  scheduledStart: Date;
+  scheduledEnd: Date;
 }
 
-function fakeReservation(overrides: Partial<FakeReservation>): FakeReservation {
+function fakeReservation(
+  overrides: FakeReservationOverrides,
+): ReservationWithRelations {
+  const clientId = overrides.clientId ?? 'client-1';
+
   return {
-    id: overrides.id ?? 'default-id',
-    clientId: overrides.clientId ?? 'client-1',
+    id: overrides.id,
+    clientId,
+    categoryId: 'c1',
+    treatmentId: 't1',
+    status: ReservationStatus.CONFIRMADA,
+    channel: ReservationChannel.WEB,
     comboGroupId: overrides.comboGroupId ?? null,
-    scheduledStart: overrides.scheduledStart ?? new Date(),
-    scheduledEnd: overrides.scheduledEnd ?? new Date(),
-    status: 'CONFIRMADA',
-    finalPrice: { toString: () => '100' },
-    client: {
-      id: overrides.clientId ?? 'client-1',
-      name: 'Test',
-      phone: '123',
-    },
+    scheduledStart: overrides.scheduledStart,
+    scheduledEnd: overrides.scheduledEnd,
+    finalPrice: new Decimal(100),
+    finalDurationMinutes: 60,
+    valoracionPhotoReference: null,
+    valoracionRespondedAt: null,
+    checkedInAt: null,
+    completedAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
+    rescheduledFromId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    client: { id: clientId, name: 'Test', phone: '123' },
     treatment: { id: 't1', name: 'Tratamiento' },
     category: { id: 'c1', name: 'Categoría' },
   };
@@ -46,7 +65,6 @@ describe('isEffectivelyConsecutive', () => {
   });
 
   it('true si el hueco es solo el almuerzo (el caso real de "Combo3")', () => {
-    // 12pm a 2pm local, en un miércoles cualquiera
     expect(
       isEffectivelyConsecutive(
         new Date('2026-09-16T12:00:00'),
