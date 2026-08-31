@@ -1,8 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { AppModule } from '../../src/app.module';
-import { PrismaService } from '../../src/infrastructure/database/prisma.service';
-import { AvailabilityRepository } from '../../src/reservations/repositories/availability.repository';
+import { AppModule } from '../../../src/app.module';
+import { PrismaService } from 'src/infrastructure/database/prisma.service';
+import { AvailabilityRepository } from 'src/reservations/repositories/availability.repository';
 
 describe('Availability concurrency (e2e)', () => {
   let app: INestApplication;
@@ -25,7 +25,7 @@ describe('Availability concurrency (e2e)', () => {
     availabilityRepository = app.get(AvailabilityRepository);
 
     const category = await prisma.client.category.create({
-      data: { name: `Test Concurrency ${Date.now()}`, cooldownDays: 0 },
+      data: { name: `Test Concurrency ${Date.now()}` },
     });
     categoryId = category.id;
 
