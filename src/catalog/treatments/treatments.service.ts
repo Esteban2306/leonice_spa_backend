@@ -14,6 +14,10 @@ import {
   CATALOG_CACHE_TTL_SECONDS,
 } from '../constants/catalog-cache.constants';
 import { Decimal } from '@prisma/client/runtime/library';
+import { SetHairColorSurchargesDto } from './dto/set-hair-color-surcharges.dto';
+import { SetHairLengthPricingDto } from './dto/set-hair-length-pricing.dto';
+import { HairColor, HairLength } from '@prisma/client';
+import { combineHairPricing } from 'src/clients/domain/compute-treatment-pricing';
 
 interface RangeCheck {
   basePriceMin?: number | Decimal | null;
@@ -70,6 +74,101 @@ export class TreatmentsService {
     const treatment = await this.repository.update(id, dto);
     await this.invalidateCache();
     return treatment;
+  }
+
+  async setHairLengthPricing(
+    treatmentId: string,
+    entries: SetHairLengthPricingDto['entries'],
+  ) {
+    const treatment = await this.findOne(treatmentId);
+    if (!treatment.hasHairVariablePricing) {
+      throw new BadRequestException(
+        'Activa "hasHairVariablePricing" antes de configurar precios por largo de cabello',
+      );
+    }
+
+    const allLengths = Object.values(HairLength);
+    const provided = new Set(entries.map((e) => e.hairLength));
+    const missing = allLengths.filter((l) => !provided.has(l));
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Faltan precios para: ${missing.join(', ')}`,
+      );
+    }
+    if (provided.size !== entries.length) {
+      throw new BadRequestException(
+        'No puedes repetir el mismo largo de cabello más de una vez',
+      );
+    }
+
+    return this.repository.replaceHairLengthPricing(treatmentId, entries);
+  }
+
+  async setHairColorSurcharges(
+    treatmentId: string,
+    entries: SetHairColorSurchargesDto['entries'],
+  ) {
+    const treatment = await this.findOne(treatmentId);
+    if (!treatment.hasHairVariablePricing) {
+      throw new BadRequestException(
+        'Activa "hasHairVariablePricing" antes de configurar recargos por color',
+      );
+    }
+
+    const colors = entries.map((e) => e.hairColor);
+    if (new Set(colors).size !== colors.length) {
+      throw new BadRequestException(
+        'No puedes repetir el mismo color de cabello más de una vez',
+      );
+    }
+
+    return this.repository.replaceHairColorSurcharges(treatmentId, entries);
+  }
+
+  async getHairLengthPricing(id: string) {
+    await this.findOne(id);
+    const pricing = await this.repository.findHairLengthPricing(id);
+    if (pricing.length === 0) {
+      throw new BadRequestException(
+        'Este tratamiento no tiene precios configurados por largo de cabello',
+      );
+    }
+    return pricing;
+  }
+
+  async getHairColorSurcharges(id: string) {
+    await this.findOne(id);
+    return this.repository.findHairColorSurcharges(id);
+  }
+
+  async getHairPricingMatrix(treatmentId: string) {
+    const treatment = await this.findOne(treatmentId);
+    if (!treatment.hasHairVariablePricing) {
+      throw new BadRequestException(
+        'Este tratamiento no tiene precios variables por cabello',
+      );
+    }
+
+    const [lengthPricing, colorSurcharges] = await Promise.all([
+      this.repository.findHairLengthPricing(treatmentId),
+      this.repository.findHairColorSurcharges(treatmentId),
+    ]);
+
+    const allColors = Object.values(HairColor);
+    const matrix = lengthPricing.flatMap((lengthRow) =>
+      allColors.map((color) => ({
+        hairLength: lengthRow.hairLength,
+        hairColor: color,
+        ...combineHairPricing(
+          lengthPricing,
+          colorSurcharges,
+          lengthRow.hairLength,
+          color,
+        ),
+      })),
+    );
+
+    return { lengthPricing, colorSurcharges, matrix };
   }
 
   private assertConsistentRanges(data: RangeCheck) {
