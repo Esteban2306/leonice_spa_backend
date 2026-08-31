@@ -7,6 +7,8 @@ export interface CreateClientData {
   whatsappJid?: string;
   allergies?: string;
   isPregnant?: boolean;
+  hairLength?: HairLength;
+  hairColor?: HairColor;
 }
 
 export interface UpdateClientData {

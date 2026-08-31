@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard, seconds } from '@nestjs/throttler';
+import { ThrottlerModule, seconds } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import Redis from 'ioredis';
 import { validateEnv } from './config/env.validation';
@@ -19,6 +19,14 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ConduitModule } from './conduit/conduit.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ProductsModule } from './products/products.module';
+import { EventModule } from './common/events/event.module';
+import { QueueModule } from './infrastructure/queue/bullmq.module';
+import { AutomationModule } from './automation/automation.module';
+import {
+  CLIENT_BOOKING_RATE_LIMIT,
+  CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
+} from './reservations/domain/reservation-timing.constants';
+import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
 
 @Module({
   imports: [
@@ -32,8 +40,14 @@ import { ProductsModule } from './products/products.module';
       useFactory: (config: ConfigService) => ({
         throttlers: [
           {
+            name: 'default',
             ttl: seconds(60),
             limit: config.get<number>('THROTTLE_LIMIT', 100),
+          },
+          {
+            name: 'client-booking',
+            ttl: CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
+            limit: CLIENT_BOOKING_RATE_LIMIT,
           },
         ],
 
@@ -43,6 +57,7 @@ import { ProductsModule } from './products/products.module';
       }),
     }),
     EncryptionModule,
+    EventModule,
     RedisModule,
     PrismaModule,
     ContextModule,
@@ -53,12 +68,14 @@ import { ProductsModule } from './products/products.module';
     ConduitModule,
     ProductsModule,
     CatalogModule,
+    QueueModule,
+    AutomationModule,
   ],
   controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: ClientThrottlerGuard,
     },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

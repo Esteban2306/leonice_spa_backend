@@ -8,7 +8,7 @@ import {
 import Redis from 'ioredis';
 import { Public } from '../auth/decorators/public.decorator';
 import { PrismaService } from '../infrastructure/database/prisma.service';
-import { REDIS_CLIENT } from 'src/infrastructure/redis/redis.constants';
+import { REDIS_CLIENT } from '../../src/infrastructure/redis/redis.constants';
 
 @Controller('health')
 export class HealthController {

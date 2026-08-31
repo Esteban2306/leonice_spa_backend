@@ -1,0 +1,1 @@
+export const HAIR_PROFILE_VALID_MONTHS = 4;
