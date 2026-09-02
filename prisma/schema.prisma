@@ -118,6 +118,7 @@ model Client {
 
   consentRecords ConsentRecord[]
   reservations   Reservation[]
+  productViewLogs ProductViewLog[]
 
   @@index([createdAt])
   @@map("clients")
@@ -361,6 +362,8 @@ model Product {
   category ProductCategory  @relation(fields: [productCategoryId], references: [id])
   variants ProductVariant[]
   recommendations TreatmentProductRecommendation[]
+  tagAssignments ProductTagAssignment[]
+  viewLogs ProductViewLog[]
 
   @@index([productCategoryId])
   @@map("products")
@@ -413,4 +416,42 @@ model AutomationExecution {
   @@index([reservationId])
   @@index([clientId])
   @@map("automation_executions")
+}
+
+model ProductTag {
+  id          String                 @id @default(uuid())
+  name        String                 @unique
+  isActive    Boolean                @default(true) @map("is_active")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  assignments ProductTagAssignment[]
+
+  @@map("product_tags")
+}
+
+model ProductTagAssignment {
+  id        String     @id @default(uuid())
+  productId String     @map("product_id")
+  tagId     String     @map("tag_id")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  product Product    @relation(fields: [productId], references: [id])
+  tag     ProductTag @relation(fields: [tagId], references: [id])
+
+  @@unique([productId, tagId])
+  @@index([tagId])
+  @@map("product_tag_assignments")
+}
+
+model ProductViewLog {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  productId String   @map("product_id")
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([clientId, viewedAt])
+  @@index([productId])
+  @@map("product_view_logs")
 }

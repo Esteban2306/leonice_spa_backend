@@ -19,6 +19,10 @@ import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { CreateRecommendationDto } from './dto/create-recommendation.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { Public } from '../auth/decorators/public.decorator';
+import { AssignProductTagsDto } from './dto/assign-product-tags.dto';
+import { LogProductViewDto } from './dto/log-product-view.dto';
+import { SkipCsrf } from 'src/auth/decorators/skip-csrf.decorator';
+import { CreateProductTagDto } from './dto/create-product-tag.dto';
 
 @Controller({ path: 'products', version: '1' })
 export class ProductsController {
@@ -68,7 +72,7 @@ export class ProductsController {
   @Public()
   @Get()
   findAll(@Query() query: FindProductsQueryDto) {
-    return this.service.findAll(query.productCategoryId);
+    return this.service.findAll(query);
   }
 
   @Public()
@@ -106,5 +110,51 @@ export class ProductsController {
     @Body() dto: UpdateProductVariantDto,
   ) {
     return this.service.updateVariant(variantId, dto);
+  }
+
+  @Public()
+  @Get('tags')
+  findAllTags() {
+    return this.service.findAllTags();
+  }
+
+  @Post('tags')
+  createTag(@Body() dto: CreateProductTagDto) {
+    return this.service.createTag(dto);
+  }
+
+  @Public()
+  @Get('recommended-for-client')
+  findRecommendedForClient(@Query('phone') phone: string) {
+    return this.service.findRecommendedForClient(phone);
+  }
+
+  @Patch(':id/toggle')
+  toggleActive(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.toggleActive(id);
+  }
+
+  @Patch(':id/tags')
+  assignTags(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignProductTagsDto,
+  ) {
+    return this.service.assignTags(id, dto.tagIds);
+  }
+
+  @Public()
+  @Get(':id/related')
+  findRelated(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.findRelated(id);
+  }
+
+  @Public()
+  @SkipCsrf()
+  @Post(':id/view')
+  logView(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LogProductViewDto,
+  ) {
+    return this.service.logView(id, dto.phone);
   }
 }
