@@ -27,6 +27,7 @@ import {
   CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
 } from './reservations/domain/reservation-timing.constants';
 import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
+import { PromotionsModule } from './promotions/promotions.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { ClientThrottlerGuard } from './reservations/guards/client-throttler.gua
     CatalogModule,
     QueueModule,
     AutomationModule,
+    PromotionsModule,
   ],
   controllers: [HealthController],
   providers: [

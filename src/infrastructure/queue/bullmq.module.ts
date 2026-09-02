@@ -16,7 +16,22 @@ import { QUEUE_NAMES } from './queue.constants';
         },
       }),
     }),
-    BullModule.registerQueue({ name: QUEUE_NAMES.RESERVATION_TIMEOUTS }),
+    BullModule.registerQueue(
+      {
+        name: QUEUE_NAMES.RESERVATION_TIMEOUTS,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2_000 },
+        },
+      },
+      {
+        name: QUEUE_NAMES.AUTOMATION_COMMUNICATIONS,
+        defaultJobOptions: {
+          attempts: 4,
+          backoff: { type: 'exponential', delay: 5_000 },
+        },
+      },
+    ),
   ],
   exports: [BullModule],
 })

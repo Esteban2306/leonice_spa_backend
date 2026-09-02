@@ -32,7 +32,7 @@ export class ReservationsRepository {
   ) {
     return client.reservation.findUnique({
       where: { id },
-      include: { client: { select: { phone: true } } },
+      include: { client: { select: { phone: true, name: true } } },
     });
   }
 
@@ -98,6 +98,22 @@ export class ReservationsRepository {
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
         scheduledStart: { gte: dayStart, lt: dayEnd },
         ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
+      },
+    });
+    return count > 0;
+  }
+
+  async hasMoreRecentActivityInCategory(
+    clientId: string,
+    categoryId: string,
+    since: Date,
+  ): Promise<boolean> {
+    const count = await this.prisma.client.reservation.count({
+      where: {
+        clientId,
+        categoryId,
+        status: { notIn: HOLDING_EXCLUDED_STATUSES },
+        OR: [{ scheduledStart: { gt: since } }, { completedAt: { gt: since } }],
       },
     });
     return count > 0;

@@ -19,6 +19,6 @@ import { ConfigService } from '@nestjs/config';
     ConsentRecordRepository,
     ConfigService,
   ],
-  exports: [ClientsService, ClientsRepository],
+  exports: [ClientsService, ClientsRepository, ConsentService],
 })
 export class ClientsModule {}

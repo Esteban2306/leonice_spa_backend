@@ -1,25 +1,22 @@
 import {
-  Reservation,
+  DepositRecord,
   ReservationChannel,
   ReservationStatus,
 } from '@prisma/client';
 import {
   groupReservationsForDisplay,
   isEffectivelyConsecutive,
+  ReservationWithRelations,
 } from './group-reservations-for-display';
 import { Decimal } from '@prisma/client/runtime/library';
 
-export type ReservationWithRelations = Reservation & {
-  client: { id: string; name: string; phone: string };
-  treatment: { id: string; name: string };
-  category: { id: string; name: string };
-};
 interface FakeReservationOverrides {
   id: string;
   clientId?: string;
   comboGroupId?: string | null;
   scheduledStart: Date;
   scheduledEnd: Date;
+  deposit?: DepositRecord[];
 }
 
 function fakeReservation(
@@ -51,6 +48,7 @@ function fakeReservation(
     client: { id: clientId, name: 'Test', phone: '123' },
     treatment: { id: 't1', name: 'Tratamiento' },
     category: { id: 'c1', name: 'Categoría' },
+    deposit: overrides.deposit ?? [],
   };
 }
 

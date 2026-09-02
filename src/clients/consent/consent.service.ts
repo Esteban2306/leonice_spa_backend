@@ -23,6 +23,10 @@ export class ConsentService {
     }
   }
 
+  async hasMarketingConsent(clientId: string): Promise<boolean> {
+    return this.repository.hasAnyOfType(clientId, ConsentType.MARKETING);
+  }
+
   async recordHealthDataConsent(
     clientId: string,
     policyVersion: string,
