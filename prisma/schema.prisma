@@ -65,6 +65,21 @@ enum HairColor {
   OSCURO
 }
 
+enum AutomationExecutionType {
+  VALORACION_TIMEOUT
+  DEPOSITO_TIMEOUT
+  NO_SHOW_CHECK
+  RESERVATION_REMINDER
+  REACTIVATION
+}
+
+enum AutomationExecutionResult {
+  EXECUTED
+  SKIPPED
+  FAILED
+}
+
+
 model User {
   id                  String  @id() @default(uuid()) 
   email               String    @unique
@@ -294,6 +309,9 @@ model AutomationRule {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
+  promotionId String?    @map("promotion_id")
+  promotion   Promotion? @relation(fields: [promotionId], references: [id])
+
   treatment Treatment? @relation(fields: [treatmentId], references: [id])
   category  Category?  @relation(fields: [categoryId], references: [id])
 
@@ -313,6 +331,8 @@ model Promotion {
 
   treatment Treatment? @relation(fields: [treatmentId], references: [id])
   category  Category?  @relation(fields: [categoryId], references: [id])
+  executions AutomationExecution[]
+  automationRules AutomationRule[]
 
   @@index([startsAt, endsAt])
   @@map("promotions")
@@ -373,4 +393,24 @@ model TreatmentProductRecommendation {
 
   @@unique([treatmentId, productId])
   @@map("treatment_product_recommendations")
+}
+
+model AutomationExecution {
+  id                String                     @id @default(uuid())
+  type              AutomationExecutionType
+  result            AutomationExecutionResult
+  reservationId     String?                    @map("reservation_id")
+  clientId          String?                    @map("client_id")
+  automationRuleId  String?                    @map("automation_rule_id")
+  reason            String?
+  errorMessage      String?                    @map("error_message")
+  executedAt        DateTime                   @default(now()) @map("executed_at")
+
+  promotionId String?    @map("promotion_id")
+  promotion   Promotion? @relation(fields: [promotionId], references: [id])
+
+  @@index([type, executedAt])
+  @@index([reservationId])
+  @@index([clientId])
+  @@map("automation_executions")
 }
