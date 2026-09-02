@@ -155,10 +155,4 @@ export class ReservationsController {
       dto.finalDurationMinutes,
     );
   }
-
-  // TEMPORAL — ver ConfirmDepositOrchestrator
-  @Patch(':id/confirm-deposit')
-  confirmDeposit(@Param('id', ParseUUIDPipe) id: string) {
-    return this.confirmDepositOrchestrator.execute(id);
-  }
 }

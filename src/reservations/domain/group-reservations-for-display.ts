@@ -1,11 +1,24 @@
-import { Reservation } from '@prisma/client';
+import {
+  DepositCoverage,
+  DepositRecord,
+  DepositStatus,
+  Reservation,
+  ReservationStatus,
+} from '@prisma/client';
 import { getOperatingWindowsForDate } from './operating-hours';
 
-type ReservationWithRelations = Reservation & {
+export type ReservationWithRelations = Reservation & {
   client: { id: string; name: string; phone: string };
   treatment: { id: string; name: string };
   category: { id: string; name: string };
+  deposit: DepositRecord[];
 };
+
+export interface LatestDepositSummary {
+  status: DepositStatus;
+  coverage: DepositCoverage | null;
+  imageUrl: string | null;
+}
 
 export interface GroupedReservation {
   isCombo: boolean;
@@ -19,7 +32,35 @@ export interface GroupedReservation {
     scheduledStart: Date;
     scheduledEnd: Date;
     finalPrice: string;
+    latestDeposit: LatestDepositSummary | null;
+    hasUnresolvedDeposit: boolean;
   }>;
+}
+
+function toLatestDepositSummary(
+  deposits: DepositRecord[],
+): LatestDepositSummary | null {
+  const [latest] = deposits;
+  return latest
+    ? {
+        status: latest.status,
+        coverage: latest.coverage,
+        imageUrl: latest.imageUrl,
+      }
+    : null;
+}
+
+export function computeHasUnresolvedDeposit(
+  status: ReservationStatus,
+  deposits: DepositRecord[],
+): boolean {
+  const [latest] = deposits;
+  if (!latest) return false;
+  const reservationDidNotHappen =
+    status === ReservationStatus.NO_SHOW ||
+    status === ReservationStatus.CANCELADA;
+  const moneyWasAccepted = latest.status === DepositStatus.CONFIRMADO;
+  return reservationDidNotHappen && moneyWasAccepted;
 }
 
 export function isEffectivelyConsecutive(
@@ -104,6 +145,8 @@ export function groupReservationsForDisplay(
         scheduledStart: r.scheduledStart,
         scheduledEnd: r.scheduledEnd,
         finalPrice: r.finalPrice.toString(),
+        latestDeposit: toLatestDepositSummary(r.deposit),
+        hasUnresolvedDeposit: computeHasUnresolvedDeposit(r.status, r.deposit),
       })),
   }));
 }

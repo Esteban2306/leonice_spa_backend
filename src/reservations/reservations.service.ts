@@ -8,7 +8,10 @@ import { ReservationsRepository } from './repositories/reservations.repository';
 import { formatLocalTime } from './domain/format-local-time';
 import { FindReservationsQueryDto } from './dto/find-reservations-query.dto';
 import { getDayBoundaries } from './domain/day-boundaries';
-import { groupReservationsForDisplay } from './domain/group-reservations-for-display';
+import {
+  computeHasUnresolvedDeposit,
+  groupReservationsForDisplay,
+} from './domain/group-reservations-for-display';
 
 const AVAILABILITY_CACHE_TTL_SECONDS = 10;
 
@@ -62,7 +65,15 @@ export class ReservationsService {
       categoryId: query.categoryId,
       clientId: query.clientId,
     });
-    return groupReservationsForDisplay(reservations);
+
+    const filtered =
+      query.hasUnresolvedDeposit === true
+        ? reservations.filter((r) =>
+            computeHasUnresolvedDeposit(r.status, r.deposit),
+          )
+        : reservations;
+
+    return groupReservationsForDisplay(filtered);
   }
 
   private async computeAvailability(

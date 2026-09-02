@@ -7,6 +7,7 @@ import compression from 'compression';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { StructuredLoggerService } from './common/logging/structured-logger.service';
+import { json } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -34,6 +35,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  app.use(json({ limit: '10mb' }));
 
   app.setGlobalPrefix('api');
   app.enableVersioning({

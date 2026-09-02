@@ -1,5 +1,12 @@
-import { IsDateString, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsUUID,
+} from 'class-validator';
 import { ReservationStatus } from '@prisma/client';
+import { Transform } from 'class-transformer';
 
 export class FindReservationsQueryDto {
   @IsOptional()
@@ -17,4 +24,9 @@ export class FindReservationsQueryDto {
   @IsOptional()
   @IsUUID()
   clientId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  hasUnresolvedDeposit?: boolean;
 }

@@ -78,6 +78,7 @@ export class ReservationsRepository {
         client: { select: { id: true, name: true, phone: true } },
         treatment: { select: { id: true, name: true } },
         category: { select: { id: true, name: true } },
+        deposit: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
   }

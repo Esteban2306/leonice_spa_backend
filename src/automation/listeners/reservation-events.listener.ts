@@ -31,6 +31,18 @@ export class ReservationEventsListener {
     );
   }
 
+  @OnEvent(EVENT_TYPES.DEPOSIT_SUBMITTED_FOR_REVIEW)
+  handleDepositSubmittedForReview(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.DEPOSIT_SUBMITTED_FOR_REVIEW
+    >,
+  ) {
+    this.logger.warn(
+      `Comprobante nuevo para revisar — reserva ${event.payload.reservationId}, cliente ${event.payload.clientPhone}: ${event.payload.imageUrl}`,
+    );
+  }
+
   @OnEvent(EVENT_TYPES.RESERVATION_CANCELLED)
   handleCancelled(
     event: EventOf<EventPayloadMap, typeof EVENT_TYPES.RESERVATION_CANCELLED>,

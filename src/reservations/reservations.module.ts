@@ -38,6 +38,7 @@ import { AdminCancelReservationOrchestrator } from './orchestrators/admin-cancel
     ReservationsRepository,
     CancelReservationOrchestrator,
     MarkNoShowOrchestrator,
+    ConfirmDepositOrchestrator,
   ],
 })
 export class ReservationsModule {}
