@@ -42,6 +42,11 @@ enum DepositVerificationMethod {
   AUTOMATICO
 }
 
+enum DepositCoverage {
+  ANTICIPO
+  PAGO_COMPLETO
+}
+
 enum ConsentType {
   DATOS_SALUD
   MARKETING
@@ -135,6 +140,8 @@ model Category {
 
   @@map("categories")
 }
+
+
 
 model CapacityPool {
   id            String   @id @default(uuid())
@@ -248,7 +255,7 @@ model Reservation {
   client    Client         @relation(fields: [clientId], references: [id])
   category  Category       @relation(fields: [categoryId], references: [id])
   treatment Treatment      @relation(fields: [treatmentId], references: [id])
-  deposit   DepositRecord?
+  deposit   DepositRecord[]
 
   @@index([categoryId, status, scheduledStart, scheduledEnd])
   @@index([comboGroupId])
@@ -257,20 +264,23 @@ model Reservation {
 }
 
 model DepositRecord {
-  id               String                    @id @default(uuid())
-  reservationId    String                    @unique @map("reservation_id")
-  amount           Decimal                   @db.Decimal(10, 2)
-  status           DepositStatus             @default(PENDIENTE)
-  method           DepositVerificationMethod
-  reference        String?
-  verifiedByUserId String?                   @map("verified_by_user_id")
-  verifiedAt       DateTime?                 @map("verified_at")
-  createdAt        DateTime                  @default(now()) @map("created_at")
-  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  id                String                    @id @default(uuid())
+  reservationId     String                    @map("reservation_id")
+  method            DepositVerificationMethod
+  status            DepositStatus             @default(PENDIENTE)
+  coverage          DepositCoverage?
+  imageUrl          String?                   @map("image_url")
+  imageCloudinaryId String?                   @map("image_cloudinary_id")
+  verifiedByUserId  String?                   @map("verified_by_user_id")
+  verifiedAt        DateTime?                 @map("verified_at")
+  rejectionReason   String?                   @map("rejection_reason")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
 
   reservation    Reservation @relation(fields: [reservationId], references: [id])
   verifiedByUser User?       @relation(fields: [verifiedByUserId], references: [id])
 
+  @@index([reservationId, createdAt])
   @@map("deposit_records")
 }
 
