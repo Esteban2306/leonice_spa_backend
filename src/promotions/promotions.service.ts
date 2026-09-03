@@ -22,6 +22,10 @@ export class PromotionsService {
     return promotion;
   }
 
+  async findAllCurrentlyValid() {
+    return this.repository.findMany({ currentlyValid: true });
+  }
+
   async create(dto: CreatePromotionDto) {
     this.assertExactlyOneTarget(dto.treatmentId, dto.categoryId);
     const startsAt = new Date(dto.startsAt);

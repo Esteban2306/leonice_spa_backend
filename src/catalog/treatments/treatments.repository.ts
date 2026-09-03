@@ -2,7 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
-import { HairColor, HairLength } from '@prisma/client';
+import { HairColor, HairLength, Prisma } from '@prisma/client';
+
+const treatmentWithRelationsArgs = {
+  include: {
+    category: { select: { id: true, name: true } },
+    hairLengthPricing: true,
+    hairColorSurcharges: true,
+  },
+} satisfies Prisma.TreatmentDefaultArgs;
+
+export type TreatmentWithRelations = Prisma.TreatmentGetPayload<
+  typeof treatmentWithRelationsArgs
+>;
 
 @Injectable()
 export class TreatmentsRepository {
@@ -12,14 +24,14 @@ export class TreatmentsRepository {
     return this.prisma.client.treatment.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
-      include: { category: { select: { id: true, name: true } } },
+      ...treatmentWithRelationsArgs,
     });
   }
 
   findById(id: string) {
     return this.prisma.client.treatment.findUnique({
       where: { id },
-      include: { category: { select: { id: true, name: true } } },
+      ...treatmentWithRelationsArgs,
     });
   }
 

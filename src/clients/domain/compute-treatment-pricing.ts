@@ -5,6 +5,7 @@ import {
   TreatmentHairColorSurcharge,
   TreatmentHairLengthPricing,
   Client,
+  Promotion,
 } from '@prisma/client';
 import { isHairProfileValid } from '../../clients/domain/hair-profile.util';
 
@@ -97,5 +98,17 @@ export function determineTreatmentPricing(
       client.hairColor!,
     ),
     forcesAssessment: treatment.requiresPriorAssessment,
+  };
+}
+
+export function applyPromotionDiscount(
+  pricing: PricingResult,
+  promotion: Promotion | null,
+): PricingResult {
+  if (!promotion) return pricing;
+  const discount = Number(promotion.discountPercentage) / 100;
+  return {
+    ...pricing,
+    price: Number((pricing.price * (1 - discount)).toFixed(2)),
   };
 }

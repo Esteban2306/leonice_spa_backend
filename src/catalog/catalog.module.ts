@@ -8,8 +8,10 @@ import { TreatmentsRepository } from './treatments/treatments.repository';
 import { CapacityPoolsController } from './capacity-pools/capacity-pools.controller';
 import { CapacityPoolsService } from './capacity-pools/capacity-pools.service';
 import { CapacityPoolsRepository } from './capacity-pools/capacity-pools.repository';
+import { PromotionsModule } from 'src/promotions/promotions.module';
 
 @Module({
+  imports: [PromotionsModule],
   controllers: [
     CategoriesController,
     TreatmentsController,

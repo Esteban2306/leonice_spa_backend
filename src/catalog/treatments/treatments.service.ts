@@ -4,7 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TreatmentsRepository } from './treatments.repository';
+import {
+  TreatmentsRepository,
+  TreatmentWithRelations,
+} from './treatments.repository';
 import { CategoriesService } from '../categories/categories.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
@@ -16,8 +19,10 @@ import {
 import { Decimal } from '@prisma/client/runtime/library';
 import { SetHairColorSurchargesDto } from './dto/set-hair-color-surcharges.dto';
 import { SetHairLengthPricingDto } from './dto/set-hair-length-pricing.dto';
-import { HairColor, HairLength } from '@prisma/client';
+import { HairColor, HairLength, Promotion } from '@prisma/client';
 import { combineHairPricing } from 'src/clients/domain/compute-treatment-pricing';
+import { PromotionsService } from 'src/promotions/promotions.service';
+import { resolveApplicablePromotion } from 'src/promotions/domain/resolve-applicable-promotion';
 
 interface RangeCheck {
   basePriceMin?: number | Decimal | null;
@@ -32,23 +37,31 @@ export class TreatmentsService {
     private readonly repository: TreatmentsRepository,
     private readonly categoriesService: CategoriesService,
     private readonly cache: SafeCacheService,
+    private readonly promotionsService: PromotionsService,
   ) {}
 
   async findAll(categoryId?: string) {
-    const cached = await this.cache.get<Array<{ categoryId: string }>>(
+    const cached = await this.cache.get<TreatmentWithRelations[]>(
       CATALOG_CACHE_KEYS.treatments,
     );
     const treatments = cached ?? (await this.loadAndCacheAll());
 
-    return categoryId
+    const filtered = categoryId
       ? treatments.filter((t) => t.categoryId === categoryId)
       : treatments;
+
+    const activePromotions =
+      await this.promotionsService.findAllCurrentlyValid();
+    return filtered.map((t) => this.withPromotion(t, activePromotions));
   }
 
   async findOne(id: string) {
     const treatment = await this.repository.findById(id);
     if (!treatment) throw new NotFoundException('Tratamiento no encontrado');
-    return treatment;
+
+    const activePromotions =
+      await this.promotionsService.findAllCurrentlyValid();
+    return this.withPromotion(treatment, activePromotions);
   }
 
   async create(dto: CreateTreatmentDto) {
@@ -200,6 +213,34 @@ export class TreatmentsService {
       CATALOG_CACHE_TTL_SECONDS,
     );
     return treatments;
+  }
+
+  private withPromotion(
+    treatment: TreatmentWithRelations,
+    activePromotions: Promotion[],
+  ) {
+    const promo = resolveApplicablePromotion(activePromotions, {
+      treatmentId: treatment.id,
+      categoryId: treatment.categoryId,
+    });
+    if (!promo) return { ...treatment, activePromotion: null };
+
+    const discount = Number(promo.discountPercentage) / 100;
+    const applyDiscount = (price: unknown) =>
+      price != null
+        ? Number((Number(price) * (1 - discount)).toFixed(2))
+        : null;
+
+    return {
+      ...treatment,
+      activePromotion: {
+        id: promo.id,
+        name: promo.name,
+        discountPercentage: promo.discountPercentage.toString(),
+      },
+      effectiveBasePriceMin: applyDiscount(treatment.basePriceMin),
+      effectiveBasePriceMax: applyDiscount(treatment.basePriceMax),
+    };
   }
 
   private async invalidateCache() {

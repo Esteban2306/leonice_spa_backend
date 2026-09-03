@@ -14,9 +14,10 @@ import { ClientsModule } from '../clients/clients.module';
 import { ConfirmValoracionOrchestrator } from './orchestrators/confirm-valoracion.orchestrator';
 import { AdminRescheduleReservationOrchestrator } from './orchestrators/admin-reservartion.orchestator';
 import { AdminCancelReservationOrchestrator } from './orchestrators/admin-cancel-reservation.orchestrator';
+import { PromotionsModule } from 'src/promotions/promotions.module';
 
 @Module({
-  imports: [ClientsModule],
+  imports: [ClientsModule, PromotionsModule],
   controllers: [ReservationsController],
   providers: [
     ReservationsService,

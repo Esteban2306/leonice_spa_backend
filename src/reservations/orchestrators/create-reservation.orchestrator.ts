@@ -47,6 +47,9 @@ import {
 } from '../domain/reservation-booking-summary';
 import { assertNoDuplicateTreatmentsInRequest } from '../validators/assert-no-duplicate-treatments-in-request';
 import { determineTreatmentPricing } from 'src/catalog/treatments/validators/compute-treatment-pricing';
+import { PromotionsService } from 'src/promotions/promotions.service';
+import { resolveApplicablePromotion } from 'src/promotions/domain/resolve-applicable-promotion';
+import { applyPromotionDiscount } from 'src/clients/domain/compute-treatment-pricing';
 
 export interface CreateReservationResult {
   reservations: Reservation[];
@@ -61,6 +64,7 @@ export class CreateReservationOrchestrator {
     private readonly reservationsRepository: ReservationsRepository,
     private readonly clientService: ClientsService,
     private readonly eventBus: EventBusService,
+    private readonly promotionsService: PromotionsService,
     @InjectQueue(QUEUE_NAMES.RESERVATION_TIMEOUTS)
     private readonly timeoutsQueue: Queue,
   ) {}
@@ -91,16 +95,24 @@ export class CreateReservationOrchestrator {
     const requestedStart = new Date(dto.scheduledStart);
     validateAdvancedWindow(requestedStart);
 
+    const activePromotions =
+      await this.promotionsService.findAllCurrentlyValid();
+
     const timingInputs: TreatmentTimingInput[] = treatments.map((t) => {
       const pricing = determineTreatmentPricing(t, client);
+      const promo = resolveApplicablePromotion(activePromotions, {
+        treatmentId: t.id,
+        categoryId: t.categoryId,
+      });
+      const finalPricing = applyPromotionDiscount(pricing, promo);
       return {
         treatmentId: t.id,
         treatmentName: t.name,
         categoryId: t.categoryId,
         categoryName: t.category.name,
         isPrincipal: t.category.isPrincipal,
-        durationMinutes: pricing.durationMinutes,
-        price: pricing.price,
+        durationMinutes: finalPricing.durationMinutes,
+        price: finalPricing.price,
         forcesAssessment: t.requiresPriorAssessment || pricing.forcesAssessment,
         needsHairProfile: pricing.needsHairProfile,
       };
