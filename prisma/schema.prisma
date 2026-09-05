@@ -79,6 +79,19 @@ enum AutomationExecutionResult {
   FAILED
 }
 
+enum ConduitMessageStatus {
+  SENT
+  FAILED
+  DEAD
+  CANCELLED
+}
+
+enum ConduitOutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 
 model User {
   id                  String  @id() @default(uuid()) 
@@ -454,4 +467,36 @@ model ProductViewLog {
   @@index([clientId, viewedAt])
   @@index([productId])
   @@map("product_view_logs")
+}
+
+model ConduitMessageDeliveryLog {
+  id                 String               @id @default(uuid())
+  messageId          String               @map("message_id")
+  status             ConduitMessageStatus
+  channel            String?
+  recipient          String?
+  provider           String?
+  providerMessageId  String?              @map("provider_message_id")
+  errorMessage       String?              @map("error_message")
+  companyEventId     String?              @map("company_event_id")
+  rawPayload         Json                 @map("raw_payload")
+  receivedAt         DateTime             @default(now()) @map("received_at")
+
+  @@unique([messageId, status])
+  @@index([companyEventId])
+  @@map("conduit_message_delivery_logs")
+}
+
+model ConduitOutboxEvent {
+  id        String              @id @default(uuid())
+  eventType String              @map("event_type")
+  payload   Json
+  status    ConduitOutboxStatus @default(PENDING)
+  attempts  Int                 @default(0)
+  lastError String?             @map("last_error")
+  createdAt DateTime            @default(now()) @map("created_at")
+  sentAt    DateTime?           @map("sent_at")
+
+  @@index([status, createdAt])
+  @@map("conduit_outbox_events")
 }

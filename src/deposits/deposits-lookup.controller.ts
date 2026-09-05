@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { ConduitToolAuthGuard } from './guards/conduit-tool-auth.guard';
+import { ConduitToolAuthGuard } from '../conduit/guards/conduit-tool-auth.guard';
 import { PendingDepositLookupService } from './services/pending-deposit-lookup.service';
 import { SubmitDepositProofOrchestrator } from './orchestrator/submit-deposit-proof.orchestrator';
 import { AutomaticDepositVerificationStrategy } from './strategies/automatic-deposit-verification.strategy';

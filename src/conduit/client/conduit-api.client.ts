@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BrokenCircuitError } from 'cockatiel';
-import { conduitSendPolicy } from '../resilience/conduit-resilience.policy';
+import {
+  conduitSendPolicy,
+  conduitEventPushPolicy,
+} from '../resilience/conduit-resilience.policy';
+import { signConduitEvent } from '../../common/conduit-security/sign-conduit-event';
 
 export interface SendWhatsappMessageParams {
   phone: string;
-  templateName: string;
+  templateId: string;
   variables: Record<string, string>;
 }
 
@@ -33,9 +37,18 @@ export class ConduitApiClient {
   async sendWhatsappMessage(
     params: SendWhatsappMessageParams,
   ): Promise<SendResult> {
+    const connectionId = this.config.getOrThrow<string>(
+      'CONDUIT_WHATSAPP_CONNECTION_ID',
+    );
+
     try {
       await conduitSendPolicy.execute(() =>
-        this.post('/messages/send', params),
+        this.post('/api/v1/messages', {
+          recipient: { channel: 'WHATSAPP', address: params.phone },
+          connectionId,
+          template: { id: params.templateId },
+          variables: params.variables,
+        }),
       );
       return { delivered: true };
     } catch (error) {
@@ -45,7 +58,6 @@ export class ConduitApiClient {
         );
         return { delivered: false };
       }
-
       this.logger.warn(
         `Mensaje a ${params.phone} no enviado: ${(error as Error).message}`,
       );
@@ -53,12 +65,47 @@ export class ConduitApiClient {
     }
   }
 
+  async pushBusinessEvent(params: {
+    eventType: string;
+    eventId: string;
+    payload: unknown;
+  }): Promise<void> {
+    const integrationId = this.config.getOrThrow<string>(
+      'CONDUIT_INTEGRATION_ID',
+    );
+    const integrationSecret = this.config.getOrThrow<string>(
+      'CONDUIT_INTEGRATION_SECRET',
+    );
+    const botId = this.config.getOrThrow<string>('CONDUIT_DEFAULT_BOT_ID');
+
+    const signed = signConduitEvent({
+      payload: params.payload,
+      integrationId,
+      integrationSecret,
+      eventId: params.eventId,
+    });
+    const url = `${this.baseUrl}/api/v1/api/external-data/${botId}/webhook/${params.eventType}`;
+
+    await conduitEventPushPolicy.execute(async () => {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: signed.headers,
+        body: signed.rawBody,
+      });
+      if (!res.ok) {
+        throw new Error(
+          `Conduit respondió ${res.status} al recibir "${params.eventType}": ${await res.text()}`,
+        );
+      }
+    });
+  }
+
   private async post<T>(path: string, body: unknown): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
+        'X-API-Key': this.apiKey,
       },
       body: JSON.stringify(body),
     });

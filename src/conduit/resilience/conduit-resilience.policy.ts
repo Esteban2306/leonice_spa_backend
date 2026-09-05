@@ -42,3 +42,9 @@ export const conduitQueryPolicy = wrap(
   retry(handleAll, { maxAttempts: 2, backoff: new ExponentialBackoff() }),
   conduitTimeout,
 );
+
+export const conduitEventPushPolicy = wrap(
+  conduitBreaker,
+  retry(handleAll, { maxAttempts: 3, backoff: new ExponentialBackoff() }),
+  conduitTimeout,
+);

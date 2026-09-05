@@ -31,6 +31,13 @@ import { QUEUE_NAMES } from './queue.constants';
           backoff: { type: 'exponential', delay: 5_000 },
         },
       },
+      {
+        name: QUEUE_NAMES.CONDUIT_OUTBOX,
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: { type: 'exponential', delay: 5_000 },
+        },
+      },
     ),
   ],
   exports: [BullModule],

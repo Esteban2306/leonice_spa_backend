@@ -1,6 +1,7 @@
 export const QUEUE_NAMES = {
   RESERVATION_TIMEOUTS: 'reservation-timeouts',
   AUTOMATION_COMMUNICATIONS: 'automation-communications',
+  CONDUIT_OUTBOX: 'conduit-outbox',
 } as const;
 
 export const JOB_NAMES = {
@@ -12,4 +13,7 @@ export const JOB_NAMES = {
   // Comunicación saliente — corre en AUTOMATION_COMMUNICATIONS
   RESERVATION_REMINDER_CHECK: 'reservation-reminder-check',
   REACTIVATION_CHECK: 'reactivation-check',
+
+  // Conduit - corre en CONDUIT_OUTBOX
+  PUBLISH_CONDUIT_EVENT: 'publish-conduit-event',
 } as const;

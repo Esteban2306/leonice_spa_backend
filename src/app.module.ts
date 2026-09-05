@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, seconds } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import Redis from 'ioredis';
+import type { Request } from 'express';
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './infrastructure/database/prisma.module';
@@ -28,6 +29,9 @@ import {
 } from './reservations/domain/reservation-timing.constants';
 import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
 import { PromotionsModule } from './promotions/promotions.module';
+import { IdempotencyModule } from './common/idempotency/idempotency.module';
+import { DepositsModule } from './deposits/deposits.module';
+import { CloudinaryModule } from './infrastructure/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -55,9 +59,17 @@ import { PromotionsModule } from './promotions/promotions.module';
         storage: new ThrottlerStorageRedisService(
           new Redis(config.getOrThrow<string>('REDIS_URL')),
         ),
+
+        skipIf: (context) => {
+          const req = context.switchToHttp().getRequest<Request>();
+          const providedKey = req.headers['x-api-key'];
+          const conduitKey = config.get<string>('CONDUIT_TOOL_API_KEY');
+          return Boolean(conduitKey && providedKey === conduitKey);
+        },
       }),
     }),
     EncryptionModule,
+    CloudinaryModule,
     EventModule,
     RedisModule,
     PrismaModule,
@@ -72,6 +84,8 @@ import { PromotionsModule } from './promotions/promotions.module';
     QueueModule,
     AutomationModule,
     PromotionsModule,
+    IdempotencyModule,
+    DepositsModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -35,8 +35,10 @@ import { PromotionsModule } from 'src/promotions/promotions.module';
     AdminCancelReservationOrchestrator,
   ],
   exports: [
+    ReservationsService,
     AvailabilityRepository,
     ReservationsRepository,
+    CreateReservationOrchestrator,
     CancelReservationOrchestrator,
     MarkNoShowOrchestrator,
     ConfirmDepositOrchestrator,

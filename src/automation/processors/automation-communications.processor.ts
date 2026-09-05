@@ -17,6 +17,7 @@ import { assertMessageDelivered } from '../utils/assert-message-delivered';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { ReactivationJobData } from '../listeners/schedule-reactivation.listener';
 import { ConsentService } from 'src/clients/consent/consent.service';
+import { CONDUIT_TEMPLATE_IDS } from '../domain/conduit-template-ids.constants';
 
 interface ReminderJobData {
   reservationId: string;
@@ -175,9 +176,9 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
 
     const result = await this.conduitApiClient.sendWhatsappMessage({
       phone: client.phone,
-      templateName: hasValidPromo
-        ? 'reactivacion_con_promocion'
-        : 'reactivacion_cliente',
+      templateId: hasValidPromo
+        ? CONDUIT_TEMPLATE_IDS.REACTIVATION_WITH_PROMO
+        : CONDUIT_TEMPLATE_IDS.REACTIVATION,
       variables: hasValidPromo
         ? {
             nombre: client.name,
@@ -234,7 +235,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
 
     const result = await this.conduitApiClient.sendWhatsappMessage({
       phone: reservation.client.phone,
-      templateName: 'recordatorio_cita',
+      templateId: CONDUIT_TEMPLATE_IDS.RESERVATION_REMINDER,
       variables: {
         nombre: reservation.client.name,
         fecha: reservation.scheduledStart.toISOString(),

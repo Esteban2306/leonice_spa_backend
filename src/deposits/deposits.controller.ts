@@ -29,9 +29,10 @@ import { DepositsRepository } from './repositories/deposits.repositories';
 import { ManualDepositVerificationStrategy } from './strategies/manual-deposit-verification.strategy';
 import { AutomaticDepositVerificationStrategy } from './strategies/automatic-deposit-verification.strategy';
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
-import { ConduitToolAuthGuard } from './guards/conduit-tool-auth.guard';
+import { ConduitToolAuthGuard } from '../conduit/guards/conduit-tool-auth.guard';
 import { SubmitDepositProofDto } from './dto/submit-deposit-proof.dto';
 import { assertValidImageDataUri } from './validators/assert-valid-image-data-uri';
+import { IdempotencyInterceptor } from 'src/common/idempotency/idempotency.interceptor';
 
 const IMAGE_UPLOAD_OPTIONS = {
   storage: memoryStorage(),
@@ -87,6 +88,7 @@ export class DepositsController {
   }
 
   @UseGuards(ConduitToolAuthGuard)
+  @UseInterceptors(IdempotencyInterceptor)
   @Post('automatic')
   async submitAutomaticProof(
     @Param('id', ParseUUIDPipe) reservationId: string,

@@ -9,6 +9,8 @@ import { RejectDepositOrchestrator } from './orchestrator/reject-deposit.orchest
 import { ReservationsModule } from '../reservations/reservations.module';
 import { DepositsLookupController } from './deposits-lookup.controller';
 import { PendingDepositLookupService } from './services/pending-deposit-lookup.service';
+import { ClientsRepository } from 'src/clients/repositories/clients.repository';
+import { EncryptionService } from 'src/infrastructure/encryption/encryption.service';
 
 @Module({
   imports: [ReservationsModule],
@@ -20,6 +22,8 @@ import { PendingDepositLookupService } from './services/pending-deposit-lookup.s
     SubmitDepositProofOrchestrator,
     ApproveDepositOrchestrator,
     RejectDepositOrchestrator,
+    EncryptionService,
+    ClientsRepository,
     PendingDepositLookupService,
   ],
 })
