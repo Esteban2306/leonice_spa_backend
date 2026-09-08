@@ -500,3 +500,15 @@ model ConduitOutboxEvent {
   @@index([status, createdAt])
   @@map("conduit_outbox_events")
 }
+
+model ConduitIdempotencyKey {
+  id             String   @id @default(uuid())
+  key            String   @unique
+  operation      String   @map("operation")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([operation])
+  @@map("conduit_idempotency_keys")
+}

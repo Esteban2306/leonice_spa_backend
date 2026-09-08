@@ -1,6 +1,8 @@
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
@@ -8,9 +10,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ConsentType, HairColor, HairLength } from '@prisma/client';
-import { Type } from 'class-transformer';
 
-export class ConduitConsentDto {
+class ConduitConsentDto {
   @IsEnum(ConsentType)
   type: ConsentType;
 
@@ -21,11 +22,22 @@ export class ConduitConsentDto {
   policyVersion: string;
 }
 
-export class ConduitUpdateClientDto {
+export class ConduitCreateClientDto {
   @IsString()
   @MinLength(10)
   phone: string;
 
+  @IsOptional()
+  @IsString()
+  whatsappJid?: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
   @IsOptional()
   @IsEnum(HairLength)
   hairLength?: HairLength;

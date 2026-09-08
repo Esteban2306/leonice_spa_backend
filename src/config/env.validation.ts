@@ -37,6 +37,14 @@ class EnvironmentVariables {
   @IsString()
   CORS_ORIGIN: string;
 
+  @IsString()
+  @IsOptional()
+  CONDUIT_TOOL_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  CONDUIT_WEBHOOK_SECRET?: string;
+
   @IsOptional()
   @IsInt()
   THROTTLE_LIMIT?: number;
