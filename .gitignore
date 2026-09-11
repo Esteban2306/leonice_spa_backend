@@ -4,8 +4,5 @@ node_modules
 .vscode
 /generated/prisma
 dist
-.agents
-.claude
-.windsurf
 scripts
 *docs
