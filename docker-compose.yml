@@ -22,6 +22,12 @@ services:
     image: redis:8-alpine
     container_name: leonice-redis
     restart: unless-stopped
+    command:
+      - redis-server
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
     ports:
       - '6379:6379'
     volumes:

@@ -107,6 +107,7 @@ model User {
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   verifiedDeposits DepositRecord[]
+  auditLog AuditLog[]
 
   @@map("users")
 }
@@ -511,4 +512,22 @@ model ConduitIdempotencyKey {
 
   @@index([operation])
   @@map("conduit_idempotency_keys")
+}
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  action      String   
+  entityType  String  
+  entityId    String   
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
 }

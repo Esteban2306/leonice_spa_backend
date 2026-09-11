@@ -49,6 +49,26 @@ class EnvironmentVariables {
   @IsInt()
   THROTTLE_LIMIT?: number;
 
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  THROTTLE_LIMIT_DEFAULT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  THROTTLE_LIMIT_AVAILABILITY?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  THROTTLE_LIMIT_RESERVATIONS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  THROTTLE_LIMIT_WEBHOOKS?: number;
+
   @IsString()
   @Length(64, 64)
   ENCRYPTION_KEY: string;

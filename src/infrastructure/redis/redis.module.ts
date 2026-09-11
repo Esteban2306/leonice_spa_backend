@@ -16,6 +16,10 @@ import { REDIS_CLIENT } from './redis.constants';
           commandTimeout: 300,
           enableOfflineQueue: false,
           maxRetriesPerRequest: 1,
+
+          retryStrategy(times) {
+            return Math.min(times * 100, 2_000);
+          },
         }),
     },
     SafeCacheService,

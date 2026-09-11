@@ -1,10 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule, seconds } from '@nestjs/throttler';
-import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
-import Redis from 'ioredis';
-import type { Request } from 'express';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './infrastructure/database/prisma.module';
@@ -23,15 +20,17 @@ import { ProductsModule } from './products/products.module';
 import { EventModule } from './common/events/event.module';
 import { QueueModule } from './infrastructure/queue/bullmq.module';
 import { AutomationModule } from './automation/automation.module';
-import {
-  CLIENT_BOOKING_RATE_LIMIT,
-  CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
-} from './reservations/domain/reservation-timing.constants';
 import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
 import { PromotionsModule } from './promotions/promotions.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { DepositsModule } from './deposits/deposits.module';
 import { CloudinaryModule } from './infrastructure/cloudinary/cloudinary.module';
+import { getThrottlerConfig } from './config/throttler.config';
+import { AuditInterceptor } from './audit/audit.interceptor';
+import { MonitoringInterceptor } from './monitoring/monitoring.interceptor';
+import { AuditModule } from './audit/audit.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
+import { MonitoringService } from './monitoring/monitoring.service';
 
 @Module({
   imports: [
@@ -42,31 +41,7 @@ import { CloudinaryModule } from './infrastructure/cloudinary/cloudinary.module'
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        throttlers: [
-          {
-            name: 'default',
-            ttl: seconds(60),
-            limit: config.get<number>('THROTTLE_LIMIT', 100),
-          },
-          {
-            name: 'client-booking',
-            ttl: CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
-            limit: CLIENT_BOOKING_RATE_LIMIT,
-          },
-        ],
-
-        storage: new ThrottlerStorageRedisService(
-          new Redis(config.getOrThrow<string>('REDIS_URL')),
-        ),
-
-        skipIf: (context) => {
-          const req = context.switchToHttp().getRequest<Request>();
-          const providedKey = req.headers['x-api-key'];
-          const conduitKey = config.get<string>('CONDUIT_TOOL_API_KEY');
-          return Boolean(conduitKey && providedKey === conduitKey);
-        },
-      }),
+      useFactory: getThrottlerConfig,
     }),
     EncryptionModule,
     CloudinaryModule,
@@ -85,10 +60,22 @@ import { CloudinaryModule } from './infrastructure/cloudinary/cloudinary.module'
     AutomationModule,
     PromotionsModule,
     IdempotencyModule,
+    AuditModule,
+    MonitoringModule,
     DepositsModule,
   ],
   controllers: [HealthController],
   providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useFactory: (monitoringService: MonitoringService) =>
+        new MonitoringInterceptor(monitoringService),
+      inject: [MonitoringService],
+    },
     {
       provide: APP_GUARD,
       useClass: ClientThrottlerGuard,

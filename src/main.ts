@@ -6,25 +6,31 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
-import { StructuredLoggerService } from './common/logging/structured-logger.service';
 import { json, type Request } from 'express';
+import { PinoLoggerService } from './common/logging/pino-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
   const config = app.get(ConfigService);
+  const pinoLogger = app.get(PinoLoggerService);
 
-  const port = config.get<number>('PORT', 3000);
+  const port = config.get<number>('PORT', 3920);
   const nodeEnv = config.get<string>('NODE_ENV', 'development');
 
-  app.useLogger(app.get(StructuredLoggerService));
+  app.useLogger(pinoLogger);
   app.use(cookieParser());
   app.use(helmet());
   app.use(compression());
 
   app.enableCors({
-    origin: config
-      .get<string>('CORS_ORIGIN', 'http://localhost:3001')
-      .split(','),
+    origin: process.env.CORS_ORIGIN?.split(',') || [
+      'https://leonicespa.com',
+      'https://admin.leonicespa.com',
+      'http://localhost:3001',
+    ],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 

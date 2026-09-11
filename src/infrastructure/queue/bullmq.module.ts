@@ -22,6 +22,12 @@ import { QUEUE_NAMES } from './queue.constants';
         defaultJobOptions: {
           attempts: 3,
           backoff: { type: 'exponential', delay: 2_000 },
+          removeOnComplete: {
+            count: 500,
+          },
+          removeOnFail: {
+            count: 1_000,
+          },
         },
       },
       {
@@ -29,6 +35,12 @@ import { QUEUE_NAMES } from './queue.constants';
         defaultJobOptions: {
           attempts: 4,
           backoff: { type: 'exponential', delay: 5_000 },
+          removeOnComplete: {
+            count: 1_000,
+          },
+          removeOnFail: {
+            count: 2_000,
+          },
         },
       },
       {
@@ -36,6 +48,12 @@ import { QUEUE_NAMES } from './queue.constants';
         defaultJobOptions: {
           attempts: 5,
           backoff: { type: 'exponential', delay: 5_000 },
+          removeOnComplete: {
+            count: 1_000,
+          },
+          removeOnFail: {
+            count: 5_000,
+          },
         },
       },
     ),

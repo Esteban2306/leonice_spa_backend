@@ -1,5 +1,6 @@
 import { Injectable, LoggerService } from '@nestjs/common';
 import { RequestContextService } from '../context/request-context.service';
+import { PinoLoggerService } from './pino-logger.service';
 
 const COLORS: Record<string, string> = {
   log: '\x1b[32m',
@@ -16,28 +17,35 @@ const DIM = '\x1b[2m';
 export class StructuredLoggerService implements LoggerService {
   private readonly isDevelopment = process.env.NODE_ENV === 'development';
 
-  constructor(private readonly requestContext: RequestContextService) {}
+  constructor(
+    private readonly requestContext: RequestContextService,
+    private readonly pinoLogger: PinoLoggerService,
+  ) {}
 
-  log(message: unknown, ...optionalParams: unknown[]) {
+  log(message: unknown, ...optionalParams: unknown[]): void {
     this.write('log', message, optionalParams);
   }
-  error(message: unknown, ...optionalParams: unknown[]) {
+  error(message: unknown, ...optionalParams: unknown[]): void {
     this.write('error', message, optionalParams);
   }
-  warn(message: unknown, ...optionalParams: unknown[]) {
+  warn(message: unknown, ...optionalParams: unknown[]): void {
     this.write('warn', message, optionalParams);
   }
-  debug(message: unknown, ...optionalParams: unknown[]) {
+  debug(message: unknown, ...optionalParams: unknown[]): void {
     this.write('debug', message, optionalParams);
   }
-  verbose(message: unknown, ...optionalParams: unknown[]) {
+  verbose(message: unknown, ...optionalParams: unknown[]): void {
     this.write('verbose', message, optionalParams);
   }
-  fatal(message: unknown, ...optionalParams: unknown[]) {
+  fatal(message: unknown, ...optionalParams: unknown[]): void {
     this.write('fatal', message, optionalParams);
   }
 
-  private write(level: string, message: unknown, optionalParams: unknown[]) {
+  private write(
+    level: string,
+    message: unknown,
+    optionalParams: unknown[],
+  ): void {
     const store = this.requestContext.get();
     const text =
       typeof message === 'string' ? message : JSON.stringify(message);
@@ -51,27 +59,34 @@ export class StructuredLoggerService implements LoggerService {
       details = optionalParams.slice(0, -1);
     }
 
-    const stream =
-      level === 'error' || level === 'fatal' ? process.stderr : process.stdout;
-
-    if (this.isDevelopment) {
-      stream.write(
-        this.formatPretty(level, text, context, details, store?.correlationId) +
-          '\n',
-      );
-      return;
-    }
-
-    const entry = {
-      timestamp: new Date().toISOString(),
-      level,
-      message: text,
+    const pinoLevel = this.mapLevel(level);
+    const logObj: Record<string, unknown> = {
+      msg: text,
       correlationId: store?.correlationId,
       userId: store?.userId,
-      context,
-      details,
     };
-    stream.write(JSON.stringify(entry) + '\n');
+
+    if (context) logObj.context = context;
+    if (details?.length) logObj.details = details;
+
+    (
+      this.pinoLogger as unknown as Record<
+        string,
+        (obj: Record<string, unknown>) => void
+      >
+    )[pinoLevel](logObj);
+  }
+
+  private mapLevel(level: string): string {
+    const levelMap: Record<string, string> = {
+      log: 'info',
+      error: 'error',
+      warn: 'warn',
+      debug: 'debug',
+      verbose: 'trace',
+      fatal: 'fatal',
+    };
+    return levelMap[level] || 'info';
   }
 
   private formatPretty(
