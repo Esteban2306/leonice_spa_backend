@@ -6,3 +6,5 @@ node_modules
 dist
 scripts
 *docs
+# macOS
+.DS_Store
