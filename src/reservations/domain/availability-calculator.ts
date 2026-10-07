@@ -13,7 +13,7 @@ export function maxConcurrentInWindow(
   const criticalPoints = new Set<number>([windowStart.getTime()]);
   for (const interval of held) {
     const t = interval.scheduledStart.getTime();
-    if (t >= windowStart.getTime() && t <= windowEnd.getTime()) {
+    if (t >= windowStart.getTime() && t < windowEnd.getTime()) {
       criticalPoints.add(t);
     }
   }

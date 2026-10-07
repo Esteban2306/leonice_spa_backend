@@ -25,6 +25,23 @@ describe('maxConcurrentInWindow', () => {
     expect(result).toBe(1);
   });
 
+  it('una reserva que empieza justo al final de la ventana no cuenta (igual que el SQL de escritura)', () => {
+    const held = [
+      {
+        scheduledStart: new Date('2027-01-01T09:00:00'),
+        scheduledEnd: new Date('2027-01-01T10:00:00'),
+      },
+    ];
+
+    const result = maxConcurrentInWindow(
+      held,
+      new Date('2027-01-01T08:00:00'),
+      new Date('2027-01-01T09:00:00'),
+    );
+
+    expect(result).toBe(0);
+  });
+
   it('sí detecta correctamente cuando dos reservas SÍ coexisten en el tiempo', () => {
     const held = [
       {
@@ -69,6 +86,28 @@ describe('generateAvailableSlots', () => {
       (s) => s.getHours() >= 12 && s.getHours() < 14,
     );
     expect(hasSlotInLunchBreak).toBe(false);
+  });
+
+  it('con capacidad llena, un horario contiguo anterior a una reserva sigue disponible', () => {
+    const slots = generateAvailableSlots({
+      operatingWindows: [
+        {
+          start: new Date('2027-01-04T08:00:00'),
+          end: new Date('2027-01-04T10:00:00'),
+        },
+      ],
+      held: [
+        {
+          scheduledStart: new Date('2027-01-04T09:00:00'),
+          scheduledEnd: new Date('2027-01-04T10:00:00'),
+        },
+      ],
+      durationMinutes: 60,
+      capacity: 1,
+      stepMinutes: 60,
+    });
+
+    expect(slots.map((s) => s.getHours())).toEqual([8]);
   });
 
   it('no genera un horario que empiece antes del cierre pero termine después', () => {

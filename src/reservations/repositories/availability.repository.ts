@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 import { HOLDING_EXCLUDED_STATUSES } from '../domain/reservation-status.constants';
+import { getCalendarDayKey } from '../domain/calendar-day-key';
 
 interface AttemptToHoldSlotParams {
   categoryId: string;
@@ -47,6 +48,30 @@ export class AvailabilityRepository {
     });
   }
 
+  /**
+   * Intervalos que retienen cupo y se solapan con [windowStart, windowEnd).
+   * Se lee con el cliente de la transacción para ver también lo escrito en ella.
+   */
+
+  async findHoldingIntervalsOverlapping(
+    categoryId: string,
+    windowStart: Date,
+    windowEnd: Date,
+    client: PrismaClientOrTx = this.prisma.client,
+    excludeReservationId?: string,
+  ): Promise<{ scheduledStart: Date; scheduledEnd: Date }[]> {
+    return client.reservation.findMany({
+      where: {
+        categoryId,
+        status: { notIn: HOLDING_EXCLUDED_STATUSES },
+        scheduledStart: { lt: windowEnd },
+        scheduledEnd: { gt: windowStart },
+        ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
+      },
+      select: { scheduledStart: true, scheduledEnd: true },
+    });
+  }
+
   /*
   Este es el camino que escritura que se utiliza en el camino, utilizo SQL crudo, 
   pero se evalua dentro de la transaccion que ya sostiene el advisory lock asi el resultado no puede
@@ -63,6 +88,8 @@ export class AvailabilityRepository {
     candidateStart: Date,
     candidateEnd: Date,
   ): Promise<number> {
+    const excluded = Prisma.join(HOLDING_EXCLUDED_STATUSES);
+
     const result = await tx.$queryRaw<{ max_concurrent: bigint | null }[]>`
     WITH candidate_points AS (
         SELECT ${candidateStart}::timestamptz AS ts
@@ -70,7 +97,7 @@ export class AvailabilityRepository {
         SELECT scheduled_start
         FROM reservations
         WHERE category_id = ${categoryId}
-          AND status NOT IN ('CANCELADA', 'NO_SHOW', 'REPROGRAMADA')
+          AND status::text NOT IN (${excluded})
           AND scheduled_start >= ${candidateStart}
           AND scheduled_start < ${candidateEnd}
       )
@@ -80,7 +107,7 @@ export class AvailabilityRepository {
         SELECT COUNT(*) AS active_count
         FROM reservations r
         WHERE r.category_id = ${categoryId}
-          AND r.status NOT IN ('CANCELADA', 'NO_SHOW', 'REPROGRAMADA')
+          AND r.status::text NOT IN (${excluded})
           AND r.scheduled_start <= cp.ts
           AND r.scheduled_end > cp.ts
       ) counts;
@@ -99,8 +126,7 @@ export class AvailabilityRepository {
     date: Date,
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    const dayKey = date.toISOString().slice(0, 10);
-    const lockKey = `${dayKey}:${categoryId}`;
+    const lockKey = `${getCalendarDayKey(date)}:${categoryId}`;
 
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
@@ -113,7 +139,7 @@ export class AvailabilityRepository {
     date: Date,
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    const dayKey = date.toISOString().slice(0, 10);
+    const dayKey = getCalendarDayKey(date);
     const sortedUniqueIds = [...new Set(categoryIds)].sort();
 
     return this.prisma.client.$transaction(async (tx) => {
