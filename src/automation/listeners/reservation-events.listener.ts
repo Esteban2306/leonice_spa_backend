@@ -63,4 +63,16 @@ export class ReservationEventsListener {
       `Reserva ${event.payload.reservationId} cancelada por el administrador: ${event.payload.reason} — pendiente notificar al cliente vía Conduit`,
     );
   }
+
+  @OnEvent(EVENT_TYPES.DEPOSIT_REJECTED)
+  handleDepositRejected(
+    event: EventOf<EventPayloadMap, typeof EVENT_TYPES.DEPOSIT_REJECTED>,
+  ) {
+    const deadline = event.payload.newDeadline
+      ? `nuevo plazo hasta ${event.payload.newDeadline.toISOString()}`
+      : 'sin nuevo plazo (la reserva no estaba esperando depósito)';
+    this.logger.log(
+      `Comprobante rechazado — reserva ${event.payload.reservationId}: ${event.payload.reason}. ${deadline} [${event.correlationId}]`,
+    );
+  }
 }

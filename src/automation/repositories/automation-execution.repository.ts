@@ -3,7 +3,7 @@ import {
   AutomationExecutionResult,
   AutomationExecutionType,
 } from '@prisma/client';
-import { PrismaService } from 'src/infrastructure/database/prisma.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 
 interface LogExecutionParams {
   type: AutomationExecutionType;

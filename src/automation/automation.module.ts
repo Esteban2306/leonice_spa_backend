@@ -1,4 +1,3 @@
-// automation.module.ts — completo, con todo lo de hoy
 import { Module } from '@nestjs/common';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { ConduitModule } from '../conduit/conduit.module';
@@ -12,6 +11,7 @@ import { AutomationExecutionRepository } from './repositories/automation-executi
 import { AutomationRulesRepository } from './repositories/automation-rules.repository';
 import { AutomationRulesService } from './automation-rules.service';
 import { AutomationRulesController } from './automation-rules.controller';
+import { DepositExpirySweepScheduler } from './deposit-expiry-sweep.scheduler';
 
 @Module({
   imports: [ReservationsModule, ConduitModule, ClientsModule],
@@ -25,6 +25,7 @@ import { AutomationRulesController } from './automation-rules.controller';
     AutomationExecutionRepository,
     AutomationRulesRepository,
     AutomationRulesService,
+    DepositExpirySweepScheduler,
   ],
 })
 export class AutomationModule {}

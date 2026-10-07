@@ -1,9 +1,10 @@
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { ConflictException, HttpException, Logger } from '@nestjs/common';
+import { Job, UnrecoverableError } from 'bullmq';
 import {
   AutomationExecutionResult,
   AutomationExecutionType,
+  CancellationSource,
   ReservationStatus,
 } from '@prisma/client';
 import {
@@ -11,13 +12,21 @@ import {
   JOB_NAMES,
 } from '../../infrastructure/queue/queue.constants';
 import { ReservationsRepository } from '../../reservations/repositories/reservations.repository';
-import { CancelReservationOrchestrator } from '../../reservations/orchestrators/cancel-reservation.orchestrator';
+import { AdminCancelReservationOrchestrator } from '../../reservations/orchestrators/admin-cancel-reservation.orchestrator';
 import { MarkNoShowOrchestrator } from '../../reservations/orchestrators/mark-no-show.orchestrator';
 import { AutomationExecutionRepository } from '../repositories/automation-execution.repository';
+import {
+  DEPOSIT_SWEEP_BATCH_SIZE,
+  NO_SHOW_GRACE_MS,
+} from '../../reservations/domain/reservation-timing.constants';
 
 interface TimeoutJobData {
-  reservationId: string;
+  reservationId?: string;
 }
+
+const NOTIFY_CLIENT_ON_TIMEOUT = false;
+
+const DEPOSIT_TIMEOUT_REASON = 'Depósito no confirmado a tiempo';
 
 @Processor(QUEUE_NAMES.RESERVATION_TIMEOUTS)
 export class ReservationTimeoutsProcessor extends WorkerHost {
@@ -25,7 +34,7 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
 
   constructor(
     private readonly repository: ReservationsRepository,
-    private readonly cancelOrchestrator: CancelReservationOrchestrator,
+    private readonly adminCancelOrchestrator: AdminCancelReservationOrchestrator,
     private readonly markNoShowOrchestrator: MarkNoShowOrchestrator,
     private readonly executions: AutomationExecutionRepository,
   ) {
@@ -33,22 +42,38 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
   }
 
   async process(job: Job<TimeoutJobData>): Promise<void> {
-    const { reservationId } = job.data;
+    try {
+      await this.handle(job);
+    } catch (error: unknown) {
+      if (this.isDeterministicError(error)) {
+        throw new UnrecoverableError(`${error.name}: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  private async handle(job: Job<TimeoutJobData>): Promise<void> {
+    if (job.name === JOB_NAMES.DEPOSIT_EXPIRY_SWEEP) {
+      return this.sweepExpiredDeposits();
+    }
+
+    const reservationId = this.requireReservationId(job);
 
     switch (job.name) {
       case JOB_NAMES.VALORACION_TIMEOUT:
-        return this.cancelIfStillIn(
-          AutomationExecutionType.VALORACION_TIMEOUT,
+        await this.executions.log({
+          type: AutomationExecutionType.VALORACION_TIMEOUT,
+          result: AutomationExecutionResult.SKIPPED,
           reservationId,
-          ReservationStatus.PENDIENTE_VALORACION,
-          'Valoración no respondida a tiempo',
-        );
+          reason: 'Timeout de valoración desactivado por regla de negocio',
+        });
+        return;
       case JOB_NAMES.DEPOSITO_TIMEOUT:
         return this.cancelIfStillIn(
           AutomationExecutionType.DEPOSITO_TIMEOUT,
           reservationId,
           ReservationStatus.PENDIENTE_DEPOSITO,
-          'Depósito no confirmado a tiempo',
+          DEPOSIT_TIMEOUT_REASON,
         );
       case JOB_NAMES.NO_SHOW_CHECK:
         return this.markNoShowIfStillConfirmed(reservationId);
@@ -57,12 +82,53 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
     }
   }
 
+  private requireReservationId(job: Job<TimeoutJobData>): string {
+    const id = job.data.reservationId;
+    if (typeof id !== 'string' || id.length === 0) {
+      throw new UnrecoverableError(
+        `El job "${job.name}" llegó sin reservationId`,
+      );
+    }
+    return id;
+  }
+
+  private async sweepExpiredDeposits(): Promise<void> {
+    const ids = await this.repository.findExpiredPendingDepositIds(
+      new Date(),
+      DEPOSIT_SWEEP_BATCH_SIZE,
+    );
+    if (ids.length === 0) {
+      this.logger.debug('Barrido: sin depósitos vencidos');
+      return;
+    }
+
+    this.logger.log(`Barrido: ${ids.length} depósito(s) vencido(s)`);
+    for (const id of ids) {
+      try {
+        await this.cancelIfStillIn(
+          AutomationExecutionType.DEPOSITO_TIMEOUT,
+          id,
+          ReservationStatus.PENDIENTE_DEPOSITO,
+          DEPOSIT_TIMEOUT_REASON,
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Barrido: no se pudo procesar ${id}: ${message}`);
+      }
+    }
+  }
+
+  private isDeterministicError(error: unknown): error is HttpException {
+    return error instanceof HttpException && error.getStatus() < 500;
+  }
+
   @OnWorkerEvent('failed')
   async onFailed(job: Job<TimeoutJobData> | undefined, error: Error) {
     if (!job) return;
 
     const maxAttempts = job.opts.attempts ?? 1;
-    const isFinal = job.attemptsMade >= maxAttempts;
+    const isUnrecoverable = error instanceof UnrecoverableError;
+    const isFinal = isUnrecoverable || job.attemptsMade >= maxAttempts;
 
     if (!isFinal) {
       this.logger.warn(
@@ -71,17 +137,22 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
       return;
     }
 
+    const cause = isUnrecoverable
+      ? 'error determinista, sin reintentos'
+      : `agotó sus ${maxAttempts} intentos`;
+
     this.logger.error(
-      `"${job.name}" (${job.id}) agotó sus ${maxAttempts} intentos — falla permanente: ${error.message}`,
+      `"${job.name}" (${job.id}) falla permanente (${cause}): ${error.message}`,
       error.stack,
     );
 
     const type = this.jobNameToExecutionType(job.name);
-    if (type) {
+    const reservationId = job.data.reservationId;
+    if (type && reservationId) {
       await this.executions.log({
         type,
         result: AutomationExecutionResult.FAILED,
-        reservationId: job.data.reservationId,
+        reservationId,
         errorMessage: error.message,
       });
     }
@@ -102,6 +173,19 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
     }
   }
 
+  private async skip(
+    type: AutomationExecutionType,
+    reservationId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.SKIPPED,
+      reservationId,
+      reason,
+    });
+  }
+
   private async cancelIfStillIn(
     type: AutomationExecutionType,
     reservationId: string,
@@ -110,17 +194,67 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
   ) {
     const reservation = await this.repository.findById(reservationId);
     if (!reservation || reservation.status !== expectedStatus) {
-      await this.executions.log({
+      await this.skip(
         type,
-        result: AutomationExecutionResult.SKIPPED,
         reservationId,
-        reason: reservation
+        reservation
           ? `Ya no está en ${expectedStatus} (está en ${reservation.status})`
           : 'La reserva ya no existe',
-      });
+      );
       return;
     }
-    await this.cancelOrchestrator.execute(reservationId, reason);
+
+    if (expectedStatus === ReservationStatus.PENDIENTE_DEPOSITO) {
+      if (
+        reservation.depositExpiresAt &&
+        reservation.depositExpiresAt.getTime() > Date.now()
+      ) {
+        await this.skip(
+          type,
+          reservationId,
+          'El plazo de depósito aún no vence (fue extendido)',
+        );
+        return;
+      }
+
+      if (!reservation.depositExpiresAt) {
+        await this.skip(
+          type,
+          reservationId,
+          'Sin plazo de depósito (reserva revivida): la gestiona el administrador',
+        );
+        return;
+      }
+
+      if (reservation.depositExpiresAt.getTime() > Date.now()) {
+        await this.skip(
+          type,
+          reservationId,
+          'El plazo de depósito aún no vence (fue extendido)',
+        );
+        return;
+      }
+    }
+
+    try {
+      await this.adminCancelOrchestrator.execute(
+        reservationId,
+        reason,
+        NOTIFY_CLIENT_ON_TIMEOUT,
+        CancellationSource.TIMEOUT,
+      );
+    } catch (error: unknown) {
+      if (error instanceof ConflictException) {
+        await this.skip(
+          type,
+          reservationId,
+          'La reserva cambió de estado durante la cancelación',
+        );
+        return;
+      }
+      throw error;
+    }
+
     await this.executions.log({
       type,
       result: AutomationExecutionResult.EXECUTED,
@@ -137,20 +271,37 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
       reservation.status !== ReservationStatus.CONFIRMADA ||
       reservation.checkedInAt
     ) {
-      await this.executions.log({
-        type: AutomationExecutionType.NO_SHOW_CHECK,
-        result: AutomationExecutionResult.SKIPPED,
+      await this.skip(
+        AutomationExecutionType.NO_SHOW_CHECK,
         reservationId,
-        reason: !reservation
+        !reservation
           ? 'La reserva ya no existe'
           : reservation.checkedInAt
             ? 'Ya hizo check-in'
             : `Ya no está CONFIRMADA (está en ${reservation.status})`,
-      });
+      );
       return;
     }
 
-    await this.markNoShowOrchestrator.execute(reservationId);
+    const graceEndsAt = reservation.scheduledStart.getTime() + NO_SHOW_GRACE_MS;
+    if (graceEndsAt > Date.now() + 1_000) {
+      await this.skip(
+        AutomationExecutionType.NO_SHOW_CHECK,
+        reservationId,
+        'La cita fue reprogramada: su plazo de gracia aún no vence',
+      );
+      return;
+    }
+
+    const marked = await this.markNoShowOrchestrator.execute(reservationId);
+    if (!marked) {
+      await this.skip(
+        AutomationExecutionType.NO_SHOW_CHECK,
+        reservationId,
+        'La reserva cambió de estado antes de marcar no-show',
+      );
+      return;
+    }
     await this.executions.log({
       type: AutomationExecutionType.NO_SHOW_CHECK,
       result: AutomationExecutionResult.EXECUTED,

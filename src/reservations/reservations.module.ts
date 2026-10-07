@@ -46,6 +46,7 @@ import { ReservationRescheduler } from './service/reservation-rescheduler.servic
     CancelReservationOrchestrator,
     MarkNoShowOrchestrator,
     ConfirmDepositOrchestrator,
+    AdminCancelReservationOrchestrator,
   ],
 })
 export class ReservationsModule {}

@@ -7,3 +7,6 @@ export const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
 
 export const CLIENT_BOOKING_RATE_LIMIT = 15;
 export const CLIENT_BOOKING_RATE_LIMIT_TTL_MS = 15 * 60 * 1000;
+
+export const DEPOSIT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+export const DEPOSIT_SWEEP_BATCH_SIZE = 100;

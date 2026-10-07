@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   CancellationSource,
+  DepositStatus,
   Prisma,
   PrismaClient,
   Reservation,
@@ -27,6 +28,20 @@ export class ReservationsRepository {
 
   findById(id: string, client: PrismaClientOrTx = this.prisma.client) {
     return client.reservation.findUnique({ where: { id } });
+  }
+
+  async hasSubmittedProof(
+    reservationId: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<boolean> {
+    const count = await client.depositRecord.count({
+      where: {
+        reservationId,
+        status: DepositStatus.PENDIENTE,
+        imageUrl: { not: null },
+      },
+    });
+    return count > 0;
   }
 
   async updateStatusIfCurrent(
@@ -57,6 +72,37 @@ export class ReservationsRepository {
       data,
     });
     return result.count === 1;
+  }
+
+  async findExpiredPendingDepositIds(
+    now: Date,
+    limit: number,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<string[]> {
+    const rows = await client.reservation.findMany({
+      where: {
+        status: ReservationStatus.PENDIENTE_DEPOSITO,
+        depositExpiresAt: { lt: now },
+        deposit: {
+          none: { status: DepositStatus.PENDIENTE, imageUrl: { not: null } },
+        },
+      },
+      select: { id: true },
+      orderBy: { depositExpiresAt: 'asc' },
+      take: limit,
+    });
+    return rows.map((r) => r.id);
+  }
+
+  extendDepositDeadline(
+    id: string,
+    depositExpiresAt: Date,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<Reservation> {
+    return client.reservation.update({
+      where: { id },
+      data: { depositExpiresAt },
+    });
   }
 
   async findByIdWithClientPhone(
@@ -175,6 +221,7 @@ export class ReservationsRepository {
       finalDurationMinutes: number;
       scheduledEnd: Date;
       status: ReservationStatus;
+      depositExpiresAt: Date;
     },
     client: PrismaClientOrTx = this.prisma.client,
   ): Promise<Reservation> {

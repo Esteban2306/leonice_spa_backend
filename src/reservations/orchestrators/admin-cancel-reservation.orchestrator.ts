@@ -1,5 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { ReservationStatus } from '@prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CancellationSource, ReservationStatus } from '@prisma/client';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
 import { EventBusService } from '../../common/events/event.service';
@@ -18,6 +22,7 @@ export class AdminCancelReservationOrchestrator {
     reservationId: string,
     reason: string | undefined,
     notifyClient: boolean,
+    source: CancellationSource = CancellationSource.ADMIN,
   ) {
     const reservation = await this.repository.findById(reservationId);
     if (!reservation) throw new NotFoundException('Reserva no encontrada');
@@ -27,11 +32,32 @@ export class AdminCancelReservationOrchestrator {
       ReservationStatus.CANCELADA,
     );
 
-    const updated = await this.repository.updateStatus(reservationId, {
-      status: ReservationStatus.CANCELADA,
-      cancelledAt: new Date(),
-      cancellationReason: reason ?? DEFAULT_ADMIN_CANCEL_REASON,
-    });
+    const applied = await this.repository.updateStatusIfCurrent(
+      reservationId,
+      reservation.status,
+      {
+        status: ReservationStatus.CANCELADA,
+        cancelledAt: new Date(),
+        cancellationReason: reason ?? DEFAULT_ADMIN_CANCEL_REASON,
+        cancellationSource: source,
+      },
+    );
+    if (!applied) {
+      throw new ConflictException(
+        'La reserva cambió de estado mientras se cancelaba. Revisa su estado actual.',
+      );
+    }
+
+    const updated = await this.repository.findById(reservationId);
+    if (!updated) throw new NotFoundException('Reserva no encontrada');
+
+    if (source === CancellationSource.TIMEOUT) {
+      this.eventBus.publish(EVENT_TYPES.RESERVATION_CANCELLED_BY_TIMEOUT, {
+        reservationId: updated.id,
+        clientId: updated.clientId,
+        comboGroupId: updated.comboGroupId,
+      });
+    }
 
     if (notifyClient) {
       this.eventBus.publish(EVENT_TYPES.RESERVATION_CANCELLED_BY_ADMIN, {

@@ -11,6 +11,8 @@ export const EVENT_TYPES = {
   RESERVATION_CANCELLED_BY_ADMIN: 'reservation.cancelled_by_admin',
   RESERVATION_NEEDS_HAIR_PROFILE: 'reservation.needs_hair_profile',
   DEPOSIT_SUBMITTED_FOR_REVIEW: 'deposit.submitted_for_review',
+  DEPOSIT_REJECTED: 'deposit.rejected',
+  RESERVATION_CANCELLED_BY_TIMEOUT: 'reservation.cancelled_by_timeout',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -25,6 +27,21 @@ export interface EventPayloadMap {
     status: ReservationStatus;
     scheduledStart: Date;
     channel: ReservationChannel;
+  };
+
+  [EVENT_TYPES.DEPOSIT_REJECTED]: {
+    depositId: string;
+    reservationId: string;
+    clientId: string;
+    clientPhone: string;
+    reason: string;
+    newDeadline: Date | null;
+  };
+
+  [EVENT_TYPES.RESERVATION_CANCELLED_BY_TIMEOUT]: {
+    reservationId: string;
+    clientId: string;
+    comboGroupId: string | null;
   };
 
   [EVENT_TYPES.RESERVATION_RESCHEDULED_BY_ADMIN]: {
