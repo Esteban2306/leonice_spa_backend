@@ -1,6 +1,6 @@
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Job, UnrecoverableError } from 'bullmq';
 import {
   AutomationExecutionResult,
   AutomationExecutionType,
@@ -18,13 +18,25 @@ import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { ReactivationJobData } from '../listeners/schedule-reactivation.listener';
 import { ConsentService } from 'src/clients/consent/consent.service';
 import { CONDUIT_TEMPLATE_IDS } from '../domain/conduit-template-ids.constants';
+import {
+  AdminDepositTimeoutNoticeJobData,
+  AdminRescheduleNoticeJobData,
+  ClientDepositRejectedNoticeJobData,
+  RescheduleNoticeJobData,
+} from '../domain/operational-notifications.constants';
+import { OperationalNotificationsService } from '../operational-notifications.service';
 
 interface ReminderJobData {
   reservationId: string;
 }
 
-type AutomationJobData = ReminderJobData | ReactivationJobData;
-
+type AutomationJobData =
+  | ReminderJobData
+  | ReactivationJobData
+  | AdminDepositTimeoutNoticeJobData
+  | ClientDepositRejectedNoticeJobData
+  | RescheduleNoticeJobData
+  | AdminRescheduleNoticeJobData;
 @Processor(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS)
 export class AutomationCommunicationsProcessor extends WorkerHost {
   private readonly logger = new Logger(AutomationCommunicationsProcessor.name);
@@ -35,6 +47,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     private readonly executions: AutomationExecutionRepository,
     private readonly prisma: PrismaService,
     private readonly consentService: ConsentService,
+    private readonly notifications: OperationalNotificationsService,
   ) {
     super();
   }
@@ -45,6 +58,22 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return this.sendReminder((job.data as ReminderJobData).reservationId);
       case JOB_NAMES.REACTIVATION_CHECK:
         return this.checkReactivation(job.data as ReactivationJobData);
+      case JOB_NAMES.NOTIFY_ADMIN_DEPOSIT_TIMEOUT:
+        return this.notifications.notifyAdminDepositTimeout(
+          job.data as AdminDepositTimeoutNoticeJobData,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_DEPOSIT_REJECTED:
+        return this.notifications.notifyClientDepositRejected(
+          job.data as ClientDepositRejectedNoticeJobData,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED:
+        return this.notifications.notifyClientRescheduled(
+          job.data as RescheduleNoticeJobData,
+        );
+      case JOB_NAMES.NOTIFY_ADMIN_RESCHEDULED:
+        return this.notifications.notifyAdminRescheduled(
+          job.data as AdminRescheduleNoticeJobData,
+        );
       default:
         this.logger.warn(`Job desconocido recibido: ${job.name}`);
     }
@@ -53,8 +82,12 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
   @OnWorkerEvent('failed')
   async onFailed(job: Job<AutomationJobData> | undefined, error: Error) {
     if (!job) return;
+
     const maxAttempts = job.opts.attempts ?? 1;
-    if (job.attemptsMade < maxAttempts) {
+    const isFinal =
+      error instanceof UnrecoverableError || job.attemptsMade >= maxAttempts;
+
+    if (!isFinal) {
       this.logger.warn(
         `Intento ${job.attemptsMade}/${maxAttempts} fallido para "${job.name}" (${job.id}): ${error.message}`,
       );
@@ -62,16 +95,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     }
 
     this.logger.error(
-      `"${job.name}" (${job.id}) agotó sus ${maxAttempts} intentos: ${error.message}`,
+      `"${job.name}" (${job.id}) falla permanente tras ${job.attemptsMade} intento(s): ${error.message}`,
       error.stack,
     );
 
-    const type =
-      job.name === JOB_NAMES.RESERVATION_REMINDER_CHECK
-        ? AutomationExecutionType.RESERVATION_REMINDER
-        : job.name === JOB_NAMES.REACTIVATION_CHECK
-          ? AutomationExecutionType.REACTIVATION
-          : null;
+    const type = this.resolveExecutionType(job.name);
     if (!type) return;
 
     await this.executions.log({
@@ -81,6 +109,27 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       clientId: (job.data as { clientId?: string }).clientId,
       errorMessage: error.message,
     });
+  }
+
+  private resolveExecutionType(
+    jobName: string,
+  ): AutomationExecutionType | null {
+    switch (jobName) {
+      case JOB_NAMES.RESERVATION_REMINDER_CHECK:
+        return AutomationExecutionType.RESERVATION_REMINDER;
+      case JOB_NAMES.REACTIVATION_CHECK:
+        return AutomationExecutionType.REACTIVATION;
+      case JOB_NAMES.NOTIFY_ADMIN_DEPOSIT_TIMEOUT:
+        return AutomationExecutionType.ADMIN_DEPOSIT_TIMEOUT_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_DEPOSIT_REJECTED:
+        return AutomationExecutionType.CLIENT_DEPOSIT_REJECTED_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED:
+        return AutomationExecutionType.CLIENT_RESCHEDULE_NOTICE;
+      case JOB_NAMES.NOTIFY_ADMIN_RESCHEDULED:
+        return AutomationExecutionType.ADMIN_RESCHEDULE_NOTICE;
+      default:
+        return null;
+    }
   }
 
   private async checkReactivation(data: ReactivationJobData) {

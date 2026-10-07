@@ -17,4 +17,9 @@ export const JOB_NAMES = {
 
   // Conduit - corre en CONDUIT_OUTBOX
   PUBLISH_CONDUIT_EVENT: 'publish-conduit-event',
+
+  NOTIFY_ADMIN_DEPOSIT_TIMEOUT: 'notify-admin-deposit-timeout',
+  NOTIFY_CLIENT_DEPOSIT_REJECTED: 'notify-client-deposit-rejected',
+  NOTIFY_CLIENT_RESCHEDULED: 'notify-client-rescheduled',
+  NOTIFY_ADMIN_RESCHEDULED: 'notify-admin-rescheduled',
 } as const;
