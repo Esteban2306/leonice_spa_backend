@@ -226,11 +226,11 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
         return;
       }
 
-      if (reservation.depositExpiresAt.getTime() > Date.now()) {
+      if (await this.repository.hasSubmittedProof(reservationId)) {
         await this.skip(
           type,
           reservationId,
-          'El plazo de depósito aún no vence (fue extendido)',
+          'Hay un comprobante pendiente de revisión: no se cancela por tiempo',
         );
         return;
       }

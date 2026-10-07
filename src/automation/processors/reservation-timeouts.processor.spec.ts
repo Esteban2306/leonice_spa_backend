@@ -28,7 +28,10 @@ interface LoggedExecution {
 interface FixtureOptions {
   cancelError?: Error;
   hasSubmittedProof?: boolean;
+  depositExpiresAt?: Date | null;
 }
+
+const EXPIRED_DEADLINE = new Date(Date.now() - 60_000);
 
 const buildJob = (name: string): Job<{ reservationId: string }> =>
   ({ name, data: { reservationId: 'r1' } }) as unknown as Job<{
@@ -44,7 +47,19 @@ const buildFixture = (
 
   const repository = {
     findById: () =>
-      Promise.resolve(status ? { id: 'r1', status, checkedInAt: null } : null),
+      Promise.resolve(
+        status
+          ? {
+              id: 'r1',
+              status,
+              checkedInAt: null,
+              depositExpiresAt:
+                options.depositExpiresAt === undefined
+                  ? EXPIRED_DEADLINE
+                  : options.depositExpiresAt,
+            }
+          : null,
+      ),
     hasSubmittedProof: () =>
       Promise.resolve(options.hasSubmittedProof ?? false),
   };
@@ -98,6 +113,18 @@ describe('ReservationTimeoutsProcessor', () => {
     expect(cancelCalls).toHaveLength(0);
     expect(logged[0]?.result).toBe(AutomationExecutionResult.SKIPPED);
     expect(logged[0]?.reason).toContain('comprobante');
+  });
+
+  it('no cancela una reserva sin plazo de depósito (revivida)', async () => {
+    const { processor, cancelCalls, logged } = buildFixture(
+      ReservationStatus.PENDIENTE_DEPOSITO,
+      { depositExpiresAt: null },
+    );
+
+    await processor.process(buildJob(JOB_NAMES.DEPOSITO_TIMEOUT));
+
+    expect(cancelCalls).toHaveLength(0);
+    expect(logged[0]?.result).toBe(AutomationExecutionResult.SKIPPED);
   });
 
   it('ignora un valoracion-timeout ya encolado y no cancela', async () => {
