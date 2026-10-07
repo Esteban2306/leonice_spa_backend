@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma, Reservation, ReservationStatus } from '@prisma/client';
@@ -16,6 +11,7 @@ import {
 import { NO_SHOW_GRACE_MS } from '../domain/reservation-timing.constants';
 import { EVENT_TYPES } from 'src/common/events/constants/event.types';
 import { EventBusService } from 'src/common/events/event.service';
+import { AppException } from '../../common/errors/app.exception';
 
 @Injectable()
 export class ConfirmDepositOrchestrator {
@@ -53,9 +49,7 @@ export class ConfirmDepositOrchestrator {
       tx,
     );
     if (!applied) {
-      throw new ConflictException(
-        'La reserva cambió de estado mientras se confirmaba. Revisa su estado actual.',
-      );
+      throw new AppException('RESERVATION_CONCURRENT_CHANGE');
     }
 
     const updated = await this.repository.findById(reservationId, tx);

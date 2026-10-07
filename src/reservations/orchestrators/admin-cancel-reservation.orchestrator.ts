@@ -1,13 +1,10 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CancellationSource, ReservationStatus } from '@prisma/client';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
+import { AppException } from '../../common/errors/app.exception';
 
 const DEFAULT_ADMIN_CANCEL_REASON = 'Cancelado por el administrador';
 
@@ -43,9 +40,7 @@ export class AdminCancelReservationOrchestrator {
       },
     );
     if (!applied) {
-      throw new ConflictException(
-        'La reserva cambió de estado mientras se cancelaba. Revisa su estado actual.',
-      );
+      throw new AppException('RESERVATION_CONCURRENT_CHANGE');
     }
 
     const updated = await this.repository.findById(reservationId);

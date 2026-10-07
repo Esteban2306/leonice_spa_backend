@@ -2,7 +2,6 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Reservation, ReservationStatus } from '@prisma/client';
 import { Queue } from 'bullmq';
-import { DomainException } from '../../common/exceptions/domain.exception';
 import {
   JOB_NAMES,
   QUEUE_NAMES,
@@ -12,6 +11,8 @@ import { ReservationsRepository } from '../repositories/reservations.repository'
 import { NO_SHOW_GRACE_MS } from '../domain/reservation-timing.constants';
 import { placementRejectionException } from '../domain/placement-rejection.exception';
 import { PlacementCheckService } from './placement-check.service';
+import { AppException } from '../../common/errors/app.exception';
+import type { ErrorCode } from '../../common/errors/error-catalog';
 
 export const RESCHEDULABLE_STATUSES: readonly ReservationStatus[] = [
   ReservationStatus.PENDIENTE_DEPOSITO,
@@ -22,7 +23,7 @@ export const RESCHEDULE_ERROR_CODES = {
   NOT_RESCHEDULABLE: 'RESERVATION_NOT_RESCHEDULABLE',
   SAME_SLOT: 'RESERVATION_RESCHEDULE_SAME_SLOT',
   CONCURRENT_CHANGE: 'RESERVATION_RESCHEDULE_CONCURRENT_CHANGE',
-} as const;
+} as const satisfies Record<string, ErrorCode>;
 
 export interface RescheduleInPlaceResult {
   reservation: Reservation;
@@ -61,10 +62,7 @@ export class ReservationRescheduler {
         this.assertReschedulable(current, current.status);
 
         if (current.scheduledStart.getTime() === newScheduledStart.getTime()) {
-          throw new DomainException({
-            code: RESCHEDULE_ERROR_CODES.SAME_SLOT,
-            message: 'La reserva ya está en ese horario.',
-          });
+          throw new AppException(RESCHEDULE_ERROR_CODES.SAME_SLOT);
         }
 
         const newScheduledEnd = new Date(
@@ -91,11 +89,7 @@ export class ReservationRescheduler {
             tx,
           );
         if (!applied) {
-          throw new DomainException({
-            code: RESCHEDULE_ERROR_CODES.CONCURRENT_CHANGE,
-            message:
-              'La reserva cambió mientras se reagendaba. Revisa su estado actual.',
-          });
+          throw new AppException(RESCHEDULE_ERROR_CODES.CONCURRENT_CHANGE);
         }
 
         const updated = await this.reservationsRepository.findById(
@@ -126,10 +120,9 @@ export class ReservationRescheduler {
     status: ReservationStatus,
   ): void {
     if (!RESCHEDULABLE_STATUSES.includes(status)) {
-      throw new DomainException({
-        code: RESCHEDULE_ERROR_CODES.NOT_RESCHEDULABLE,
+      throw new AppException(RESCHEDULE_ERROR_CODES.NOT_RESCHEDULABLE, {
         message: `Solo se pueden reagendar reservas pendientes de depósito o confirmadas (estado actual: ${status}).`,
-        reservationId: reservation.id,
+        details: { reservationId: reservation.id, status },
       });
     }
   }

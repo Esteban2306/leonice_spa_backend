@@ -1,13 +1,10 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ReservationStatus } from '@prisma/client';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
 import { EventBusService } from 'src/common/events/event.service';
 import { EVENT_TYPES } from 'src/common/events/constants/event.types';
+import { AppException } from '../../common/errors/app.exception';
 
 @Injectable()
 export class CompleteReservationOrchestrator {
@@ -31,9 +28,7 @@ export class CompleteReservationOrchestrator {
       { status: ReservationStatus.COMPLETADA, completedAt: new Date() },
     );
     if (!applied) {
-      throw new ConflictException(
-        'La reserva cambió de estado mientras se completaba. Revisa su estado actual.',
-      );
+      throw new AppException('RESERVATION_CONCURRENT_CHANGE');
     }
 
     const updated = await this.repository.findById(reservationId);

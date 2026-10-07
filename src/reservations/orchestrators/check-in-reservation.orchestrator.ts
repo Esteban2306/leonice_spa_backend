@@ -1,18 +1,14 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ReservationStatus } from '@prisma/client';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
 import { DepositCreditService } from '../service/deposit-credit.service';
-import { DomainException } from '../../common/exceptions/domain.exception';
+import { AppException } from '../../common/errors/app.exception';
+import type { ErrorCode } from '../../common/errors/error-catalog';
 
 export const CHECK_IN_ERROR_CODES = {
   CREDIT_COMMITTED_ELSEWHERE: 'RESERVATION_CREDIT_COMMITTED_ELSEWHERE',
-} as const;
+} as const satisfies Record<string, ErrorCode>;
 
 @Injectable()
 export class CheckInReservationOrchestrator {
@@ -36,12 +32,12 @@ export class CheckInReservationOrchestrator {
       const committed =
         await this.depositCredit.isDepositCommittedElsewhere(reservationId);
       if (committed) {
-        throw new DomainException({
-          code: CHECK_IN_ERROR_CODES.CREDIT_COMMITTED_ELSEWHERE,
-          message:
-            'El adelanto de esta reserva ya respalda otra reserva. No se puede atender sin descontarlo allí.',
-          reservationId,
-        });
+        throw new AppException(
+          CHECK_IN_ERROR_CODES.CREDIT_COMMITTED_ELSEWHERE,
+          {
+            details: { reservationId },
+          },
+        );
       }
       this.logger.warn(
         `Reserva ${reservationId} revivida desde NO_SHOW — el cliente llegó tarde y el admin decidió atenderlo igual`,
@@ -54,9 +50,7 @@ export class CheckInReservationOrchestrator {
       { status: ReservationStatus.CITA_EN_CURSO, checkedInAt: new Date() },
     );
     if (!applied) {
-      throw new ConflictException(
-        'La reserva cambió de estado mientras se registraba la llegada. Revisa su estado actual.',
-      );
+      throw new AppException('RESERVATION_CONCURRENT_CHANGE');
     }
 
     const updated = await this.repository.findById(reservationId);

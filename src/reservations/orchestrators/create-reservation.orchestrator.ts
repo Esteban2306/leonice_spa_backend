@@ -49,6 +49,7 @@ import { PromotionsService } from 'src/promotions/promotions.service';
 import { resolveApplicablePromotion } from 'src/promotions/domain/resolve-applicable-promotion';
 import { applyPromotionDiscount } from 'src/clients/domain/compute-treatment-pricing';
 import { DepositCreditService } from '../service/deposit-credit.service';
+import { AppException } from '../../common/errors/app.exception';
 
 export interface CreateReservationResult {
   reservations: Reservation[];
@@ -220,11 +221,7 @@ export class CreateReservationOrchestrator {
                 createdReservation.id,
               );
               if (!applied) {
-                throw new DomainException({
-                  code: 'CREDIT_ALREADY_APPLIED',
-                  message:
-                    'El crédito del cliente se usó en otra reserva al mismo tiempo. Intenta de nuevo.',
-                });
+                throw new AppException('CREDIT_ALREADY_APPLIED');
               }
             }
             if (hasCredit) creditAppliedIds.push(createdReservation.id);

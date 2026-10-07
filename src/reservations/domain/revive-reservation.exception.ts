@@ -1,4 +1,5 @@
-import { DomainException } from '../../common/exceptions/domain.exception';
+import { AppException } from '../../common/errors/app.exception';
+import type { ErrorCode } from '../../common/errors/error-catalog';
 
 export const REVIVE_ERROR_CODES = {
   NOT_REVIVABLE: 'RESERVATION_NOT_REVIVABLE',
@@ -9,13 +10,13 @@ export const REVIVE_ERROR_CODES = {
   CATEGORY_DAY_CONFLICT: 'RESERVATION_REVIVE_CATEGORY_DAY_CONFLICT',
   CLIENT_OVERLAP: 'RESERVATION_REVIVE_CLIENT_OVERLAP',
   CONCURRENT_CHANGE: 'RESERVATION_REVIVE_CONCURRENT_CHANGE',
-} as const;
+} as const satisfies Record<string, ErrorCode>;
 
 export type ReviveErrorCode =
   (typeof REVIVE_ERROR_CODES)[keyof typeof REVIVE_ERROR_CODES];
 
-export class ReviveReservationException extends DomainException {
+export class ReviveReservationException extends AppException {
   constructor(code: ReviveErrorCode, message: string, reservationId: string) {
-    super({ code, message, reservationId });
+    super(code, { message, details: { reservationId } });
   }
 }
