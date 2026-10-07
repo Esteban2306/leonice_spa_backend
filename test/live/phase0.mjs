@@ -120,6 +120,24 @@ const scenarios = {
     const statuses = [];
     for (let i = 0; i < 8; i++) statuses.push((await api('GET', '/reservations?pageSize=1')).status);
     check('P admin autenticado no recibe 429 en 8 GET /reservations seguidos', !statuses.includes(429), statuses.join(','));
+    const adminWrites = [];
+    for (let i = 0; i < 20; i++) {
+      adminWrites.push((await api('PATCH', '/reservations/00000000-0000-4000-8000-000000000000/revive')).status);
+    }
+    check('P admin autenticado no recibe 429 en 20 escrituras seguidas', !adminWrites.includes(429), [...new Set(adminWrites)].join(','));
+    const anonGets = [];
+    for (let i = 0; i < 25; i++) anonGets.push((await fetch(`${BASE}/categories`)).status);
+    check('P anónimo navegando (25 GET) no recibe 429', !anonGets.includes(429), [...new Set(anonGets)].join(','));
+    const anonPosts = [];
+    for (let i = 0; i < 16; i++) {
+      const res = await fetch(`${BASE}/reservations`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ client: { phone: '+999000000999' } }),
+      });
+      anonPosts.push(res.status);
+    }
+    check('P anónimo escribiendo (16 POST /reservations) sí es limitado', anonPosts.includes(429), anonPosts.join(','));
   },
 
   // S1 — crear: nace PENDIENTE_DEPOSITO con plazo
