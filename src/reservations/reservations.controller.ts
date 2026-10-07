@@ -34,6 +34,7 @@ import { SkipCsrf } from 'src/auth/decorators/skip-csrf.decorator';
 import { AdminCancelReservationOrchestrator } from './orchestrators/admin-cancel-reservation.orchestrator';
 import { AdminCancelReservationDto } from './dto/admin-cancel-reservation.dto';
 import { IdempotencyInterceptor } from 'src/common/idempotency/idempotency.interceptor';
+import { ReviveReservationOrchestrator } from './orchestrators/revive-reservation.orchestrator';
 
 @Controller({ path: 'reservations', version: '1' })
 export class ReservationsController {
@@ -47,6 +48,7 @@ export class ReservationsController {
     private readonly completeOrchestrator: CompleteReservationOrchestrator,
     private readonly adminRescheduleOrchestrator: AdminRescheduleReservationOrchestrator,
     private readonly adminCancelOrchestrator: AdminCancelReservationOrchestrator,
+    private readonly reviveOrchestrator: ReviveReservationOrchestrator,
   ) {}
 
   @Get()
@@ -105,6 +107,11 @@ export class ReservationsController {
       dto.reason,
       dto.notifyClient ?? true,
     );
+  }
+
+  @Patch(':id/revive')
+  revive(@Param('id', ParseUUIDPipe) id: string) {
+    return this.reviveOrchestrator.execute(id);
   }
 
   @Public()

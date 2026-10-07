@@ -30,6 +30,16 @@ export class ReservationsRepository {
     return client.reservation.findUnique({ where: { id } });
   }
 
+  findByComboGroupId(
+    comboGroupId: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.reservation.findMany({
+      where: { comboGroupId },
+      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   async hasSubmittedProof(
     reservationId: string,
     client: PrismaClientOrTx = this.prisma.client,

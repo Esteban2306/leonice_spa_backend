@@ -15,6 +15,7 @@ import { ConfirmValoracionOrchestrator } from './orchestrators/confirm-valoracio
 import { AdminRescheduleReservationOrchestrator } from './orchestrators/admin-reservartion.orchestator';
 import { AdminCancelReservationOrchestrator } from './orchestrators/admin-cancel-reservation.orchestrator';
 import { PromotionsModule } from 'src/promotions/promotions.module';
+import { ReviveReservationOrchestrator } from './orchestrators/revive-reservation.orchestrator';
 import { PlacementCheckService } from './service/placement-check.service';
 import { ReservationRescheduler } from './service/reservation-rescheduler.service';
 
@@ -35,8 +36,10 @@ import { ReservationRescheduler } from './service/reservation-rescheduler.servic
     ConfirmValoracionOrchestrator,
     MarkNoShowOrchestrator,
     AdminCancelReservationOrchestrator,
+    ReviveReservationOrchestrator,
     PlacementCheckService,
     ReservationRescheduler,
+    ReviveReservationOrchestrator,
   ],
   exports: [
     ReservationsService,
