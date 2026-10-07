@@ -16,6 +16,7 @@ import { AdminRescheduleReservationOrchestrator } from './orchestrators/admin-re
 import { AdminCancelReservationOrchestrator } from './orchestrators/admin-cancel-reservation.orchestrator';
 import { PromotionsModule } from 'src/promotions/promotions.module';
 import { PlacementCheckService } from './service/placement-check.service';
+import { ReservationRescheduler } from './service/reservation-rescheduler.service';
 
 @Module({
   imports: [ClientsModule, PromotionsModule],
@@ -35,6 +36,7 @@ import { PlacementCheckService } from './service/placement-check.service';
     MarkNoShowOrchestrator,
     AdminCancelReservationOrchestrator,
     PlacementCheckService,
+    ReservationRescheduler,
   ],
   exports: [
     ReservationsService,

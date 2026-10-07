@@ -30,7 +30,9 @@ export interface EventPayloadMap {
   [EVENT_TYPES.RESERVATION_RESCHEDULED_BY_ADMIN]: {
     reservationId: string;
     clientId: string;
+    previousScheduledStart: Date;
     newScheduledStart: Date;
+    notifyClient: boolean;
     internalNote?: string;
   };
 
@@ -74,6 +76,7 @@ export interface EventPayloadMap {
     newReservationId: string;
     clientId: string;
     newScheduledStart: Date;
+    previousScheduledStart: Date;
   };
 
   [EVENT_TYPES.RESERVATION_COMPLETED]: {

@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { OnEvent } from '@nestjs/event-emitter';
+import { ReservationStatus } from '@prisma/client';
 import {
   EVENT_TYPES,
   EventPayloadMap,
@@ -16,6 +17,8 @@ import { DEFAULT_REMINDER_DAYS } from '../domain/automation-timing.constants';
 
 @Injectable()
 export class ScheduleReminderListener {
+  private readonly logger = new Logger(ScheduleReminderListener.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS)
@@ -26,8 +29,60 @@ export class ScheduleReminderListener {
   async handleReservationConfirmed(
     event: EventOf<EventPayloadMap, typeof EVENT_TYPES.RESERVATION_CONFIRMED>,
   ) {
+    await this.scheduleReminder(
+      event.payload.reservationId,
+      event.payload.scheduledStart,
+    );
+  }
+
+  @OnEvent(EVENT_TYPES.RESERVATION_RESCHEDULED)
+  async handleRescheduledByClient(
+    event: EventOf<EventPayloadMap, typeof EVENT_TYPES.RESERVATION_RESCHEDULED>,
+  ) {
+    await this.rescheduleReminder(
+      event.payload.newReservationId,
+      event.payload.newScheduledStart,
+    );
+  }
+
+  @OnEvent(EVENT_TYPES.RESERVATION_RESCHEDULED_BY_ADMIN)
+  async handleRescheduledByAdmin(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.RESERVATION_RESCHEDULED_BY_ADMIN
+    >,
+  ) {
+    await this.rescheduleReminder(
+      event.payload.reservationId,
+      event.payload.newScheduledStart,
+    );
+  }
+
+  private async rescheduleReminder(
+    reservationId: string,
+    scheduledStart: Date,
+  ): Promise<void> {
+    try {
+      const reservation = await this.prisma.client.reservation.findUnique({
+        where: { id: reservationId },
+        select: { status: true },
+      });
+      if (reservation?.status !== ReservationStatus.CONFIRMADA) return;
+      await this.scheduleReminder(reservationId, scheduledStart);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `No se pudo reprogramar el recordatorio de ${reservationId}: ${message}`,
+      );
+    }
+  }
+
+  private async scheduleReminder(
+    reservationId: string,
+    scheduledStart: Date,
+  ): Promise<void> {
     const reservation = await this.prisma.client.reservation.findUnique({
-      where: { id: event.payload.reservationId },
+      where: { id: reservationId },
       select: { treatmentId: true, categoryId: true },
     });
     if (!reservation) return;
@@ -50,7 +105,7 @@ export class ScheduleReminderListener {
 
     const reminderDays = rule?.reminderDays ?? DEFAULT_REMINDER_DAYS;
     const delay =
-      event.payload.scheduledStart.getTime() -
+      scheduledStart.getTime() -
       reminderDays * 24 * 60 * 60 * 1000 -
       Date.now();
 
@@ -58,7 +113,7 @@ export class ScheduleReminderListener {
 
     await this.queue.add(
       JOB_NAMES.RESERVATION_REMINDER_CHECK,
-      { reservationId: event.payload.reservationId },
+      { reservationId },
       { delay },
     );
   }

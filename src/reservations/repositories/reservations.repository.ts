@@ -26,6 +26,23 @@ export class ReservationsRepository {
     return client.reservation.findUnique({ where: { id } });
   }
 
+  async updateScheduleIfCurrent(
+    id: string,
+    expected: { status: ReservationStatus; scheduledStart: Date },
+    data: { scheduledStart: Date; scheduledEnd: Date },
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<boolean> {
+    const result = await client.reservation.updateMany({
+      where: {
+        id,
+        status: expected.status,
+        scheduledStart: expected.scheduledStart,
+      },
+      data,
+    });
+    return result.count === 1;
+  }
+
   async findByIdWithClientPhone(
     id: string,
     client: PrismaClientOrTx = this.prisma.client,

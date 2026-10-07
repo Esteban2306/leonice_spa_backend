@@ -21,7 +21,6 @@ import { CancelReservationOrchestrator } from './orchestrators/cancel-reservatio
 import { RescheduleReservationOrchestrator } from './orchestrators/reschedule-reservation.orchestrator';
 import { CheckInReservationOrchestrator } from './orchestrators/check-in-reservation.orchestrator';
 import { CompleteReservationOrchestrator } from './orchestrators/complete-reservation.orchestrator';
-import { ConfirmDepositOrchestrator } from './orchestrators/confirm-deposit.orchestrator';
 import { ConfirmValoracionOrchestrator } from './orchestrators/confirm-valoracion.orchestrator';
 import { ConfirmValoracionDto } from './dto/confirm-valoracion.dto';
 import {
@@ -46,7 +45,6 @@ export class ReservationsController {
     private readonly confirmValoracionOrchestrator: ConfirmValoracionOrchestrator,
     private readonly checkInOrchestrator: CheckInReservationOrchestrator,
     private readonly completeOrchestrator: CompleteReservationOrchestrator,
-    private readonly confirmDepositOrchestrator: ConfirmDepositOrchestrator,
     private readonly adminRescheduleOrchestrator: AdminRescheduleReservationOrchestrator,
     private readonly adminCancelOrchestrator: AdminCancelReservationOrchestrator,
   ) {}
@@ -132,7 +130,7 @@ export class ReservationsController {
     return this.adminRescheduleOrchestrator.execute(
       id,
       new Date(dto.newScheduledStart),
-      dto.notifyClient ?? false,
+      dto.notifyClient ?? true,
       dto.internalNote,
     );
   }
