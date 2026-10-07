@@ -1,15 +1,24 @@
 import {
   ArgumentsHost,
   Catch,
-  HttpException,
+  ExceptionFilter,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { RequestContextService } from '../context/request-context.service';
+import {
+  normalizeException,
+  type ErrorResponseBody,
+} from '../errors/normalize-exception';
 
+/**
+ * Único punto de salida de errores HTTP. Toda excepción se normaliza al
+ * contrato de `ErrorResponseBody` (code del catálogo + correlationId) y se
+ * registra una sola vez: 5xx con stack, 4xx como advertencia con su code.
+ */
 @Catch()
-export class AllExceptionsFilter {
+export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionsFilter');
 
   constructor(private readonly requestContext: RequestContextService) {}
@@ -19,32 +28,28 @@ export class AllExceptionsFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const isHttpException = exception instanceof HttpException;
-    const status = isHttpException
-      ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
-    const message = isHttpException
-      ? exception.getResponse()
-      : 'Error interno del servidor';
-
+    const normalized = normalizeException(exception);
     const correlationId = this.requestContext.getCorrelationId();
 
-    const logLine = `${request.method} ${request.originalUrl} → ${status}`;
-    if (status >= 500) {
+    const logLine = `${request.method} ${request.originalUrl} → ${normalized.status} ${normalized.code}`;
+    if (normalized.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         logLine,
         exception instanceof Error ? exception.stack : String(exception),
-        'ExceptionsFilter',
       );
     } else {
-      this.logger.warn(logLine, 'ExceptionsFilter');
+      this.logger.warn(`${logLine}: ${normalized.message}`);
     }
-    response.status(status).json({
-      statusCode: status,
-      message,
+
+    const body: ErrorResponseBody = {
+      statusCode: normalized.status,
+      code: normalized.code,
+      message: normalized.message,
+      ...(normalized.details ? { details: normalized.details } : {}),
       correlationId,
       timestamp: new Date().toISOString(),
       path: request.originalUrl,
-    });
+    };
+    response.status(normalized.status).json(body);
   }
 }
