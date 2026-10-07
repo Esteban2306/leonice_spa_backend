@@ -11,6 +11,7 @@ import { DepositsLookupController } from './deposits-lookup.controller';
 import { PendingDepositLookupService } from './services/pending-deposit-lookup.service';
 import { ClientsRepository } from 'src/clients/repositories/clients.repository';
 import { EncryptionService } from 'src/infrastructure/encryption/encryption.service';
+import { DepositCreditService } from 'src/reservations/service/deposit-credit.service';
 
 @Module({
   imports: [ReservationsModule],
@@ -25,6 +26,8 @@ import { EncryptionService } from 'src/infrastructure/encryption/encryption.serv
     EncryptionService,
     ClientsRepository,
     PendingDepositLookupService,
+    DepositCreditService,
   ],
+  exports: [DepositCreditService],
 })
 export class DepositsModule {}

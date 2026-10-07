@@ -89,6 +89,23 @@ export class ReservationsRepository {
     });
   }
 
+  findByClientAndDayWithStatus(
+    clientId: string,
+    dayStart: Date,
+    dayEnd: Date,
+    status: ReservationStatus,
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.reservation.findMany({
+      where: {
+        clientId,
+        status,
+        scheduledStart: { gte: dayStart, lt: dayEnd },
+      },
+      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   findGroupingProjection(filters: ReservationFilters) {
     return this.prisma.client.reservation.findMany({
       where: this.buildWhere(filters),

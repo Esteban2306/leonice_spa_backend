@@ -1,5 +1,6 @@
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { DepositStatus, DepositVerificationMethod } from '@prisma/client';
+import { Transform } from 'class-transformer';
 
 export class FindDepositsQueryDto {
   @IsOptional()
@@ -17,4 +18,17 @@ export class FindDepositsQueryDto {
   @IsOptional()
   @IsUUID()
   clientId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  page = 1;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize = 20;
 }

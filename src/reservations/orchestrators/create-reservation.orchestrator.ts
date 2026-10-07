@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
   Prisma,
@@ -16,16 +16,14 @@ import {
 } from 'src/infrastructure/queue/queue.constants';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
+import { PlacementCheckService } from '../service/placement-check.service';
+import { placementRejectionException } from '../domain/placement-rejection.exception';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { validateAdvancedWindow } from '../validators/validate-advance-window';
-import { fitsOperatingHours } from '../domain/validate-operating-hours';
 import { assertNoSameDayCategoryConflict } from '../validators/assert-no-same-day-category-conflict';
 import { assertNoDuplicateCategoriesInCombo } from '../validators/assert-no-duplicate-categories-in-combo';
 import { DomainException } from 'src/common/exceptions/domain.exception';
-import {
-  DEPOSITO_TIMEOUT_MS,
-  VALORACION_TIMEOUT_MS,
-} from '../domain/reservation-timing.constants';
+import { DEPOSITO_TIMEOUT_MS } from '../domain/reservation-timing.constants';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { getDayBoundaries } from '../domain/day-boundaries';
@@ -50,14 +48,18 @@ import { determineTreatmentPricing } from 'src/catalog/treatments/validators/com
 import { PromotionsService } from 'src/promotions/promotions.service';
 import { resolveApplicablePromotion } from 'src/promotions/domain/resolve-applicable-promotion';
 import { applyPromotionDiscount } from 'src/clients/domain/compute-treatment-pricing';
+import { DepositCreditService } from '../service/deposit-credit.service';
 
 export interface CreateReservationResult {
   reservations: Reservation[];
   summary: string;
+  creditAppliedReservationIds: string[];
 }
 
 @Injectable()
 export class CreateReservationOrchestrator {
+  private readonly logger = new Logger(CreateReservationOrchestrator.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly availabilityRepository: AvailabilityRepository,
@@ -65,6 +67,8 @@ export class CreateReservationOrchestrator {
     private readonly clientService: ClientsService,
     private readonly eventBus: EventBusService,
     private readonly promotionsService: PromotionsService,
+    private readonly placementCheck: PlacementCheckService,
+    private readonly depositCredit: DepositCreditService,
     @InjectQueue(QUEUE_NAMES.RESERVATION_TIMEOUTS)
     private readonly timeoutsQueue: Queue,
   ) {}
@@ -124,7 +128,7 @@ export class CreateReservationOrchestrator {
     const categoryIds = [...new Set(treatments.map((t) => t.categoryId))];
     const { dayStart, dayEnd } = getDayBoundaries(requestedStart);
 
-    const { reservations, resolvedSegments } =
+    const { reservations, resolvedSegments, creditAppliedIds } =
       await this.availabilityRepository.withCategoriesLock(
         categoryIds,
         requestedStart,
@@ -140,7 +144,13 @@ export class CreateReservationOrchestrator {
           const resolved: BookedSegmentSummary[] = [];
           const created: Reservation[] = [];
 
-          for (const draft of draftSegments) {
+          const creditAppliedIds: string[] = [];
+          const availableCredits =
+            await this.depositCredit.findAvailableForClient(client.id, tx);
+          const credit = availableCredits[0] ?? null;
+          const hasCredit = credit !== null;
+
+          for (const [index, draft] of draftSegments.entries()) {
             const treatment = treatments.find(
               (t) => t.id === draft.treatmentId,
             )!;
@@ -155,6 +165,7 @@ export class CreateReservationOrchestrator {
 
             const placement = await this.resolvePlacement({
               tx,
+              clientId: client.id,
               categoryId: draft.categoryId,
               categoryName: draft.categoryName,
               durationMinutes: draft.durationMinutes,
@@ -178,13 +189,10 @@ export class CreateReservationOrchestrator {
               hasCategoryConflict,
             );
 
-            const requiresAssessment = treatment.requiresPriorAssessment;
-            const price = requiresAssessment
+            const price = treatment.requiresPriorAssessment
               ? (treatment.basePriceMax ?? 0)
               : (treatment.basePriceMin ?? 0);
-            const initialStatus = requiresAssessment
-              ? ReservationStatus.PENDIENTE_VALORACION
-              : ReservationStatus.PENDIENTE_DEPOSITO;
+            const initialStatus = ReservationStatus.PENDIENTE_DEPOSITO;
 
             const createdReservation = await tx.reservation.create({
               data: {
@@ -198,8 +206,28 @@ export class CreateReservationOrchestrator {
                 finalPrice: price,
                 finalDurationMinutes: draft.durationMinutes,
                 comboGroupId,
+                depositExpiresAt: hasCredit
+                  ? null
+                  : new Date(Date.now() + DEPOSITO_TIMEOUT_MS),
               },
             });
+
+            if (credit && index === 0) {
+              const applied = await this.depositCredit.applyToReservation(
+                tx,
+                credit.depositId,
+                credit.appliedToReservationId,
+                createdReservation.id,
+              );
+              if (!applied) {
+                throw new DomainException({
+                  code: 'CREDIT_ALREADY_APPLIED',
+                  message:
+                    'El crédito del cliente se usó en otra reserva al mismo tiempo. Intenta de nuevo.',
+                });
+              }
+            }
+            if (hasCredit) creditAppliedIds.push(createdReservation.id);
 
             created.push(createdReservation);
             resolved.push({
@@ -211,7 +239,11 @@ export class CreateReservationOrchestrator {
             });
           }
 
-          return { reservations: created, resolvedSegments: resolved };
+          return {
+            reservations: created,
+            resolvedSegments: resolved,
+            creditAppliedIds,
+          };
         },
       );
 
@@ -219,17 +251,13 @@ export class CreateReservationOrchestrator {
       const reservation = reservations[i];
       const draft = draftSegments[i];
 
-      if (reservation.status === ReservationStatus.PENDIENTE_VALORACION) {
-        await this.timeoutsQueue.add(
-          JOB_NAMES.VALORACION_TIMEOUT,
-          { reservationId: reservation.id },
-          { delay: VALORACION_TIMEOUT_MS },
-        );
-      } else {
-        await this.timeoutsQueue.add(
-          JOB_NAMES.DEPOSITO_TIMEOUT,
-          { reservationId: reservation.id },
-          { delay: DEPOSITO_TIMEOUT_MS },
+      if (
+        reservation.status === ReservationStatus.PENDIENTE_DEPOSITO &&
+        reservation.depositExpiresAt
+      ) {
+        await this.scheduleDepositTimeout(
+          reservation.id,
+          reservation.depositExpiresAt,
         );
       }
 
@@ -256,11 +284,16 @@ export class CreateReservationOrchestrator {
       }
     }
 
-    return { reservations, summary: buildBookingSummary(resolvedSegments) };
+    return {
+      reservations,
+      summary: buildBookingSummary(resolvedSegments),
+      creditAppliedReservationIds: creditAppliedIds,
+    };
   }
 
   private async resolvePlacement(params: {
     tx: Prisma.TransactionClient;
+    clientId: string;
     categoryId: string;
     categoryName: string;
     durationMinutes: number;
@@ -276,6 +309,7 @@ export class CreateReservationOrchestrator {
   }> {
     const {
       tx,
+      clientId,
       categoryId,
       categoryName,
       durationMinutes,
@@ -304,62 +338,89 @@ export class CreateReservationOrchestrator {
     let candidateEnd = new Date(
       candidateStart.getTime() + durationMinutes * 60_000,
     );
+
+    const decision = await this.placementCheck.evaluate(tx, {
+      clientId,
+      categoryId,
+      start: candidateStart,
+      end: candidateEnd,
+    });
+
+    if (decision.ok) {
+      return {
+        scheduledStart: candidateStart,
+        scheduledEnd: candidateEnd,
+        wasAdjusted,
+        adjustmentReason,
+      };
+    }
+
+    if (decision.reason === 'CATEGORY_DAY_CONFLICT') {
+      assertNoSameDayCategoryConflict(categoryName, true);
+      throw placementRejectionException(decision.reason);
+    }
+    if (
+      decision.reason === 'INVALID_RANGE' ||
+      decision.reason === 'IN_THE_PAST'
+    ) {
+      throw placementRejectionException(decision.reason);
+    }
+
     const capacity = await this.availabilityRepository.getCapacityForCategory(
       categoryId,
       tx,
     );
-    const fits = fitsOperatingHours(candidateStart, candidateEnd);
-    const stillConflicts = overlapsAny(
-      candidateStart,
-      candidateEnd,
-      conflictIntervals,
-    );
-    const concurrent = fits
-      ? await this.availabilityRepository.getMaxConcurrentInWindow(
-          tx,
-          categoryId,
-          candidateStart,
-          candidateEnd,
-        )
-      : Infinity;
+    const held =
+      await this.availabilityRepository.getHoldingReservationsInRange(
+        categoryId,
+        dayStart,
+        dayEnd,
+      );
+    const windows = getOperatingWindowsForDate(idealStart);
+    const allCandidates = generateAvailableSlots({
+      operatingWindows: windows,
+      held,
+      durationMinutes,
+      capacity,
+    });
+    const validCandidates = allCandidates.filter((c) => {
+      const end = new Date(c.getTime() + durationMinutes * 60_000);
+      return !overlapsAny(c, end, conflictIntervals);
+    });
 
-    if (!fits || stillConflicts || concurrent >= capacity) {
-      const held =
-        await this.availabilityRepository.getHoldingReservationsInRange(
-          categoryId,
-          dayStart,
-          dayEnd,
-        );
-      const windows = getOperatingWindowsForDate(idealStart);
-      const allCandidates = generateAvailableSlots({
-        operatingWindows: windows,
-        held,
-        durationMinutes,
-        capacity,
-      });
-      const validCandidates = allCandidates.filter((c) => {
-        const end = new Date(c.getTime() + durationMinutes * 60_000);
-        return !overlapsAny(c, end, conflictIntervals);
-      });
-
-      const nearest = findNearestSlot(validCandidates, idealStart);
-      if (!nearest) {
-        throw new DomainException(
-          `No hay cupo disponible para ${categoryName} ese día, ni siquiera ajustando el horario. Intenta otro día.`,
-        );
-      }
-
-      candidateStart = nearest;
-      candidateEnd = new Date(nearest.getTime() + durationMinutes * 60_000);
-      wasAdjusted = true;
-      adjustmentReason = 'se reubicó al horario disponible más cercano ese día';
+    const nearest = findNearestSlot(validCandidates, idealStart);
+    if (!nearest) {
+      throw new DomainException(
+        `No hay cupo disponible para ${categoryName} ese día, ni siquiera ajustando el horario. Intenta otro día.`,
+      );
     }
+
+    candidateStart = nearest;
+    candidateEnd = new Date(nearest.getTime() + durationMinutes * 60_000);
 
     return {
       scheduledStart: candidateStart,
       scheduledEnd: candidateEnd,
-      wasAdjusted,
-      adjustmentReason,
+      wasAdjusted: true,
+      adjustmentReason: 'se reubicó al horario disponible más cercano ese día',
     };
+  }
+
+  private async scheduleDepositTimeout(
+    reservationId: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    try {
+      await this.timeoutsQueue.add(
+        JOB_NAMES.DEPOSITO_TIMEOUT,
+        { reservationId },
+        { delay: Math.max(expiresAt.getTime() - Date.now(), 0) },
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `No se pudo encolar deposito-timeout de ${reservationId}; lo cubrirá el barrido: ${message}`,
+      );
+    }
   }
 }

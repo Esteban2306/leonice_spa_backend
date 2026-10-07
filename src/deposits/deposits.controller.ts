@@ -59,10 +59,6 @@ export class DepositsController {
     private readonly automaticStrategy: AutomaticDepositVerificationStrategy,
     private readonly cloudinary: CloudinaryService,
   ) {}
-  @Get()
-  findAll(@Param('id', ParseUUIDPipe) reservationId: string) {
-    return this.depositsRepository.findMany({ reservationId });
-  }
 
   @Get()
   findAllByReservationId(@Param('id', ParseUUIDPipe) reservationId: string) {
@@ -119,6 +115,8 @@ export class DepositsController {
       reservationId,
       user.id,
       dto.coverage,
+      dto.amount,
+      dto.scope,
     );
   }
 

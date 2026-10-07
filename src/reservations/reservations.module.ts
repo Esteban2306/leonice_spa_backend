@@ -18,6 +18,7 @@ import { PromotionsModule } from 'src/promotions/promotions.module';
 import { ReviveReservationOrchestrator } from './orchestrators/revive-reservation.orchestrator';
 import { PlacementCheckService } from './service/placement-check.service';
 import { ReservationRescheduler } from './service/reservation-rescheduler.service';
+import { DepositCreditService } from './service/deposit-credit.service';
 
 @Module({
   imports: [ClientsModule, PromotionsModule],
@@ -40,6 +41,7 @@ import { ReservationRescheduler } from './service/reservation-rescheduler.servic
     PlacementCheckService,
     ReservationRescheduler,
     ReviveReservationOrchestrator,
+    DepositCreditService,
   ],
   exports: [
     ReservationsService,

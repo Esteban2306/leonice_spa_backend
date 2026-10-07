@@ -8,6 +8,8 @@ import { SubmitAutomaticDepositDto } from './dto/submit-automatic-deposit.dto';
 import { assertValidImageDataUri } from './validators/assert-valid-image-data-uri';
 import { FindDepositsQueryDto } from './dto/find-deposits-query.dto';
 import { DepositsRepository } from './repositories/deposits.repositories';
+import { DepositCreditService } from 'src/reservations/service/deposit-credit.service';
+import { FindClientCreditsQueryDto } from './dto/find-client-credits-query.dto';
 
 @Controller({ path: 'deposits', version: '1' })
 export class DepositsLookupController {
@@ -17,11 +19,28 @@ export class DepositsLookupController {
     private readonly automaticStrategy: AutomaticDepositVerificationStrategy,
     private readonly cloudinary: CloudinaryService,
     private readonly depositsRepository: DepositsRepository,
+    private readonly depositCredit: DepositCreditService,
   ) {}
 
   @Get()
   findMany(@Query() query: FindDepositsQueryDto) {
-    return this.depositsRepository.findMany(query);
+    return this.depositsRepository.findMany(
+      {
+        status: query.status,
+        method: query.method,
+        reservationId: query.reservationId,
+        clientId: query.clientId,
+      },
+      {
+        page: query.page,
+        pageSize: query.pageSize,
+      },
+    );
+  }
+
+  @Get('credits')
+  findCredits(@Query() query: FindClientCreditsQueryDto) {
+    return this.depositCredit.summarizeForClient(query.clientId);
   }
 
   @UseGuards(ConduitToolAuthGuard)
