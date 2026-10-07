@@ -31,6 +31,7 @@ import { MonitoringInterceptor } from './monitoring/monitoring.interceptor';
 import { AuditModule } from './audit/audit.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { MonitoringService } from './monitoring/monitoring.service';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { MonitoringService } from './monitoring/monitoring.service';
     AuditModule,
     MonitoringModule,
     DepositsModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [

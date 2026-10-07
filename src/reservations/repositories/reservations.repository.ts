@@ -152,6 +152,47 @@ export class ReservationsRepository {
     });
   }
 
+  async findManyForCalendar(dayStart: Date, dayEnd: Date) {
+    return this.prisma.client.reservation.findMany({
+      where: {
+        scheduledStart: {
+          gte: dayStart,
+          lt: dayEnd,
+        },
+      },
+      orderBy: {
+        scheduledStart: 'asc',
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+        treatment: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        deposit: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+        },
+      },
+    });
+  }
+
   async updateStatusIfCurrent(
     id: string,
     expectedStatus: ReservationStatus,
@@ -268,6 +309,68 @@ export class ReservationsRepository {
         deposit: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
+  }
+
+  async getDashboardSummary(dayStart: Date, dayEnd: Date) {
+    const [
+      completedReservations,
+      pendingReservations,
+      dailyEarnings,
+      todayAppointments,
+    ] = await this.prisma.client.$transaction([
+      this.prisma.client.reservation.count({
+        where: {
+          scheduledStart: {
+            gte: dayStart,
+            lt: dayEnd,
+          },
+          status: ReservationStatus.COMPLETADA,
+        },
+      }),
+
+      this.prisma.client.reservation.count({
+        where: {
+          status: ReservationStatus.PENDIENTE_DEPOSITO,
+        },
+      }),
+
+      this.prisma.client.reservation.aggregate({
+        where: {
+          scheduledStart: {
+            gte: dayStart,
+            lt: dayEnd,
+          },
+          status: ReservationStatus.COMPLETADA,
+        },
+        _sum: {
+          finalPrice: true,
+        },
+      }),
+
+      this.prisma.client.reservation.count({
+        where: {
+          scheduledStart: {
+            gte: dayStart,
+            lt: dayEnd,
+          },
+          status: {
+            in: [
+              ReservationStatus.PENDIENTE_DEPOSITO,
+              ReservationStatus.CONFIRMADA,
+              ReservationStatus.CITA_EN_CURSO,
+              ReservationStatus.COMPLETADA,
+            ],
+          },
+        },
+      }),
+    ]);
+
+    return {
+      completedReservations,
+      pendingReservations,
+      dailyEarnings: dailyEarnings._sum.finalPrice ?? 0,
+      todayAppointments,
+    };
   }
 
   async hasActiveReservationInCategoryOnDay(
