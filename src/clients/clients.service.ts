@@ -72,14 +72,14 @@ export class ClientsService {
     });
   }
 
-  async search(query?: string) {
-    if (!query || query.trim() === '') {
+  async search(query?: string, page = 1, pageSize = 20) {
+    if (!query || query.trim().length < 2) {
       throw new BadRequestException(
         'Escribe al menos 2 caracteres para buscar',
       );
     }
 
-    return this.repository.searchByName(query.trim());
+    return this.repository.searchByName(query.trim(), page, pageSize);
   }
 
   async getDetail(id: string) {

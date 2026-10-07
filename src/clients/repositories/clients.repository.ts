@@ -58,12 +58,47 @@ export class ClientsRepository {
     return client ? this.decryptSensitive(client) : null;
   }
 
-  async searchByName(query: string, take = 20) {
-    return this.prisma.client.client.findMany({
-      where: { name: { contains: query, mode: 'insensitive' } },
-      take,
-      select: { id: true, name: true, phone: true, createdAt: true },
-    });
+  async searchByName(query: string, page = 1, pageSize = 20) {
+    const where = {
+      name: {
+        contains: query,
+        mode: 'insensitive' as const,
+      },
+    };
+
+    const skip = (page - 1) * pageSize;
+
+    const [clients, total] = await this.prisma.client.$transaction([
+      this.prisma.client.client.findMany({
+        where,
+        orderBy: {
+          name: 'asc',
+        },
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          createdAt: true,
+        },
+      }),
+
+      this.prisma.client.client.count({
+        where,
+      }),
+    ]);
+
+    return {
+      data: clients,
+
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
   }
 
   async create(data: CreateClientData) {

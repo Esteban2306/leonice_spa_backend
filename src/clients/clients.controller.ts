@@ -12,6 +12,7 @@ import { ClientsService } from './clients.service';
 import { ResolveClientDto } from './dto/resolve-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { Public } from '../auth/decorators/public.decorator';
+import { FindClientsQueryDto } from './dto/find-clients-query.dto';
 
 @Controller({ path: 'clients', version: '1' })
 export class ClientsController {
@@ -30,8 +31,8 @@ export class ClientsController {
   }
 
   @Get()
-  async search(@Query('q') query?: string) {
-    return this.clientsService.search(query);
+  async search(@Query() query: FindClientsQueryDto) {
+    return this.clientsService.search(query.q, query.page, query.pageSize);
   }
 
   @Get(':id')
