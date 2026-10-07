@@ -21,6 +21,7 @@ import { EventModule } from './common/events/event.module';
 import { QueueModule } from './infrastructure/queue/bullmq.module';
 import { AutomationModule } from './automation/automation.module';
 import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
+import { GlobalGuardChain } from './common/guards/global-guard-chain.guard';
 import { PromotionsModule } from './promotions/promotions.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { DepositsModule } from './deposits/deposits.module';
@@ -78,10 +79,8 @@ import { AdminModule } from './admin/admin.module';
         new MonitoringInterceptor(monitoringService),
       inject: [MonitoringService],
     },
-    {
-      provide: APP_GUARD,
-      useClass: ClientThrottlerGuard,
-    },
+    ClientThrottlerGuard,
+    { provide: APP_GUARD, useClass: GlobalGuardChain },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
