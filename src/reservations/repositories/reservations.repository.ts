@@ -22,6 +22,21 @@ interface UpdateStatusData {
   depositExpiresAt?: Date | null;
 }
 
+export interface ReservationFilters {
+  dayStart?: Date;
+  dayEnd?: Date;
+  status?: ReservationStatus;
+  categoryId?: string;
+  clientId?: string;
+}
+
+export interface ReservationPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 @Injectable()
 export class ReservationsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -40,6 +55,58 @@ export class ReservationsRepository {
     });
   }
 
+  async findByIdWithDetails(id: string) {
+    return this.prisma.client.reservation.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+        treatment: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        deposit: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+    });
+  }
+
+  findGroupingProjection(filters: ReservationFilters) {
+    return this.prisma.client.reservation.findMany({
+      where: this.buildWhere(filters),
+      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        clientId: true,
+        status: true,
+        scheduledStart: true,
+        deposit: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { status: true },
+        },
+      },
+    });
+  }
+
   async hasSubmittedProof(
     reservationId: string,
     client: PrismaClientOrTx = this.prisma.client,
@@ -52,6 +119,20 @@ export class ReservationsRepository {
       },
     });
     return count > 0;
+  }
+
+  findManyByIdsWithDetails(ids: string[]) {
+    return this.prisma.client.reservation.findMany({
+      where: { id: { in: ids } },
+      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+      include: {
+        client: { select: { id: true, name: true, phone: true } },
+        treatment: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true } },
+        deposit: { orderBy: { createdAt: 'desc' }, take: 1 },
+        appliedDeposits: { select: { id: true, amount: true } },
+      },
+    });
   }
 
   async updateStatusIfCurrent(
@@ -239,5 +320,18 @@ export class ReservationsRepository {
       where: { id },
       data: { ...data, valoracionRespondedAt: new Date() },
     });
+  }
+
+  private buildWhere(
+    filters: ReservationFilters,
+  ): Prisma.ReservationWhereInput {
+    return {
+      ...(filters.dayStart && filters.dayEnd
+        ? { scheduledStart: { gte: filters.dayStart, lt: filters.dayEnd } }
+        : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+      ...(filters.clientId ? { clientId: filters.clientId } : {}),
+    };
   }
 }

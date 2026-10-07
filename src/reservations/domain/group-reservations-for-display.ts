@@ -5,19 +5,28 @@ import {
   Reservation,
   ReservationStatus,
 } from '@prisma/client';
-import { getOperatingWindowsForDate } from './operating-hours';
+import { getCalendarDayKey } from './calendar-day-key';
 
 export type ReservationWithRelations = Reservation & {
   client: { id: string; name: string; phone: string };
   treatment: { id: string; name: string };
   category: { id: string; name: string };
   deposit: DepositRecord[];
+  depositExpiresAt: Date | null;
+  appliedDeposits?: Array<Pick<DepositRecord, 'id' | 'amount'>>;
 };
 
 export interface LatestDepositSummary {
   status: DepositStatus;
   coverage: DepositCoverage | null;
   imageUrl: string | null;
+  amount: string | null;
+}
+
+export interface AppliedCreditSummary {
+  depositId: string;
+  amount: string | null;
+  viaCombo: boolean;
 }
 
 export interface GroupedReservation {
@@ -34,7 +43,33 @@ export interface GroupedReservation {
     finalPrice: string;
     latestDeposit: LatestDepositSummary | null;
     hasUnresolvedDeposit: boolean;
+    isProofUnderReview: boolean;
+    depositExpiresAt: Date | null;
+    appliedCredit: AppliedCreditSummary | null;
   }>;
+}
+
+export interface ReservationGroupingRow {
+  id: string;
+  clientId: string;
+  status: ReservationStatus;
+  scheduledStart: Date;
+  deposit: Array<Pick<DepositRecord, 'status'>>;
+}
+
+export interface ReservationGroupsPage {
+  reservationIds: string[];
+  total: number;
+  totalPages: number;
+}
+
+type CreditRef = Pick<AppliedCreditSummary, 'depositId' | 'amount'>;
+
+function getReservationGroupKey(r: {
+  clientId: string;
+  scheduledStart: Date;
+}): string {
+  return `${r.clientId}:${getCalendarDayKey(r.scheduledStart)}`;
 }
 
 function toLatestDepositSummary(
@@ -46,13 +81,33 @@ function toLatestDepositSummary(
         status: latest.status,
         coverage: latest.coverage,
         imageUrl: latest.imageUrl,
+        amount: latest.amount?.toString() ?? null,
       }
     : null;
 }
 
+function toOwnCredit(r: ReservationWithRelations): CreditRef | null {
+  const credit = r.appliedDeposits?.[0];
+  return credit
+    ? { depositId: credit.id, amount: credit.amount?.toString() ?? null }
+    : null;
+}
+
+function resolveAppliedCredit(
+  r: ReservationWithRelations,
+  creditByCombo: Map<string, CreditRef>,
+): AppliedCreditSummary | null {
+  const own = toOwnCredit(r);
+  if (own) return { ...own, viaCombo: false };
+  if (r.comboGroupId === null) return null;
+
+  const shared = creditByCombo.get(r.comboGroupId);
+  return shared ? { ...shared, viaCombo: true } : null;
+}
+
 export function computeHasUnresolvedDeposit(
   status: ReservationStatus,
-  deposits: DepositRecord[],
+  deposits: Array<Pick<DepositRecord, 'status'>>,
 ): boolean {
   const [latest] = deposits;
   if (!latest) return false;
@@ -63,81 +118,82 @@ export function computeHasUnresolvedDeposit(
   return reservationDidNotHappen && moneyWasAccepted;
 }
 
-export function isEffectivelyConsecutive(
-  cursorEnd: Date,
-  candidateStart: Date,
+export function isProofUnderReview(
+  status: ReservationStatus,
+  deposits: Array<Pick<DepositRecord, 'status' | 'imageUrl'>>,
 ): boolean {
-  if (cursorEnd.getTime() === candidateStart.getTime()) return true;
-  if (candidateStart.getTime() < cursorEnd.getTime()) return false;
-
-  if (cursorEnd.toDateString() !== candidateStart.toDateString()) return false;
-
-  const windowsThatDay = getOperatingWindowsForDate(cursorEnd);
-  const hasOpenTimeInGap = windowsThatDay.some(
-    (w) =>
-      w.start.getTime() < candidateStart.getTime() &&
-      w.end.getTime() > cursorEnd.getTime(),
+  const [latest] = deposits;
+  return (
+    status === ReservationStatus.PENDIENTE_DEPOSITO &&
+    latest !== undefined &&
+    latest.status === DepositStatus.PENDIENTE &&
+    latest.imageUrl !== null
   );
+}
 
-  return !hasOpenTimeInGap;
+export function paginateReservationGroups(
+  rows: ReservationGroupingRow[],
+  pagination: { page: number; pageSize: number },
+  options: { onlyUnresolvedDeposit: boolean },
+): ReservationGroupsPage {
+  const candidates = options.onlyUnresolvedDeposit
+    ? rows.filter((r) => computeHasUnresolvedDeposit(r.status, r.deposit))
+    : rows;
+
+  const groups = new Map<string, string[]>();
+
+  for (const r of candidates) {
+    const key = getReservationGroupKey(r);
+    const bucket = groups.get(key);
+    if (bucket) {
+      bucket.push(r.id);
+    } else {
+      groups.set(key, [r.id]);
+    }
+  }
+
+  const allGroups = [...groups.values()];
+  const start = (pagination.page - 1) * pagination.pageSize;
+
+  return {
+    reservationIds: allGroups.slice(start, start + pagination.pageSize).flat(),
+    total: allGroups.length,
+    totalPages: Math.ceil(allGroups.length / pagination.pageSize),
+  };
 }
 
 export function groupReservationsForDisplay(
   reservations: ReservationWithRelations[],
 ): GroupedReservation[] {
-  const byComboGroupId = new Map<string, ReservationWithRelations[]>();
-
-  const ungrouped: ReservationWithRelations[] = [];
-
-  for (const r of reservations) {
-    if (r.comboGroupId) {
-      const bucket = byComboGroupId.get(r.comboGroupId) ?? [];
-      bucket.push(r);
-      byComboGroupId.set(r.comboGroupId, bucket);
-    } else {
-      ungrouped.push(r);
-    }
-  }
-
-  const groups: ReservationWithRelations[][] = [...byComboGroupId.values()];
-
-  const sortedUngrouped = [...ungrouped].sort(
-    (a, b) =>
-      a.clientId.localeCompare(b.clientId) ||
-      a.scheduledStart.getTime() - b.scheduledStart.getTime(),
+  const sorted = [...reservations].sort(
+    (a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime(),
   );
 
-  const consumed = new Set<string>();
+  const groups = new Map<string, ReservationWithRelations[]>();
 
-  for (const r of sortedUngrouped) {
-    if (consumed.has(r.id)) continue;
-
-    const chain = [r];
-    consumed.add(r.id);
-
-    let cursor = r;
-
-    for (const candidate of sortedUngrouped) {
-      if (consumed.has(candidate.id)) continue;
-      if (candidate.clientId !== cursor.clientId) continue;
-      if (
-        isEffectivelyConsecutive(cursor.scheduledEnd, candidate.scheduledStart)
-      ) {
-        chain.push(candidate);
-        consumed.add(candidate.id);
-        cursor = candidate;
-      }
+  for (const r of sorted) {
+    const key = getReservationGroupKey(r);
+    const bucket = groups.get(key);
+    if (bucket) {
+      bucket.push(r);
+    } else {
+      groups.set(key, [r]);
     }
-    groups.push(chain);
   }
 
-  return groups.map((group) => ({
-    isCombo: group.length > 1,
-    comboGroupId: group[0].comboGroupId,
-    client: group[0].client,
-    items: group
-      .sort((a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime())
-      .map((r) => ({
+  return [...groups.values()].map((group) => {
+    const creditByCombo = new Map<string, CreditRef>();
+    for (const r of group) {
+      const own = toOwnCredit(r);
+      if (own && r.comboGroupId !== null)
+        creditByCombo.set(r.comboGroupId, own);
+    }
+
+    return {
+      isCombo: group.length > 1,
+      comboGroupId: group[0].comboGroupId,
+      client: group[0].client,
+      items: group.map((r) => ({
         reservationId: r.id,
         treatment: r.treatment,
         category: r.category,
@@ -147,6 +203,10 @@ export function groupReservationsForDisplay(
         finalPrice: r.finalPrice.toString(),
         latestDeposit: toLatestDepositSummary(r.deposit),
         hasUnresolvedDeposit: computeHasUnresolvedDeposit(r.status, r.deposit),
+        isProofUnderReview: isProofUnderReview(r.status, r.deposit),
+        depositExpiresAt: r.depositExpiresAt,
+        appliedCredit: resolveAppliedCredit(r, creditByCombo),
       })),
-  }));
+    };
+  });
 }

@@ -9,8 +9,8 @@ import { formatLocalTime } from './domain/format-local-time';
 import { FindReservationsQueryDto } from './dto/find-reservations-query.dto';
 import { getDayBoundaries } from './domain/day-boundaries';
 import {
-  computeHasUnresolvedDeposit,
   groupReservationsForDisplay,
+  paginateReservationGroups,
 } from './domain/group-reservations-for-display';
 
 const AVAILABILITY_CACHE_TTL_SECONDS = 10;
@@ -49,8 +49,13 @@ export class ReservationsService {
   }
 
   async getById(id: string) {
-    const reservation = await this.reservationsRepository.findById(id);
-    if (!reservation) throw new NotFoundException('Reserva no encontrada');
+    const reservation =
+      await this.reservationsRepository.findByIdWithDetails(id);
+
+    if (!reservation) {
+      throw new NotFoundException('Reserva no encontrada');
+    }
+
     return reservation;
   }
 
@@ -58,7 +63,8 @@ export class ReservationsService {
     const dayBoundaries = query.date
       ? getDayBoundaries(new Date(`${query.date}T00:00:00`))
       : undefined;
-    const reservations = await this.reservationsRepository.findMany({
+
+    const rows = await this.reservationsRepository.findGroupingProjection({
       dayStart: dayBoundaries?.dayStart,
       dayEnd: dayBoundaries?.dayEnd,
       status: query.status,
@@ -66,14 +72,26 @@ export class ReservationsService {
       clientId: query.clientId,
     });
 
-    const filtered =
-      query.hasUnresolvedDeposit === true
-        ? reservations.filter((r) =>
-            computeHasUnresolvedDeposit(r.status, r.deposit),
-          )
-        : reservations;
+    const groupsPage = paginateReservationGroups(
+      rows,
+      { page: query.page, pageSize: query.pageSize },
+      { onlyUnresolvedDeposit: query.hasUnresolvedDeposit === true },
+    );
 
-    return groupReservationsForDisplay(filtered);
+    const reservations =
+      await this.reservationsRepository.findManyByIdsWithDetails(
+        groupsPage.reservationIds,
+      );
+
+    return {
+      data: groupReservationsForDisplay(reservations),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total: groupsPage.total,
+        totalPages: groupsPage.totalPages,
+      },
+    };
   }
 
   private async computeAvailability(
