@@ -70,8 +70,8 @@ async function enqueueTimeout(reservationId) {
   await q.add('deposito-timeout', { reservationId });
   await q.close();
 }
-// AllExceptionsFilter responde {statusCode, message: <cuerpo de la excepción>}
-const errCode = (r) => r.body?.message?.code ?? r.body?.code;
+// Contrato de errores: {statusCode, code, message, details?, correlationId, timestamp, path}
+const errCode = (r) => r.body?.code;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(desc, fn, timeoutMs, everyMs = 5000) {
   const until = Date.now() + timeoutMs;
@@ -115,8 +115,10 @@ const scenarios = {
   async probe() {
     const r = await api('PATCH', '/reservations/00000000-0000-4000-8000-000000000000/revive');
     console.log('  cuerpo de error real:', JSON.stringify(r.body));
-    check('P error de dominio expone code en la raíz del cuerpo', r.body?.code !== undefined,
-      `code raíz=${r.body?.code} | message.code=${r.body?.message?.code}`);
+    check('P error expone code en la raíz del cuerpo', r.body?.code === 'NOT_FOUND', `code=${r.body?.code}`);
+    check('P error trae correlationId real (no "sin-correlacion")', /^[0-9a-f-]{36}$/.test(r.body?.correlationId ?? ''), r.body?.correlationId);
+    const v = await api('POST', '/admin-notification-recipients', { phone: 1 });
+    check('P validación → VALIDATION_FAILED con details.errors', v.body?.code === 'VALIDATION_FAILED' && Array.isArray(v.body?.details?.errors), JSON.stringify(v.body?.details));
     const statuses = [];
     for (let i = 0; i < 8; i++) statuses.push((await api('GET', '/reservations?pageSize=1')).status);
     check('P admin autenticado no recibe 429 en 8 GET /reservations seguidos', !statuses.includes(429), statuses.join(','));
