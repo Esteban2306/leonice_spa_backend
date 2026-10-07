@@ -1,13 +1,56 @@
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ConfigService } from '@nestjs/config';
-import { ThrottlerModuleOptions } from '@nestjs/throttler';
+import type { ExecutionContext } from '@nestjs/common';
+import type { Request } from 'express';
+import type { ThrottlerModuleOptions } from '@nestjs/throttler';
 import Redis from 'ioredis';
-import { Request } from 'express';
+
 import {
   CLIENT_BOOKING_RATE_LIMIT,
   CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
 } from 'src/reservations/domain/reservation-timing.constants';
-import { ExecutionContext } from '@nestjs/common';
+
+interface ThrottledRequestUser {
+  role?: string;
+}
+
+function isAdministrator(request: Request): boolean {
+  const user = request.user as ThrottledRequestUser | undefined;
+
+  return user?.role === 'ADMIN';
+}
+
+function isValidConduitRequest(
+  request: Request,
+  config: ConfigService,
+): boolean {
+  const providedKey = request.headers['x-api-key'];
+
+  const conduitKey = config.get<string>('CONDUIT_TOOL_API_KEY');
+
+  if (!conduitKey || typeof providedKey !== 'string') {
+    return false;
+  }
+
+  return providedKey === conduitKey;
+}
+
+function shouldSkipThrottle(
+  context: ExecutionContext,
+  config: ConfigService,
+): boolean {
+  const request = context.switchToHttp().getRequest<Request>();
+
+  if (isValidConduitRequest(request, config)) {
+    return true;
+  }
+
+  if (isAdministrator(request)) {
+    return true;
+  }
+
+  return false;
+}
 
 export function getThrottlerConfig(
   config: ConfigService,
@@ -28,48 +71,60 @@ export function getThrottlerConfig(
         ttl: 60_000,
         limit: config.get<number>('THROTTLE_LIMIT_DEFAULT', 100),
       },
+
       {
         name: 'availability',
         ttl: 10_000,
         limit: config.get<number>('THROTTLE_LIMIT_AVAILABILITY', 10),
         skipIf: (context: ExecutionContext): boolean => {
-          const req: Request = context.switchToHttp().getRequest<Request>();
-          return !req.path.includes('/availability');
+          const request = context.switchToHttp().getRequest<Request>();
+
+          return (
+            shouldSkipThrottle(context, config) ||
+            !request.path.includes('/availability')
+          );
         },
       },
+
       {
         name: 'reservations',
         ttl: 60_000,
         limit: config.get<number>('THROTTLE_LIMIT_RESERVATIONS', 5),
         skipIf: (context: ExecutionContext): boolean => {
-          const req: Request = context.switchToHttp().getRequest<Request>();
-          return !req.path.includes('/reservations');
+          const request = context.switchToHttp().getRequest<Request>();
+
+          return (
+            shouldSkipThrottle(context, config) ||
+            !request.path.includes('/reservations')
+          );
         },
       },
+
       {
         name: 'client-booking',
         ttl: CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
         limit: CLIENT_BOOKING_RATE_LIMIT,
       },
+
       {
         name: 'webhooks',
         ttl: 1_000,
         limit: config.get<number>('THROTTLE_LIMIT_WEBHOOKS', 30),
         skipIf: (context: ExecutionContext): boolean => {
-          const req: Request = context.switchToHttp().getRequest<Request>();
-          return !req.path.includes('/integrations/conduit');
+          const request = context.switchToHttp().getRequest<Request>();
+
+          return (
+            shouldSkipThrottle(context, config) ||
+            !request.path.includes('/integrations/conduit')
+          );
         },
       },
     ],
+
     storage: new ThrottlerStorageRedisService(redis),
+
     skipIf: (context: ExecutionContext): boolean => {
-      const req: Request = context.switchToHttp().getRequest<Request>();
-      const providedKey: string | undefined = req.headers['x-api-key'] as
-        string | undefined;
-      const conduitKey: string | undefined = config.get<string>(
-        'CONDUIT_TOOL_API_KEY',
-      );
-      return Boolean(conduitKey && providedKey === conduitKey);
+      return shouldSkipThrottle(context, config);
     },
   };
 }

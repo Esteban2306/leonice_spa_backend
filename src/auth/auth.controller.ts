@@ -26,6 +26,7 @@ import {
 } from './constants/auth.constants';
 import { SkipCsrf } from './decorators/skip-csrf.decorator';
 import { GoogleProfileResult } from './types/google-profile.type';
+import type { AuthenticatedUser } from './types/authenticated-user.type';
 
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
@@ -67,6 +68,11 @@ export class AuthController {
     const tokens = await this.authService.issueTokens(user);
     this.setAuthCookies(res, tokens);
     res.redirect(process.env.FRONTEND_ADMIN_URL ?? '/');
+  }
+
+  @Get('me')
+  me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
+    return user;
   }
 
   @Public()
