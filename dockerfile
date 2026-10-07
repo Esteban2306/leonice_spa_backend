@@ -2,6 +2,7 @@
 ARG NODE_VERSION=24-alpine
 
 FROM node:${NODE_VERSION} AS base
+RUN apk add --no-cache openssl
 
 FROM base AS deps
 RUN corepack enable
@@ -17,22 +18,17 @@ CMD ["pnpm", "start:dev"]
 
 FROM deps AS build
 COPY . .
-RUN pnpm build
+RUN pnpm exec prisma generate \
+    && pnpm build \
+    && pnpm prune --prod --ignore-scripts
 
-FROM base AS prod-deps
-RUN corepack enable
-WORKDIR /usr/src/app
-COPY package.json pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod
-
-FROM node:${NODE_VERSION} AS production
+FROM base AS production
 ENV NODE_ENV=production
 WORKDIR /usr/src/app
 
 RUN addgroup -g 1001 nodeapp && adduser -D -u 1001 -G nodeapp nodeapp
 
-COPY --from=prod-deps --chown=nodeapp:nodeapp /usr/src/app/node_modules ./node_modules
+COPY --from=build --chown=nodeapp:nodeapp /usr/src/app/node_modules ./node_modules
 COPY --from=build --chown=nodeapp:nodeapp /usr/src/app/dist ./dist
 COPY --chown=nodeapp:nodeapp package.json ./
 
