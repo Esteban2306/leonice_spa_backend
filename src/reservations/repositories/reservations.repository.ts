@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CancellationSource,
   Prisma,
   PrismaClient,
   Reservation,
@@ -12,10 +13,12 @@ type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 
 interface UpdateStatusData {
   status: ReservationStatus;
-  cancelledAt?: Date;
-  cancellationReason?: string;
+  cancelledAt?: Date | null;
+  cancellationReason?: string | null;
+  cancellationSource?: CancellationSource | null;
   checkedInAt?: Date;
   completedAt?: Date;
+  depositExpiresAt?: Date | null;
 }
 
 @Injectable()
@@ -24,6 +27,19 @@ export class ReservationsRepository {
 
   findById(id: string, client: PrismaClientOrTx = this.prisma.client) {
     return client.reservation.findUnique({ where: { id } });
+  }
+
+  async updateStatusIfCurrent(
+    id: string,
+    expectedStatus: ReservationStatus,
+    data: UpdateStatusData,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<boolean> {
+    const result = await client.reservation.updateMany({
+      where: { id, status: expectedStatus },
+      data,
+    });
+    return result.count === 1;
   }
 
   async updateScheduleIfCurrent(

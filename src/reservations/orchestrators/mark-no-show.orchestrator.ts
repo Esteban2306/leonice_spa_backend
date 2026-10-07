@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ReservationStatus } from '@prisma/client';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
-import { EventBusService } from 'src/common/events/event.service';
-import { EVENT_TYPES } from 'src/common/events/constants/event.types';
+import { EventBusService } from '../../common/events/event.service';
+import { EVENT_TYPES } from '../../common/events/constants/event.types';
 
 @Injectable()
 export class MarkNoShowOrchestrator {
@@ -21,9 +21,16 @@ export class MarkNoShowOrchestrator {
       ReservationStatus.NO_SHOW,
     );
 
-    const updated = await this.repository.updateStatus(reservationId, {
-      status: ReservationStatus.NO_SHOW,
-    });
+    const applied = await this.repository.updateStatusIfCurrent(
+      reservationId,
+      reservation.status,
+      { status: ReservationStatus.NO_SHOW },
+    );
+    if (!applied) return;
+
+    const updated = await this.repository.findById(reservationId);
+    if (!updated) return;
+
     this.eventBus.publish(EVENT_TYPES.RESERVATION_NO_SHOW, {
       reservationId: updated.id,
       clientId: updated.clientId,

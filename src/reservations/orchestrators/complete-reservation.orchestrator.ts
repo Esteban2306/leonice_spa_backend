@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ReservationStatus } from '@prisma/client';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
@@ -21,10 +25,19 @@ export class CompleteReservationOrchestrator {
       ReservationStatus.COMPLETADA,
     );
 
-    const updated = await this.repository.updateStatus(reservationId, {
-      status: ReservationStatus.COMPLETADA,
-      completedAt: new Date(),
-    });
+    const applied = await this.repository.updateStatusIfCurrent(
+      reservationId,
+      reservation.status,
+      { status: ReservationStatus.COMPLETADA, completedAt: new Date() },
+    );
+    if (!applied) {
+      throw new ConflictException(
+        'La reserva cambió de estado mientras se completaba. Revisa su estado actual.',
+      );
+    }
+
+    const updated = await this.repository.findById(reservationId);
+    if (!updated) throw new NotFoundException('Reserva no encontrada');
 
     this.eventBus.publish(EVENT_TYPES.RESERVATION_COMPLETED, {
       reservationId: updated.id,
