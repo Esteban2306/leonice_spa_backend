@@ -8,8 +8,10 @@ import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { json, type Request } from 'express';
 import { PinoLoggerService } from './common/logging/pino-logger.service';
+import { assertBusinessTimezone } from './config/timezone';
 
 async function bootstrap() {
+  assertBusinessTimezone();
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
