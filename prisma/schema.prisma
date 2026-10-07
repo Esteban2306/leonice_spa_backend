@@ -1,5 +1,3 @@
-
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +5,427 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String          @id @default(uuid())
+  email               String          @unique
+  passwordHash        String          @map("password_hash")
+  role                Role            @default(ADMIN)
+  isActive            Boolean         @default(true) @map("is_active")
+  failedLoginAttempts Int             @default(0) @map("failed_login_attempts")
+  lastLoginAt         DateTime?       @map("last_login_at")
+  refreshTokenHash    String?         @map("refresh_token_hash")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  lockedUntil         DateTime?       @map("locked_until")
+  auditLog            AuditLog[]
+  verifiedDeposits    DepositRecord[]
+
+  @@map("users")
+}
+
+model Client {
+  id                   String           @id @default(uuid())
+  phone                String           @unique
+  name                 String
+  birthDate            DateTime         @map("birth_date")
+  allergies            String?
+  isPregnant           Boolean          @default(false) @map("is_pregnant")
+  creditBalance        Decimal          @default(0) @map("credit_balance") @db.Decimal(10, 2)
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  hairColor            HairColor?       @map("hair_color")
+  hairLength           HairLength?      @map("hair_length")
+  hairProfileUpdatedAt DateTime?        @map("hair_profile_updated_at")
+  whatsappJid          String?          @unique @map("whatsapp_jid")
+  consentRecords       ConsentRecord[]
+  productViewLogs      ProductViewLog[]
+  reservations         Reservation[]
+
+  @@index([createdAt])
+  @@map("clients")
+}
+
+model ConsentRecord {
+  id            String      @id @default(uuid())
+  clientId      String      @map("client_id")
+  type          ConsentType
+  policyVersion String      @map("policy_version")
+  consentedAt   DateTime    @map("consented_at")
+  ipAddress     String?     @map("ip_address")
+  guardianName  String?     @map("guardian_name")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  client        Client      @relation(fields: [clientId], references: [id])
+
+  @@index([clientId, type])
+  @@map("consent_records")
+}
+
+model Category {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  isActive        Boolean          @default(true) @map("is_active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  isPrincipal     Boolean          @default(false) @map("is_principal")
+  automationRules AutomationRule[]
+  capacityPools   CapacityPool[]
+  promotions      Promotion[]
+  reservations    Reservation[]
+  treatments      Treatment[]
+
+  @@map("categories")
+}
+
+model CapacityPool {
+  id            String   @id @default(uuid())
+  categoryId    String   @map("category_id")
+  name          String
+  maxConcurrent Int      @map("max_concurrent")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  category      Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([categoryId, name])
+  @@index([categoryId, isActive])
+  @@map("capacity_pools")
+}
+
+model Treatment {
+  id                      String                           @id @default(uuid())
+  categoryId              String                           @map("category_id")
+  name                    String
+  requiresPriorAssessment Boolean                          @default(false) @map("requires_prior_assessment")
+  basePriceMin            Decimal?                         @map("base_price_min") @db.Decimal(10, 2)
+  basePriceMax            Decimal?                         @map("base_price_max") @db.Decimal(10, 2)
+  baseDurationMinMinutes  Int?                             @map("base_duration_min_minutes")
+  baseDurationMaxMinutes  Int?                             @map("base_duration_max_minutes")
+  isActive                Boolean                          @default(true) @map("is_active")
+  createdAt               DateTime                         @default(now()) @map("created_at")
+  updatedAt               DateTime                         @updatedAt @map("updated_at")
+  hasHairVariablePricing  Boolean                          @default(false) @map("has_hair_variable_pricing")
+  automationRules         AutomationRule[]
+  promotions              Promotion[]
+  reservations            Reservation[]
+  hairColorSurcharges     TreatmentHairColorSurcharge[]
+  hairLengthPricing       TreatmentHairLengthPricing[]
+  recommendations         TreatmentProductRecommendation[]
+  category                Category                         @relation(fields: [categoryId], references: [id])
+
+  @@unique([categoryId, name])
+  @@map("treatments")
+}
+
+model TreatmentHairLengthPricing {
+  id              String     @id @default(uuid())
+  treatmentId     String     @map("treatment_id")
+  hairLength      HairLength @map("hair_length")
+  price           Decimal    @db.Decimal(10, 2)
+  durationMinutes Int        @map("duration_minutes")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  treatment       Treatment  @relation(fields: [treatmentId], references: [id])
+
+  @@unique([treatmentId, hairLength])
+  @@index([treatmentId])
+  @@map("treatment_hair_length_pricing")
+}
+
+model TreatmentHairColorSurcharge {
+  id                   String    @id @default(uuid())
+  treatmentId          String    @map("treatment_id")
+  hairColor            HairColor @map("hair_color")
+  surcharge            Decimal   @default(0) @db.Decimal(10, 2)
+  extraDurationMinutes Int       @default(0) @map("extra_duration_minutes")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  treatment            Treatment @relation(fields: [treatmentId], references: [id])
+
+  @@unique([treatmentId, hairColor])
+  @@index([treatmentId])
+  @@map("treatment_hair_color_surcharge")
+}
+
+model Reservation {
+  id                       String             @id @default(uuid())
+  clientId                 String             @map("client_id")
+  categoryId               String             @map("category_id")
+  treatmentId              String             @map("treatment_id")
+  status                   ReservationStatus  @default(SOLICITUD_INICIADA)
+  channel                  ReservationChannel
+  scheduledStart           DateTime           @map("scheduled_start")
+  scheduledEnd             DateTime           @map("scheduled_end")
+  finalPrice               Decimal            @map("final_price") @db.Decimal(10, 2)
+  finalDurationMinutes     Int                @map("final_duration_minutes")
+  valoracionPhotoReference String?            @map("valoracion_photo_reference")
+  valoracionRespondedAt    DateTime?          @map("valoracion_responded_at")
+  checkedInAt              DateTime?          @map("checked_in_at")
+  completedAt              DateTime?          @map("completed_at")
+  cancelledAt              DateTime?          @map("cancelled_at")
+  cancellationReason       String?            @map("cancellation_reason")
+  cancellationSource       CancellationSource? @map("cancellation_source")
+  rescheduledFromId        String?            @unique @map("rescheduled_from_id")
+  depositExpiresAt         DateTime?          @map("deposit_expires_at")
+  createdAt                DateTime           @default(now()) @map("created_at")
+  updatedAt                DateTime           @updatedAt @map("updated_at")
+  comboGroupId             String?            @map("combo_group_id")
+  deposit                  DepositRecord[]    @relation("DepositOfReservation")
+  appliedDeposits          DepositRecord[]    @relation("DepositAppliedToReservation")
+  category                 Category           @relation(fields: [categoryId], references: [id])
+  client                   Client             @relation(fields: [clientId], references: [id])
+  rescheduledFrom          Reservation?       @relation("ReservationReschedule", fields: [rescheduledFromId], references: [id])
+  rescheduledTo            Reservation?       @relation("ReservationReschedule")
+  treatment                Treatment          @relation(fields: [treatmentId], references: [id])
+
+  @@index([categoryId, status, scheduledStart, scheduledEnd])
+  @@index([comboGroupId])
+  @@index([status, depositExpiresAt])
+  @@index([clientId, categoryId, status])
+  @@map("reservations")
+}
+
+model DepositRecord {
+  id                     String                    @id @default(uuid())
+  reservationId          String                    @map("reservation_id")
+  status                 DepositStatus             @default(PENDIENTE)
+  method                 DepositVerificationMethod
+  verifiedByUserId       String?                   @map("verified_by_user_id")
+  verifiedAt             DateTime?                 @map("verified_at")
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @updatedAt @map("updated_at")
+  coverage               DepositCoverage?
+  imageCloudinaryId      String?                   @map("image_cloudinary_id")
+  imageUrl               String?                   @map("image_url")
+  rejectionReason        String?                   @map("rejection_reason")
+  amount                 Decimal?     @db.Decimal(10, 2)
+  appliedToReservationId String?      @map("applied_to_reservation_id")
+  reservation            Reservation  @relation("DepositOfReservation", fields: [reservationId], references: [id])
+  appliedToReservation   Reservation? @relation("DepositAppliedToReservation", fields: [appliedToReservationId], references: [id])
+  verifiedByUser         User?                     @relation(fields: [verifiedByUserId], references: [id])
+
+  @@index([reservationId, createdAt])
+  @@index([appliedToReservationId])
+  @@map("deposit_records")
+}
+
+model AutomationRule {
+  id               String     @id @default(uuid())
+  treatmentId      String?    @map("treatment_id")
+  categoryId       String?    @map("category_id")
+  reminderDays     Int?       @map("reminder_days")
+  reactivationDays Int        @map("reactivation_days")
+  isActive         Boolean    @default(true) @map("is_active")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  promotionId      String?    @map("promotion_id")
+  category         Category?  @relation(fields: [categoryId], references: [id])
+  promotion        Promotion? @relation(fields: [promotionId], references: [id])
+  treatment        Treatment? @relation(fields: [treatmentId], references: [id])
+
+  @@map("automation_rules")
+}
+
+model Promotion {
+  id                 String                @id @default(uuid())
+  name               String
+  discountPercentage Decimal               @map("discount_percentage") @db.Decimal(5, 2)
+  startsAt           DateTime              @map("starts_at")
+  endsAt             DateTime              @map("ends_at")
+  treatmentId        String?               @map("treatment_id")
+  categoryId         String?               @map("category_id")
+  isActive           Boolean               @default(true) @map("is_active")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  executions         AutomationExecution[]
+  automationRules    AutomationRule[]
+  category           Category?             @relation(fields: [categoryId], references: [id])
+  treatment          Treatment?            @relation(fields: [treatmentId], references: [id])
+
+  @@index([startsAt, endsAt])
+  @@map("promotions")
+}
+
+model ProductCategory {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  isActive Boolean   @default(true) @map("is_active")
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id                String                           @id @default(uuid())
+  productCategoryId String                           @map("product_category_id")
+  name              String
+  description       String?
+  isActive          Boolean                          @default(true) @map("is_active")
+  createdAt         DateTime                         @default(now()) @map("created_at")
+  updatedAt         DateTime                         @updatedAt @map("updated_at")
+  tagAssignments    ProductTagAssignment[]
+  variants          ProductVariant[]
+  viewLogs          ProductViewLog[]
+  category          ProductCategory                  @relation(fields: [productCategoryId], references: [id])
+  recommendations   TreatmentProductRecommendation[]
+
+  @@index([productCategoryId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id           String   @id @default(uuid())
+  productId    String   @map("product_id")
+  brand        String
+  presentation String
+  price        Decimal  @db.Decimal(10, 2)
+  imageUrl     String?  @map("image_url")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  product      Product  @relation(fields: [productId], references: [id])
+
+  @@unique([productId, brand, presentation])
+  @@map("product_variants")
+}
+
+model TreatmentProductRecommendation {
+  id          String    @id @default(uuid())
+  treatmentId String    @map("treatment_id")
+  productId   String    @map("product_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  product     Product   @relation(fields: [productId], references: [id])
+  treatment   Treatment @relation(fields: [treatmentId], references: [id])
+
+  @@unique([treatmentId, productId])
+  @@map("treatment_product_recommendations")
+}
+
+model AutomationExecution {
+  id               String                    @id @default(uuid())
+  type             AutomationExecutionType
+  result           AutomationExecutionResult
+  reservationId    String?                   @map("reservation_id")
+  clientId         String?                   @map("client_id")
+  automationRuleId String?                   @map("automation_rule_id")
+  reason           String?
+  errorMessage     String?                   @map("error_message")
+  executedAt       DateTime                  @default(now()) @map("executed_at")
+  promotionId      String?                   @map("promotion_id")
+  promotion        Promotion?                @relation(fields: [promotionId], references: [id])
+
+  @@index([type, executedAt])
+  @@index([reservationId])
+  @@index([clientId])
+  @@map("automation_executions")
+}
+
+model ProductTag {
+  id          String                 @id @default(uuid())
+  name        String                 @unique
+  isActive    Boolean                @default(true) @map("is_active")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  assignments ProductTagAssignment[]
+
+  @@map("product_tags")
+}
+
+model ProductTagAssignment {
+  id        String     @id @default(uuid())
+  productId String     @map("product_id")
+  tagId     String     @map("tag_id")
+  createdAt DateTime   @default(now()) @map("created_at")
+  product   Product    @relation(fields: [productId], references: [id])
+  tag       ProductTag @relation(fields: [tagId], references: [id])
+
+  @@unique([productId, tagId])
+  @@index([tagId])
+  @@map("product_tag_assignments")
+}
+
+model ProductViewLog {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  productId String   @map("product_id")
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+  client    Client   @relation(fields: [clientId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([clientId, viewedAt])
+  @@index([productId])
+  @@map("product_view_logs")
+}
+
+model ConduitMessageDeliveryLog {
+  id                String               @id @default(uuid())
+  messageId         String               @map("message_id")
+  status            ConduitMessageStatus
+  channel           String?
+  recipient         String?
+  provider          String?
+  providerMessageId String?              @map("provider_message_id")
+  errorMessage      String?              @map("error_message")
+  companyEventId    String?              @map("company_event_id")
+  rawPayload        Json                 @map("raw_payload")
+  receivedAt        DateTime             @default(now()) @map("received_at")
+
+  @@unique([messageId, status])
+  @@index([companyEventId])
+  @@map("conduit_message_delivery_logs")
+}
+
+model ConduitOutboxEvent {
+  id        String              @id @default(uuid())
+  eventType String              @map("event_type")
+  payload   Json
+  status    ConduitOutboxStatus @default(PENDING)
+  attempts  Int                 @default(0)
+  lastError String?             @map("last_error")
+  createdAt DateTime            @default(now()) @map("created_at")
+  sentAt    DateTime?           @map("sent_at")
+
+  @@index([status, createdAt])
+  @@map("conduit_outbox_events")
+}
+
+model ConduitIdempotencyKey {
+  id             String   @id @default(uuid())
+  key            String   @unique
+  operation      String   @map("operation")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([operation])
+  @@map("conduit_idempotency_keys")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String
+  entityId   String
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model AdminNotificationRecipient {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_notification_recipients")
 }
 
 enum Role {
@@ -71,6 +490,10 @@ enum AutomationExecutionType {
   NO_SHOW_CHECK
   RESERVATION_REMINDER
   REACTIVATION
+  ADMIN_DEPOSIT_TIMEOUT_NOTICE
+  CLIENT_DEPOSIT_REJECTED_NOTICE
+  CLIENT_RESCHEDULE_NOTICE
+  ADMIN_RESCHEDULE_NOTICE
 }
 
 enum AutomationExecutionResult {
@@ -92,442 +515,8 @@ enum ConduitOutboxStatus {
   FAILED
 }
 
-
-model User {
-  id                  String  @id() @default(uuid()) 
-  email               String    @unique
-  passwordHash        String    @map("password_hash")
-  role                Role      @default(ADMIN)
-  isActive            Boolean   @default(true) @map("is_active")
-  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
-  lastLoginAt         DateTime? @map("last_login_at")
-  lockedUntil         DateTime? @map("locked_until")
-  refreshTokenHash    String?   @map("refresh_token_hash")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  verifiedDeposits DepositRecord[]
-  auditLog AuditLog[]
-
-  @@map("users")
-}
-
-model Client {
-  id            String   @id @default(uuid())
-  phone         String   @unique
-  name          String
-  birthDate     DateTime @map("birth_date")
-  allergies     String?  
-  isPregnant    Boolean  @default(false) @map("is_pregnant")
-  creditBalance Decimal  @default(0) @db.Decimal(10, 2) @map("credit_balance")
-
-
-  whatsappJid          String?     @unique @map("whatsapp_jid")
-  hairLength           HairLength? @map("hair_length")
-  hairColor            HairColor?  @map("hair_color")
-  hairProfileUpdatedAt DateTime?   @map("hair_profile_updated_at")
-
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  consentRecords ConsentRecord[]
-  reservations   Reservation[]
-  productViewLogs ProductViewLog[]
-
-  @@index([createdAt])
-  @@map("clients")
-}
-
-model ConsentRecord {
-  id            String      @id @default(uuid())
-  clientId      String      @map("client_id")
-  type          ConsentType
-  policyVersion String      @map("policy_version")
-  consentedAt   DateTime    @map("consented_at")
-  ipAddress     String?     @map("ip_address")
-  guardianName  String?     @map("guardian_name")
-  createdAt     DateTime    @default(now()) @map("created_at")
-
-  client Client @relation(fields: [clientId], references: [id])
-
-  @@index([clientId, type])
-  @@map("consent_records")
-}
-
-model Category {
-  id           String   @id @default(uuid())
-  name         String   @unique
-  isPrincipal Boolean  @default(false) @map("is_principal")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  capacityPools   CapacityPool[]
-  treatments      Treatment[]
-  reservations    Reservation[]
-  automationRules AutomationRule[]
-  promotions      Promotion[]
-
-  @@map("categories")
-}
-
-
-
-model CapacityPool {
-  id            String   @id @default(uuid())
-  categoryId    String   @map("category_id")
-  name          String
-  maxConcurrent Int      @map("max_concurrent")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  category Category @relation(fields: [categoryId], references: [id])
-
-  @@unique([categoryId, name])
-  @@index([categoryId, isActive])
-  @@map("capacity_pools")
-}
-
-model Treatment {
-  id                      String   @id @default(uuid())
-  categoryId              String   @map("category_id")
-  name                    String
-  requiresPriorAssessment Boolean  @default(false) @map("requires_prior_assessment")
-  basePriceMin            Decimal? @db.Decimal(10, 2) @map("base_price_min")
-  basePriceMax            Decimal? @db.Decimal(10, 2) @map("base_price_max")
-  baseDurationMinMinutes  Int?     @map("base_duration_min_minutes")
-  baseDurationMaxMinutes  Int?     @map("base_duration_max_minutes")
-  isActive                Boolean  @default(true) @map("is_active")
-  createdAt               DateTime @default(now()) @map("created_at")
-  updatedAt               DateTime @updatedAt @map("updated_at")
-
-hasHairVariablePricing Boolean @default(false) @map("has_hair_variable_pricing")
-
-  category        Category         @relation(fields: [categoryId], references: [id])
-  reservations    Reservation[]
-  automationRules AutomationRule[]
-  promotions      Promotion[]
-  recommendations TreatmentProductRecommendation[]
-
-  hairLengthPricing   TreatmentHairLengthPricing[]
-  hairColorSurcharges TreatmentHairColorSurcharge[]
-  
-  @@unique([categoryId, name])
-  @@map("treatments")
-}
-
-model TreatmentHairLengthPricing {
-  id              String     @id @default(uuid())
-  treatmentId     String     @map("treatment_id")
-  hairLength      HairLength @map("hair_length")
-  price           Decimal    @db.Decimal(10, 2)
-  durationMinutes Int        @map("duration_minutes")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
-
-  treatment Treatment @relation(fields: [treatmentId], references: [id])
-
-  @@unique([treatmentId, hairLength])
-  @@index([treatmentId])
-  @@map("treatment_hair_length_pricing")
-}
-
-model TreatmentHairColorSurcharge {
-  id                   String    @id @default(uuid())
-  treatmentId          String    @map("treatment_id")
-  hairColor            HairColor @map("hair_color")
-  surcharge            Decimal   @default(0) @db.Decimal(10, 2)
-  extraDurationMinutes Int       @default(0) @map("extra_duration_minutes")
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
-
-  treatment Treatment @relation(fields: [treatmentId], references: [id])
-
-  @@unique([treatmentId, hairColor])
-  @@index([treatmentId])
-  @@map("treatment_hair_color_surcharge")
-}
-
-model Reservation {
-  id       String @id @default(uuid())
-  clientId String @map("client_id")
-
-  categoryId  String @map("category_id")
-  treatmentId String @map("treatment_id")
-
-  status  ReservationStatus @default(SOLICITUD_INICIADA)
-  channel ReservationChannel
-
-  comboGroupId String? @map("combo_group_id")
-
-  scheduledStart DateTime @map("scheduled_start")
-  scheduledEnd   DateTime @map("scheduled_end")
-
-  finalPrice           Decimal @db.Decimal(10, 2) @map("final_price")
-  finalDurationMinutes Int     @map("final_duration_minutes")
-
-  valoracionPhotoReference String?   @map("valoracion_photo_reference")
-  valoracionRespondedAt    DateTime? @map("valoracion_responded_at")
-
-  checkedInAt        DateTime? @map("checked_in_at")
-  completedAt         DateTime? @map("completed_at")
-  cancelledAt          DateTime? @map("cancelled_at")
-  cancellationReason   String?  @map("cancellation_reason")
-
-  rescheduledFromId String?      @unique @map("rescheduled_from_id")
-  rescheduledFrom   Reservation? @relation("ReservationReschedule", fields: [rescheduledFromId], references: [id])
-  rescheduledTo     Reservation? @relation("ReservationReschedule")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  client    Client         @relation(fields: [clientId], references: [id])
-  category  Category       @relation(fields: [categoryId], references: [id])
-  treatment Treatment      @relation(fields: [treatmentId], references: [id])
-  deposit   DepositRecord[]
-
-  @@index([categoryId, status, scheduledStart, scheduledEnd])
-  @@index([comboGroupId])
-  @@index([clientId, categoryId, status])
-  @@map("reservations")
-}
-
-model DepositRecord {
-  id                String                    @id @default(uuid())
-  reservationId     String                    @map("reservation_id")
-  method            DepositVerificationMethod
-  status            DepositStatus             @default(PENDIENTE)
-  coverage          DepositCoverage?
-  imageUrl          String?                   @map("image_url")
-  imageCloudinaryId String?                   @map("image_cloudinary_id")
-  verifiedByUserId  String?                   @map("verified_by_user_id")
-  verifiedAt        DateTime?                 @map("verified_at")
-  rejectionReason   String?                   @map("rejection_reason")
-  createdAt         DateTime                  @default(now()) @map("created_at")
-  updatedAt         DateTime                  @updatedAt @map("updated_at")
-
-  reservation    Reservation @relation(fields: [reservationId], references: [id])
-  verifiedByUser User?       @relation(fields: [verifiedByUserId], references: [id])
-
-  @@index([reservationId, createdAt])
-  @@map("deposit_records")
-}
-
-model AutomationRule {
-  id               String   @id @default(uuid())
-  treatmentId      String?  @map("treatment_id")
-  categoryId       String?  @map("category_id")
-  reminderDays     Int?     @map("reminder_days")
-  reactivationDays Int      @map("reactivation_days")
-  isActive         Boolean  @default(true) @map("is_active")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  promotionId String?    @map("promotion_id")
-  promotion   Promotion? @relation(fields: [promotionId], references: [id])
-
-  treatment Treatment? @relation(fields: [treatmentId], references: [id])
-  category  Category?  @relation(fields: [categoryId], references: [id])
-
-  @@map("automation_rules")
-}
-
-model Promotion {
-  id                 String   @id @default(uuid())
-  name               String
-  discountPercentage Decimal  @db.Decimal(5, 2) @map("discount_percentage")
-  startsAt           DateTime @map("starts_at")
-  endsAt             DateTime @map("ends_at")
-  treatmentId        String?  @map("treatment_id")
-  categoryId         String?  @map("category_id")
-  isActive           Boolean  @default(true) @map("is_active")
-  createdAt          DateTime @default(now()) @map("created_at")
-
-  treatment Treatment? @relation(fields: [treatmentId], references: [id])
-  category  Category?  @relation(fields: [categoryId], references: [id])
-  executions AutomationExecution[]
-  automationRules AutomationRule[]
-
-  @@index([startsAt, endsAt])
-  @@map("promotions")
-}
-
-
-model ProductCategory {
-  id       String  @id @default(uuid())
-  name     String  @unique
-  isActive Boolean @default(true) @map("is_active")
-
-  products Product[]
-
-  @@map("product_categories")
-}
-
-model Product {
-  id                String   @id @default(uuid())
-  productCategoryId String   @map("product_category_id")
-  name              String
-  description       String?
-  isActive          Boolean  @default(true) @map("is_active")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  category ProductCategory  @relation(fields: [productCategoryId], references: [id])
-  variants ProductVariant[]
-  recommendations TreatmentProductRecommendation[]
-  tagAssignments ProductTagAssignment[]
-  viewLogs ProductViewLog[]
-
-  @@index([productCategoryId])
-  @@map("products")
-}
-
-model ProductVariant {
-  id           String   @id @default(uuid())
-  productId    String   @map("product_id")
-  brand        String
-  presentation String
-  price        Decimal  @db.Decimal(10, 2)
-  imageUrl     String?  @map("image_url")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  product Product @relation(fields: [productId], references: [id])
-
-  @@unique([productId, brand, presentation])
-  @@map("product_variants")
-}
-
-model TreatmentProductRecommendation {
-  id          String   @id @default(uuid())
-  treatmentId String   @map("treatment_id")
-  productId   String   @map("product_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  treatment Treatment @relation(fields: [treatmentId], references: [id])
-  product   Product   @relation(fields: [productId], references: [id])
-
-  @@unique([treatmentId, productId])
-  @@map("treatment_product_recommendations")
-}
-
-model AutomationExecution {
-  id                String                     @id @default(uuid())
-  type              AutomationExecutionType
-  result            AutomationExecutionResult
-  reservationId     String?                    @map("reservation_id")
-  clientId          String?                    @map("client_id")
-  automationRuleId  String?                    @map("automation_rule_id")
-  reason            String?
-  errorMessage      String?                    @map("error_message")
-  executedAt        DateTime                   @default(now()) @map("executed_at")
-
-  promotionId String?    @map("promotion_id")
-  promotion   Promotion? @relation(fields: [promotionId], references: [id])
-
-  @@index([type, executedAt])
-  @@index([reservationId])
-  @@index([clientId])
-  @@map("automation_executions")
-}
-
-model ProductTag {
-  id          String                 @id @default(uuid())
-  name        String                 @unique
-  isActive    Boolean                @default(true) @map("is_active")
-  createdAt   DateTime               @default(now()) @map("created_at")
-  assignments ProductTagAssignment[]
-
-  @@map("product_tags")
-}
-
-model ProductTagAssignment {
-  id        String     @id @default(uuid())
-  productId String     @map("product_id")
-  tagId     String     @map("tag_id")
-  createdAt DateTime   @default(now()) @map("created_at")
-
-  product Product    @relation(fields: [productId], references: [id])
-  tag     ProductTag @relation(fields: [tagId], references: [id])
-
-  @@unique([productId, tagId])
-  @@index([tagId])
-  @@map("product_tag_assignments")
-}
-
-model ProductViewLog {
-  id        String   @id @default(uuid())
-  clientId  String   @map("client_id")
-  productId String   @map("product_id")
-  viewedAt  DateTime @default(now()) @map("viewed_at")
-
-  client  Client  @relation(fields: [clientId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-
-  @@index([clientId, viewedAt])
-  @@index([productId])
-  @@map("product_view_logs")
-}
-
-model ConduitMessageDeliveryLog {
-  id                 String               @id @default(uuid())
-  messageId          String               @map("message_id")
-  status             ConduitMessageStatus
-  channel            String?
-  recipient          String?
-  provider           String?
-  providerMessageId  String?              @map("provider_message_id")
-  errorMessage       String?              @map("error_message")
-  companyEventId     String?              @map("company_event_id")
-  rawPayload         Json                 @map("raw_payload")
-  receivedAt         DateTime             @default(now()) @map("received_at")
-
-  @@unique([messageId, status])
-  @@index([companyEventId])
-  @@map("conduit_message_delivery_logs")
-}
-
-model ConduitOutboxEvent {
-  id        String              @id @default(uuid())
-  eventType String              @map("event_type")
-  payload   Json
-  status    ConduitOutboxStatus @default(PENDING)
-  attempts  Int                 @default(0)
-  lastError String?             @map("last_error")
-  createdAt DateTime            @default(now()) @map("created_at")
-  sentAt    DateTime?           @map("sent_at")
-
-  @@index([status, createdAt])
-  @@map("conduit_outbox_events")
-}
-
-model ConduitIdempotencyKey {
-  id             String   @id @default(uuid())
-  key            String   @unique
-  operation      String   @map("operation")
-  responseStatus Int      @map("response_status")
-  responseBody   Json     @map("response_body")
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  @@index([operation])
-  @@map("conduit_idempotency_keys")
-}
-model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String?  @map("user_id")
-  action      String   
-  entityType  String  
-  entityId    String   
-  oldValue    Json?    @map("old_value")
-  newValue    Json?    @map("new_value")
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id])
-
-  @@index([userId, createdAt])
-  @@index([entityType, entityId])
-  @@map("audit_logs")
+enum CancellationSource {
+  CLIENT
+  ADMIN
+  TIMEOUT
 }
