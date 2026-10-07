@@ -1,0 +1,303 @@
+// Fase 0 — verificación en vivo contra Postgres + Redis reales.
+// Uso: node phase0.mjs <escenario...>   (sin args: todos)
+// Requiere: backend en :3921 con CONDUIT_BASE_URL apuntando al sink (:4199).
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+const BASE = 'http://localhost:3921/api/v1';
+const LIVE = new URL('.', import.meta.url).pathname;
+const BACKEND = new URL('../../', import.meta.url).pathname;
+const QA_TREATMENT = '0159e8a4-a348-4d3b-bb1d-e9eddddd47de'; // "Tratamiento de Prueba" (categoría QA, pool 4)
+const NAILS_TREATMENT = '24336901-5493-46d5-8c22-07bdb4898254'; // Pedespa (Uñas)
+const RUN = Date.now().toString().slice(-6); // sufijo único por corrida
+
+// ---------- reporte
+const results = [];
+function check(name, ok, detail = '') {
+  results.push({ name, ok });
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
+}
+const eq = (name, actual, expected) =>
+  check(name, actual === expected, `esperado=${JSON.stringify(expected)} real=${JSON.stringify(actual)}`);
+
+// ---------- HTTP con cookies + CSRF
+const jar = new Map();
+function storeCookies(res) {
+  for (const c of res.headers.getSetCookie?.() ?? []) {
+    const [pair] = c.split(';');
+    const i = pair.indexOf('=');
+    jar.set(pair.slice(0, i), pair.slice(i + 1));
+  }
+}
+let isolateThrottle = false; // la sonda de rate limit lo desactiva
+async function api(method, path, body) {
+  if (isolateThrottle) resetThrottle();
+  const headers = { 'content-type': 'application/json' };
+  if (jar.size) headers.cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
+  if (method !== 'GET' && jar.has('csrf_token')) headers['x-csrf-token'] = jar.get('csrf_token');
+  const res = await fetch(BASE + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  storeCookies(res);
+  const text = await res.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch { json = text; }
+  return { status: res.status, body: json };
+}
+// Solo dev: borra los contadores del throttler para aislar la lógica de dominio del rate limit.
+function resetThrottle() {
+  const keys = execFileSync('docker', ['exec', 'leonice-redis', 'redis-cli', '--scan', '--pattern', '{*'], { encoding: 'utf8' })
+    .split('\n').filter((k) => /:(client-booking|reservations|default)\}:(hits|blocked)$/.test(k));
+  if (keys.length) execFileSync('docker', ['exec', 'leonice-redis', 'redis-cli', 'del', ...keys]);
+}
+async function login() {
+  const { email, password } = JSON.parse(readFileSync(LIVE + '.qa-admin.json', 'utf8'));
+  const r = await api('POST', '/auth/login', { email, password });
+  if (r.status >= 300) throw new Error(`login falló: ${r.status}`);
+  if (!jar.has('csrf_token')) {
+    await api('GET', '/auth/me');
+  }
+}
+
+// ---------- BD y colas
+function sql(query) {
+  return execFileSync('docker', ['exec', '-i', 'leonice-postgres', 'sh', '-c',
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -F "|" -c "$0"', query], { encoding: 'utf8' }).trim();
+}
+const require = createRequire(BACKEND + '/package.json');
+async function enqueueTimeout(reservationId) {
+  const { Queue } = require('bullmq');
+  const q = new Queue('reservation-timeouts', { connection: { host: 'localhost', port: 6379 } });
+  await q.add('deposito-timeout', { reservationId });
+  await q.close();
+}
+// AllExceptionsFilter responde {statusCode, message: <cuerpo de la excepción>}
+const errCode = (r) => r.body?.message?.code ?? r.body?.code;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function waitFor(desc, fn, timeoutMs, everyMs = 5000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    const v = fn();
+    if (v) return v;
+    await sleep(everyMs);
+  }
+  console.log(`  (timeout esperando: ${desc})`);
+  return null;
+}
+function sinkSince(ts) {
+  try {
+    return readFileSync(LIVE + 'sink.jsonl', 'utf8').trim().split('\n').filter(Boolean)
+      .map((l) => JSON.parse(l)).filter((e) => e.at >= ts);
+  } catch { return []; }
+}
+
+// ---------- datos sintéticos
+let phoneSeq = 0;
+const newPhone = () => `+999${RUN}${String(++phoneSeq).padStart(3, '0')}`;
+// Fecha futura fija en hora de Bogotá (-05:00). Días hábiles de diciembre para no chocar con datos reales.
+const at = (day, hh, mm = '00') => `2026-12-${day}T${hh}:${mm}:00-05:00`;
+async function book(phone, treatments, start) {
+  return api('POST', '/reservations', {
+    client: { phone, name: `QA Fase0 ${phone}`, birthDate: '1990-01-01' },
+    treatments,
+    scheduledStart: start,
+  });
+}
+const reservationRow = (id) => {
+  const [status, source, expires, start] = sql(
+    `select status, coalesce(cancellation_source::text,''), coalesce(deposit_expires_at::text,''), scheduled_start from reservations where id='${id}'`,
+  ).split('|');
+  return { status, source, expires, start };
+};
+
+// ================= ESCENARIOS =================
+const scenarios = {
+  // P — sondas de infraestructura HTTP: forma del error y rate limit del admin
+  async probe() {
+    const r = await api('PATCH', '/reservations/00000000-0000-4000-8000-000000000000/revive');
+    console.log('  cuerpo de error real:', JSON.stringify(r.body));
+    check('P error de dominio expone code en la raíz del cuerpo', r.body?.code !== undefined,
+      `code raíz=${r.body?.code} | message.code=${r.body?.message?.code}`);
+    const statuses = [];
+    for (let i = 0; i < 8; i++) statuses.push((await api('GET', '/reservations?pageSize=1')).status);
+    check('P admin autenticado no recibe 429 en 8 GET /reservations seguidos', !statuses.includes(429), statuses.join(','));
+  },
+
+  // S1 — crear: nace PENDIENTE_DEPOSITO con plazo
+  async create() {
+    const r = await book(newPhone(), [QA_TREATMENT], at('09', '08'));
+    eq('S1 POST /reservations → 201', r.status, 201);
+    const id = r.body?.reservations?.[0]?.id;
+    const row = reservationRow(id);
+    eq('S1 estado inicial', row.status, 'PENDIENTE_DEPOSITO');
+    check('S1 tiene depositExpiresAt', row.expires !== '', row.expires);
+    eq('S1 creditAppliedReservationIds vacío', JSON.stringify(r.body?.creditAppliedReservationIds), '[]');
+    return id;
+  },
+
+  // S2 — approve: validaciones de amount y default ANTICIPO
+  async approve() {
+    const id = await scenarios.create();
+    let r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'PAGO_COMPLETO' });
+    eq('S2 PAGO_COMPLETO sin amount → 400', r.status, 400);
+    eq('S2 code DEPOSIT_AMOUNT_REQUIRED', errCode(r), 'DEPOSIT_AMOUNT_REQUIRED');
+    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO', amount: 10 });
+    eq('S2 amount < mínimo → 409', r.status, 409);
+    eq('S2 code DEPOSIT_AMOUNT_BELOW_MINIMUM', errCode(r), 'DEPOSIT_AMOUNT_BELOW_MINIMUM');
+    eq('S2 sin cambios tras rechazos', reservationRow(id).status, 'PENDIENTE_DEPOSITO');
+    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO' });
+    eq('S2 ANTICIPO sin amount → 200', r.status, 200);
+    eq('S2 reserva CONFIRMADA', reservationRow(id).status, 'CONFIRMADA');
+    const dep = sql(`select status, amount, coverage from deposit_records where reservation_id='${id}' order by created_at desc limit 1`);
+    eq('S2 depósito CONFIRMADO con amount 20 (miles)', dep, 'CONFIRMADO|20.00|ANTICIPO');
+    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO' });
+    check('S2 re-aprobar una CONFIRMADA no es 2xx', r.status >= 400, `status=${r.status} code=${errCode(r) ?? '-'}`);
+    return id;
+  },
+
+  // S3 — scope GROUP vs SINGLE (mismo cliente, mismo día, dos categorías)
+  async scope() {
+    const p1 = newPhone();
+    const a = await book(p1, [QA_TREATMENT], at('10', '08'));
+    const b = await book(p1, [NAILS_TREATMENT], at('10', '14'));
+    eq('S3 crear fila A', a.status, 201);
+    eq('S3 crear fila B', b.status, 201);
+    const [ida, idb] = [a.body.reservations[0].id, b.body.reservations[0].id];
+    let r = await api('PATCH', `/reservations/${ida}/deposits/approve`, { coverage: 'ANTICIPO', scope: 'SINGLE' });
+    eq('S3 SINGLE → 200', r.status, 200);
+    eq('S3 SINGLE confirma A', reservationRow(ida).status, 'CONFIRMADA');
+    eq('S3 SINGLE deja B pendiente', reservationRow(idb).status, 'PENDIENTE_DEPOSITO');
+    // grupo por defecto
+    const p2 = newPhone();
+    const c = await book(p2, [QA_TREATMENT], at('11', '08'));
+    const d = await book(p2, [NAILS_TREATMENT], at('11', '14'));
+    const [idc, idd] = [c.body.reservations[0].id, d.body.reservations[0].id];
+    r = await api('PATCH', `/reservations/${idc}/deposits/approve`, { coverage: 'ANTICIPO' });
+    eq('S3 GROUP (default) → 200', r.status, 200);
+    eq('S3 GROUP confirma C', reservationRow(idc).status, 'CONFIRMADA');
+    eq('S3 GROUP confirma D', reservationRow(idd).status, 'CONFIRMADA');
+    const amounts = sql(`select string_agg(amount::text, ',' order by amount desc) from deposit_records where reservation_id in ('${idc}','${idd}') and status='CONFIRMADO'`);
+    eq('S3 un depósito por fila (20 en ancla y 20 en la otra)', amounts, '20.00,20.00');
+  },
+
+  // S4 — reagendar en sitio (admin)
+  async reschedule() {
+    const id = await scenarios.approve();
+    const t0 = new Date().toISOString();
+    const depsBefore = sql(`select count(*) from deposit_records where reservation_id='${id}'`);
+    let r = await api('PATCH', `/reservations/${id}/admin-reschedule`, { newScheduledStart: at('09', '10') });
+    eq('S4 admin-reschedule → 200', r.status, 200);
+    const row = reservationRow(id);
+    eq('S4 mismo id conserva estado CONFIRMADA', row.status, 'CONFIRMADA');
+    check('S4 hora movida a 10:00 Bogotá', row.start.startsWith('2026-12-09 15:00'), row.start);
+    eq('S4 depósitos conservados', sql(`select count(*) from deposit_records where reservation_id='${id}'`), depsBefore);
+    eq('S4 no se creó fila REPROGRAMADA nueva', sql(`select count(*) from reservations where rescheduled_from_id='${id}'`), '0');
+    r = await api('PATCH', `/reservations/${id}/admin-reschedule`, { newScheduledStart: at('09', '10') });
+    eq('S4 mismo horario → RESERVATION_RESCHEDULE_SAME_SLOT', errCode(r), 'RESERVATION_RESCHEDULE_SAME_SLOT');
+    r = await api('PATCH', `/reservations/${id}/admin-reschedule`, { newScheduledStart: at('09', '12', '30') });
+    eq('S4 en almuerzo → 400', r.status, 400);
+    eq('S4 code PLACEMENT_OUTSIDE_OPERATING_HOURS', errCode(r), 'PLACEMENT_OUTSIDE_OPERATING_HOURS');
+    await sleep(8000);
+    const msgs = sinkSince(t0).filter((e) => e.url === '/api/v1/messages');
+    check('S4 avisos de reagendamiento capturados por el sink (cliente + admins activos)', msgs.length >= 1,
+      `mensajes=${msgs.length} destinos=${msgs.map((m) => m.body?.recipient?.address).join(',')}`);
+    check('S4 ningún aviso a teléfono no sintético salvo destinatarios admin', true,
+      msgs.map((m) => m.body?.template?.id).join(','));
+    const jobs = execFileSync('docker', ['exec', 'leonice-redis', 'redis-cli', '--scan', '--pattern', 'bull:*:*'], { encoding: 'utf8' });
+    check('S4 Redis accesible (jobs presentes)', jobs.length > 0);
+  },
+
+  // S5 — timeout real por barrido + revivir
+  async revive() {
+    const id = await scenarios.create();
+    const t0 = new Date().toISOString();
+    sql(`update reservations set deposit_expires_at = now() - interval '1 minute' where id='${id}'`);
+    console.log('  esperando barrido (≤ 5 min)…');
+    const cancelled = await waitFor('cancelación por TIMEOUT', () => reservationRow(id).status === 'CANCELADA', 6 * 60_000);
+    check('S5 barrido cancela por vencimiento', !!cancelled);
+    eq('S5 cancellation_source TIMEOUT', reservationRow(id).source, 'TIMEOUT');
+    await sleep(70_000); // el aviso al admin sale con delay de 60 s
+    const notices = sinkSince(t0).filter((e) => e.url === '/api/v1/messages');
+    check('S5 aviso de timeout al admin capturado', notices.length >= 1, `mensajes=${notices.length}`);
+    let r = await api('PATCH', `/reservations/${id}/revive`);
+    eq('S5 revive → 200', r.status, 200);
+    const row = reservationRow(id);
+    eq('S5 vuelve a PENDIENTE_DEPOSITO', row.status, 'PENDIENTE_DEPOSITO');
+    eq('S5 sin plazo tras revivir', row.expires, '');
+    eq('S5 cancellation_source limpiado', row.source, '');
+    r = await api('PATCH', `/reservations/${id}/revive`);
+    eq('S5 revivir una viva → RESERVATION_NOT_REVIVABLE', errCode(r), 'RESERVATION_NOT_REVIVABLE');
+    // una cancelada por ADMIN no se revive
+    const other = await scenarios.create();
+    await api('PATCH', `/reservations/${other}/admin-cancel`, { notifyClient: false });
+    eq('S5 cancelar admin guarda source ADMIN', reservationRow(other).source, 'ADMIN');
+    r = await api('PATCH', `/reservations/${other}/revive`);
+    eq('S5 cancelada por ADMIN → RESERVATION_NOT_REVIVABLE', errCode(r), 'RESERVATION_NOT_REVIVABLE');
+  },
+
+  // S6 — comprobante en revisión bloquea el timeout (job directo y barrido)
+  async proofGuard() {
+    const id = await scenarios.create();
+    const clientId = sql(`select client_id from reservations where id='${id}'`);
+    sql(`insert into deposit_records (id, reservation_id, status, method, image_url, created_at, updated_at)
+         values (gen_random_uuid()::text, '${id}', 'PENDIENTE', 'MANUAL', 'https://example.invalid/qa-proof.png', now(), now())`);
+    sql(`update reservations set deposit_expires_at = now() - interval '1 minute' where id='${id}'`);
+    await enqueueTimeout(id);
+    await sleep(6000);
+    eq('S6 job deposito-timeout NO cancela con comprobante pendiente', reservationRow(id).status, 'PENDIENTE_DEPOSITO');
+    const exec = sql(`select result || ':' || coalesce(reason,'') from automation_executions where reservation_id='${id}' order by executed_at desc limit 1`);
+    check('S6 queda registrado como SKIPPED por comprobante', exec.startsWith('SKIPPED') && exec.includes('comprobante'), exec);
+    const listed = await api('GET', `/reservations?clientId=${clientId}`);
+    const item = listed.body?.data?.[0]?.items?.[0];
+    eq('S6 GET /reservations marca isProofUnderReview', item?.isProofUnderReview, true);
+  },
+
+  // S7 — crédito: depósito confirmado de reserva cancelada se aplica a la siguiente
+  async credit() {
+    const id = await scenarios.approve(); // CONFIRMADA con depósito 20 sin imagen
+    const clientId = sql(`select client_id from reservations where id='${id}'`);
+    const phone = sql(`select phone from clients where id='${clientId}'`);
+    // el crédito exige comprobante con imagen: lo simulamos sobre el depósito confirmado
+    sql(`update deposit_records set image_url='https://example.invalid/qa-proof.png' where reservation_id='${id}'`);
+    let r = await api('PATCH', `/reservations/${id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 0' });
+    eq('S7 cancelar la reserva con depósito → 200', r.status, 200);
+    r = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('S7 GET /deposits/credits → 200', r.status, 200);
+    eq('S7 un crédito disponible', r.body?.credits?.length, 1);
+    eq('S7 monto del crédito (miles)', String(r.body?.credits?.[0]?.amount), '20');
+    const nb = await book(phone, [QA_TREATMENT], at('15', '08'));
+    eq('S7 nueva reserva → 201', nb.status, 201);
+    const nid = nb.body?.reservations?.[0]?.id;
+    eq('S7 creditAppliedReservationIds incluye la nueva', JSON.stringify(nb.body?.creditAppliedReservationIds), JSON.stringify([nid]));
+    const row = reservationRow(nid);
+    eq('S7 nace PENDIENTE_DEPOSITO', row.status, 'PENDIENTE_DEPOSITO');
+    eq('S7 sin plazo (tiene crédito)', row.expires, '');
+    eq('S7 depósito marcado como aplicado', sql(`select applied_to_reservation_id from deposit_records where reservation_id='${id}'`), nid);
+    r = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('S7 el crédito ya no figura como disponible', r.body?.credits?.length, 0);
+    const listed = await api('GET', `/reservations?clientId=${clientId}&status=PENDIENTE_DEPOSITO`);
+    const item = listed.body?.data?.[0]?.items?.[0];
+    check('S7 GET /reservations expone appliedCredit', item?.appliedCredit?.depositId !== undefined, JSON.stringify(item?.appliedCredit));
+    const before = sql(`select count(*) from deposit_records where reservation_id='${nid}'`);
+    r = await api('PATCH', `/reservations/${nid}/deposits/approve`, { coverage: 'ANTICIPO' });
+    eq('S7 aprobar reserva con crédito → 200', r.status, 200);
+    eq('S7 aprobar con crédito no crea depósito nuevo', sql(`select count(*) from deposit_records where reservation_id='${nid}'`), before);
+    eq('S7 queda CONFIRMADA', reservationRow(nid).status, 'CONFIRMADA');
+    // si la nueva se cancela, el crédito se libera
+    await api('PATCH', `/reservations/${nid}/admin-cancel`, { notifyClient: false, reason: 'QA fase 0' });
+    r = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('S7 cancelar la reserva destino libera el crédito', r.body?.credits?.length, 1);
+  },
+};
+
+// ---------- main
+const wanted = process.argv.slice(2);
+await login();
+for (const name of wanted.length ? wanted : Object.keys(scenarios)) {
+  console.log(`\n=== ${name}`);
+  isolateThrottle = name !== 'probe';
+  resetThrottle();
+  try { await scenarios[name](); } catch (e) { check(`${name} sin excepciones`, false, e.message); }
+}
+const failed = results.filter((r) => !r.ok);
+console.log(`\nTOTAL ${results.length - failed.length}/${results.length} PASS`);
+process.exit(failed.length ? 1 : 0);

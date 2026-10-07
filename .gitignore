@@ -8,3 +8,7 @@ scripts
 *docs
 # macOS
 .DS_Store
+
+# Verificación en vivo (test/live): credenciales QA y capturas del sink
+test/live/.qa-admin.json
+test/live/sink.jsonl
