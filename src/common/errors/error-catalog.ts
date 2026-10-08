@@ -149,6 +149,10 @@ const RESERVATION = {
     status: HttpStatus.CONFLICT,
     message: 'La reserva cambió mientras se revivía. Revisa su estado actual.',
   },
+  RESERVATION_CHECK_IN_NOT_TODAY: {
+    status: HttpStatus.CONFLICT,
+    message: 'El check-in solo se puede hacer el día de la cita.',
+  },
   RESERVATION_CREDIT_COMMITTED_ELSEWHERE: {
     status: HttpStatus.CONFLICT,
     message:

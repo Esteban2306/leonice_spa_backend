@@ -5,6 +5,7 @@ import { ReservationStateMachine } from '../domain/reservation-state-machine';
 import { DepositCreditService } from '../service/deposit-credit.service';
 import { AppException } from '../../common/errors/app.exception';
 import type { ErrorCode } from '../../common/errors/error-catalog';
+import { getCalendarDayKey } from '../domain/calendar-day-key';
 
 export const CHECK_IN_ERROR_CODES = {
   CREDIT_COMMITTED_ELSEWHERE: 'RESERVATION_CREDIT_COMMITTED_ELSEWHERE',
@@ -19,14 +20,25 @@ export class CheckInReservationOrchestrator {
     private readonly depositCredit: DepositCreditService,
   ) {}
 
-  async execute(reservationId: string) {
+  async execute(reservationId: string, now: Date = new Date()) {
     const reservation = await this.repository.findById(reservationId);
     if (!reservation) throw new NotFoundException('Reserva no encontrada');
+    if (reservation.status === ReservationStatus.CITA_EN_CURSO) {
+      return reservation;
+    }
 
     ReservationStateMachine.assertTransition(
       reservation.status,
       ReservationStatus.CITA_EN_CURSO,
     );
+
+    const today = getCalendarDayKey(now);
+    const appointmentDay = getCalendarDayKey(reservation.scheduledStart);
+    if (today !== appointmentDay) {
+      throw new AppException('RESERVATION_CHECK_IN_NOT_TODAY', {
+        details: { reservationId, appointmentDay, today },
+      });
+    }
 
     if (reservation.status === ReservationStatus.NO_SHOW) {
       const committed =
@@ -47,7 +59,7 @@ export class CheckInReservationOrchestrator {
     const applied = await this.repository.updateStatusIfCurrent(
       reservationId,
       reservation.status,
-      { status: ReservationStatus.CITA_EN_CURSO, checkedInAt: new Date() },
+      { status: ReservationStatus.CITA_EN_CURSO, checkedInAt: now },
     );
     if (!applied) {
       throw new AppException('RESERVATION_CONCURRENT_CHANGE');

@@ -16,6 +16,9 @@ export class CompleteReservationOrchestrator {
   async execute(reservationId: string) {
     const reservation = await this.repository.findById(reservationId);
     if (!reservation) throw new NotFoundException('Reserva no encontrada');
+    if (reservation.status === ReservationStatus.COMPLETADA) {
+      return reservation;
+    }
 
     ReservationStateMachine.assertTransition(
       reservation.status,
