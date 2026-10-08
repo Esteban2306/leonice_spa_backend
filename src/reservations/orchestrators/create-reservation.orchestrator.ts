@@ -19,15 +19,15 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { PlacementCheckService } from '../service/placement-check.service';
 import { placementRejectionException } from '../domain/placement-rejection.exception';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
+import { DomainException } from 'src/common/exceptions/domain.exception';
 import { validateAdvancedWindow } from '../validators/validate-advance-window';
 import { assertNoSameDayCategoryConflict } from '../validators/assert-no-same-day-category-conflict';
 import { assertNoDuplicateCategoriesInCombo } from '../validators/assert-no-duplicate-categories-in-combo';
-import { DomainException } from 'src/common/exceptions/domain.exception';
 import { DEPOSITO_TIMEOUT_MS } from '../domain/reservation-timing.constants';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { getDayBoundaries } from '../domain/day-boundaries';
-import { getOperatingWindowsForDate } from '../domain/operating-hours';
+import { OperatingScheduleService } from '../service/operating-schedule.service';
 import { generateAvailableSlots } from '../domain/availability-calculator';
 import {
   sequenceComboTreatments,
@@ -70,6 +70,7 @@ export class CreateReservationOrchestrator {
     private readonly promotionsService: PromotionsService,
     private readonly placementCheck: PlacementCheckService,
     private readonly depositCredit: DepositCreditService,
+    private readonly operatingSchedule: OperatingScheduleService,
     @InjectQueue(QUEUE_NAMES.RESERVATION_TIMEOUTS)
     private readonly timeoutsQueue: Queue,
   ) {}
@@ -373,7 +374,11 @@ export class CreateReservationOrchestrator {
         dayStart,
         dayEnd,
       );
-    const windows = getOperatingWindowsForDate(idealStart);
+    const windows = await this.operatingSchedule.getWindows(
+      idealStart,
+      categoryId,
+      tx,
+    );
     const allCandidates = generateAvailableSlots({
       operatingWindows: windows,
       held,

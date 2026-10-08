@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AvailabilityRepository } from '../repositories/availability.repository';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { getDayBoundaries } from '../domain/day-boundaries';
-import { getOperatingWindowsForDate } from '../domain/operating-hours';
+import { OperatingScheduleService } from './operating-schedule.service';
 import {
   evaluatePlacement,
   type PlacementDecision,
@@ -23,6 +23,7 @@ export class PlacementCheckService {
   constructor(
     private readonly availabilityRepository: AvailabilityRepository,
     private readonly reservationsRepository: ReservationsRepository,
+    private readonly operatingSchedule: OperatingScheduleService,
   ) {}
 
   async evaluate(
@@ -63,11 +64,17 @@ export class PlacementCheckService {
         tx,
       );
 
+    const operatingWindows = await this.operatingSchedule.getWindows(
+      start,
+      categoryId,
+      tx,
+    );
+
     return evaluatePlacement({
       start,
       end,
       now,
-      operatingWindows: getOperatingWindowsForDate(start),
+      operatingWindows,
       held,
       capacity,
       clientIntervals,

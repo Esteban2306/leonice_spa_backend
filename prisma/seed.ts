@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { ARGON2_OPTIONS } from '../src/auth/constants/auth.constants';
+import { DEFAULT_WEEKLY_WINDOWS } from '../src/reservations/domain/operating-hours';
 
 const prisma = new PrismaClient();
 
@@ -19,6 +20,19 @@ async function main() {
       role: 'ADMIN',
     },
   });
+
+  for (const window of DEFAULT_WEEKLY_WINDOWS) {
+    await prisma.operatingWindow.upsert({
+      where: {
+        dayOfWeek_startMinute: {
+          dayOfWeek: window.dayOfWeek,
+          startMinute: window.startMinute,
+        },
+      },
+      update: {},
+      create: window,
+    });
+  }
 
   const spaCapilar = await prisma.category.upsert({
     where: { name: 'Spa Capilar' },

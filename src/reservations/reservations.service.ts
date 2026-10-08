@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { AvailabilityRepository } from './repositories/availability.repository';
-import { getOperatingWindowsForDate } from './domain/operating-hours';
+import { OperatingScheduleService } from './service/operating-schedule.service';
 import { generateAvailableSlots } from './domain/availability-calculator';
 import { SafeCacheService } from 'src/infrastructure/redis/safe-cache.service';
 import { ReservationsRepository } from './repositories/reservations.repository';
@@ -15,6 +15,10 @@ import {
 
 const AVAILABILITY_CACHE_TTL_SECONDS = 10;
 
+export function availabilityCacheKey(treatmentId: string, dayKey: string) {
+  return `availability:${treatmentId}:${dayKey}`;
+}
+
 export interface AvailabilitySlot {
   iso: string;
   localTime: string;
@@ -27,13 +31,14 @@ export class ReservationsService {
     private readonly availabilityRepository: AvailabilityRepository,
     private readonly cache: SafeCacheService,
     private readonly reservationsRepository: ReservationsRepository,
+    private readonly operatingSchedule: OperatingScheduleService,
   ) {}
 
   async getAvailability(
     treatmentId: string,
     dateStr: string,
   ): Promise<AvailabilitySlot[]> {
-    const cacheKey = `availability:${treatmentId}:${dateStr}`;
+    const cacheKey = availabilityCacheKey(treatmentId, dateStr);
 
     const cached = await this.cache.get<AvailabilitySlot[]>(cacheKey);
     if (cached) return cached;
@@ -113,7 +118,10 @@ export class ReservationsService {
 
     const date = new Date(`${dateStr}T00:00:00`);
 
-    const operatingWindows = getOperatingWindowsForDate(date);
+    const operatingWindows = await this.operatingSchedule.getWindows(
+      date,
+      treatment.categoryId,
+    );
     if (operatingWindows.length === 0) return [];
 
     const dayStart = operatingWindows[0].start;

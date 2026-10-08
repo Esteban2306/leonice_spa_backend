@@ -19,6 +19,8 @@ import { ReviveReservationOrchestrator } from './orchestrators/revive-reservatio
 import { PlacementCheckService } from './service/placement-check.service';
 import { ReservationRescheduler } from './service/reservation-rescheduler.service';
 import { DepositCreditService } from './service/deposit-credit.service';
+import { OperatingScheduleRepository } from './repositories/operating-schedule.repository';
+import { OperatingScheduleService } from './service/operating-schedule.service';
 
 @Module({
   imports: [ClientsModule, PromotionsModule],
@@ -27,6 +29,8 @@ import { DepositCreditService } from './service/deposit-credit.service';
     ReservationsService,
     AvailabilityRepository,
     ReservationsRepository,
+    OperatingScheduleRepository,
+    OperatingScheduleService,
     CreateReservationOrchestrator,
     CancelReservationOrchestrator,
     RescheduleReservationOrchestrator,
@@ -47,6 +51,8 @@ import { DepositCreditService } from './service/deposit-credit.service';
     ReservationsService,
     AvailabilityRepository,
     ReservationsRepository,
+    OperatingScheduleRepository,
+    OperatingScheduleService,
     CreateReservationOrchestrator,
     CancelReservationOrchestrator,
     MarkNoShowOrchestrator,
