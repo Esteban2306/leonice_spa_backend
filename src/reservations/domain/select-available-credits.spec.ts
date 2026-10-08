@@ -5,8 +5,6 @@ import {
   selectAvailableCredits,
 } from './select-available-credits';
 
-const MIN = 20;
-
 const make = (
   overrides: Partial<CreditCandidate> & { depositId: string },
 ): CreditCandidate => ({
@@ -33,7 +31,7 @@ describe('selectAvailableCredits', () => {
         ReservationStatus.CONFIRMADA,
       ],
     });
-    expect(ids(selectAvailableCredits([groupDeposit], MIN))).toEqual([]);
+    expect(ids(selectAvailableCredits([groupDeposit]))).toEqual([]);
   });
 
   it('un depósito de grupo es crédito cuando todas sus filas están canceladas o no-show', () => {
@@ -41,37 +39,34 @@ describe('selectAvailableCredits', () => {
       depositId: 'g',
       coveredStatuses: [ReservationStatus.CANCELADA, ReservationStatus.NO_SHOW],
     });
-    expect(ids(selectAvailableCredits([groupDeposit], MIN))).toEqual(['g']);
+    expect(ids(selectAvailableCredits([groupDeposit]))).toEqual(['g']);
   });
 
   it('acepta un depósito confirmado con imagen de una reserva cancelada', () => {
-    expect(
-      ids(selectAvailableCredits([make({ depositId: 'a' })], MIN)),
-    ).toEqual(['a']);
+    expect(ids(selectAvailableCredits([make({ depositId: 'a' })]))).toEqual([
+      'a',
+    ]);
   });
 
   it('acepta el de una reserva NO_SHOW', () => {
     const c = make({ depositId: 'a', originStatus: ReservationStatus.NO_SHOW });
-    expect(ids(selectAvailableCredits([c], MIN))).toEqual(['a']);
+    expect(ids(selectAvailableCredits([c]))).toEqual(['a']);
   });
 
   it('rechaza un depósito sin imagen', () => {
     const c = make({ depositId: 'a', hasProofImage: false });
-    expect(selectAvailableCredits([c], MIN)).toEqual([]);
+    expect(selectAvailableCredits([c])).toEqual([]);
   });
 
-  it('rechaza un depósito sin monto o con monto menor al mínimo', () => {
+  it('rechaza un depósito histórico sin monto registrado', () => {
     expect(
-      selectAvailableCredits([make({ depositId: 'a', amount: null })], MIN),
-    ).toEqual([]);
-    expect(
-      selectAvailableCredits([make({ depositId: 'b', amount: 19 })], MIN),
+      selectAvailableCredits([make({ depositId: 'a', amount: null })]),
     ).toEqual([]);
   });
 
-  it('acepta un monto mayor al mínimo', () => {
+  it('acepta cualquier monto registrado, sin mínimo', () => {
     expect(
-      ids(selectAvailableCredits([make({ depositId: 'a', amount: 50 })], MIN)),
+      ids(selectAvailableCredits([make({ depositId: 'a', amount: 5 })])),
     ).toEqual(['a']);
   });
 
@@ -82,7 +77,7 @@ describe('selectAvailableCredits', () => {
       DepositStatus.CONVERTIDO_A_CREDITO,
     ]) {
       expect(
-        selectAvailableCredits([make({ depositId: 'a', status })], MIN),
+        selectAvailableCredits([make({ depositId: 'a', status })]),
       ).toEqual([]);
     }
   });
@@ -94,7 +89,7 @@ describe('selectAvailableCredits', () => {
       ReservationStatus.COMPLETADA,
     ]) {
       expect(
-        selectAvailableCredits([make({ depositId: 'a', originStatus })], MIN),
+        selectAvailableCredits([make({ depositId: 'a', originStatus })]),
       ).toEqual([]);
     }
   });
@@ -110,7 +105,7 @@ describe('selectAvailableCredits', () => {
         appliedToReservationId: 'r1',
         appliedToStatus,
       });
-      expect(selectAvailableCredits([c], MIN)).toEqual([]);
+      expect(selectAvailableCredits([c])).toEqual([]);
     }
   });
 
@@ -120,7 +115,7 @@ describe('selectAvailableCredits', () => {
       appliedToReservationId: 'r1',
       appliedToStatus: ReservationStatus.COMPLETADA,
     });
-    expect(selectAvailableCredits([c], MIN)).toEqual([]);
+    expect(selectAvailableCredits([c])).toEqual([]);
   });
 
   it('un crédito aplicado a una reserva cancelada o no-show vuelve a quedar libre', () => {
@@ -133,7 +128,7 @@ describe('selectAvailableCredits', () => {
         appliedToReservationId: 'r1',
         appliedToStatus,
       });
-      expect(ids(selectAvailableCredits([c], MIN))).toEqual(['a']);
+      expect(ids(selectAvailableCredits([c]))).toEqual(['a']);
     }
   });
 
@@ -146,10 +141,7 @@ describe('selectAvailableCredits', () => {
       depositId: 'o',
       confirmedAt: new Date('2026-10-01T10:00:00Z'),
     });
-    expect(ids(selectAvailableCredits([newer, older], MIN))).toEqual([
-      'o',
-      'n',
-    ]);
+    expect(ids(selectAvailableCredits([newer, older]))).toEqual(['o', 'n']);
   });
 });
 

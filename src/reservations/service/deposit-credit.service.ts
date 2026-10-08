@@ -6,7 +6,6 @@ import {
   ReservationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { MIN_ADVANCE_AMOUNT } from '../domain/advance-payment.constants';
 import {
   CREDIT_ORIGIN_STATUSES,
   CREDIT_RELEASING_STATUSES,
@@ -80,7 +79,7 @@ export class DepositCreditService {
       });
     }
 
-    return selectAvailableCredits(candidates, MIN_ADVANCE_AMOUNT);
+    return selectAvailableCredits(candidates);
   }
 
   async summarizeForClient(clientId: string): Promise<ClientCreditSummary> {

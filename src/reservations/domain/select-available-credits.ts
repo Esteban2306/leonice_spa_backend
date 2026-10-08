@@ -23,13 +23,10 @@ export interface CreditCandidate {
   confirmedAt: Date;
 }
 
-export function isCreditAvailable(
-  candidate: CreditCandidate,
-  minAmount: number,
-): boolean {
+export function isCreditAvailable(candidate: CreditCandidate): boolean {
   if (candidate.status !== DepositStatus.CONFIRMADO) return false;
   if (!candidate.hasProofImage) return false;
-  if (candidate.amount === null || candidate.amount < minAmount) return false;
+  if (candidate.amount === null) return false;
   if (!CREDIT_ORIGIN_STATUSES.includes(candidate.originStatus)) return false;
   if (
     !candidate.coveredStatuses.every((s) => CREDIT_ORIGIN_STATUSES.includes(s))
@@ -45,10 +42,9 @@ export function isCreditAvailable(
 
 export function selectAvailableCredits(
   candidates: readonly CreditCandidate[],
-  minAmount: number,
 ): CreditCandidate[] {
   return candidates
-    .filter((c) => isCreditAvailable(c, minAmount))
+    .filter((c) => isCreditAvailable(c))
     .sort(
       (a, b) =>
         a.confirmedAt.getTime() - b.confirmedAt.getTime() ||
