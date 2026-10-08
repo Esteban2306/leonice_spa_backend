@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Client, HairColor, HairLength } from '@prisma/client';
+import type { Client } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EncryptionService } from '../../infrastructure/encryption/encryption.service';
 import {
@@ -7,7 +7,6 @@ import {
   UpdateClientData,
 } from '../types/client-persistence.types';
 import { SafeCacheService } from 'src/infrastructure/redis/safe-cache.service';
-import { isHairProfileValid } from '../domain/hair-profile.util';
 
 const JID_CACHE_PREFIX = 'client:jid:';
 const JID_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -102,8 +101,6 @@ export class ClientsRepository {
   }
 
   async create(data: CreateClientData) {
-    const hasHairProfile = Boolean(data.hairLength && data.hairColor);
-
     const client = await this.prisma.client.client.create({
       data: {
         phone: data.phone,
@@ -114,9 +111,6 @@ export class ClientsRepository {
           ? this.encryption.encrypt(data.allergies)
           : null,
         isPregnant: data.isPregnant ?? false,
-        hairLength: data.hairLength,
-        hairColor: data.hairColor,
-        hairProfileUpdatedAt: hasHairProfile ? new Date() : null,
       },
     });
 
@@ -137,8 +131,6 @@ export class ClientsRepository {
       whatsappJid?: string;
       allergies?: string;
       isPregnant?: boolean;
-      hairLength?: HairLength;
-      hairColor?: HairColor;
     },
   ): Promise<Client> {
     const data: Record<string, unknown> = {};
@@ -151,16 +143,6 @@ export class ClientsRepository {
     }
     if (incoming.isPregnant !== undefined) {
       data.isPregnant = incoming.isPregnant;
-    }
-
-    if (
-      incoming.hairLength &&
-      incoming.hairColor &&
-      !isHairProfileValid(current)
-    ) {
-      data.hairLength = incoming.hairLength;
-      data.hairColor = incoming.hairColor;
-      data.hairProfileUpdatedAt = new Date();
     }
 
     if (Object.keys(data).length === 0) {
@@ -190,14 +172,10 @@ export class ClientsRepository {
         name: data.name,
         birthDate: data.birthDate,
         isPregnant: data.isPregnant,
-        hairLength: data.hairLength,
-        hairColor: data.hairColor,
         allergies:
           data.allergies !== undefined
             ? this.encryption.encrypt(data.allergies)
             : undefined,
-        hairProfileUpdatedAt:
-          data.hairLength || data.hairColor ? new Date() : undefined,
       },
     });
     return this.decryptSensitive(client);

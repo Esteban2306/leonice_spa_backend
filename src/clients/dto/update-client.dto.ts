@@ -1,11 +1,4 @@
-import {
-  IsBoolean,
-  IsDateString,
-  IsEnum,
-  IsOptional,
-  IsString,
-} from 'class-validator';
-import { HairColor, HairLength } from '@prisma/client';
+import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class UpdateClientDto {
   @IsOptional()
@@ -23,12 +16,4 @@ export class UpdateClientDto {
   @IsOptional()
   @IsBoolean()
   isPregnant?: boolean;
-
-  @IsOptional()
-  @IsEnum(HairLength)
-  hairLength?: HairLength;
-
-  @IsOptional()
-  @IsEnum(HairColor)
-  hairColor?: HairColor;
 }

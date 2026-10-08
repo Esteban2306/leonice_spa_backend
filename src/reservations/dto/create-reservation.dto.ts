@@ -11,7 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { HairColor, HairLength, ReservationChannel } from '@prisma/client';
+import { ReservationChannel } from '@prisma/client';
 
 class ConsentInputDto {
   @IsBoolean()
@@ -50,14 +50,6 @@ class ClientInputDto {
   @ValidateNested()
   @Type(() => ConsentInputDto)
   consent?: ConsentInputDto;
-
-  @IsOptional()
-  @IsEnum(HairLength)
-  hairLength?: HairLength;
-
-  @IsOptional()
-  @IsEnum(HairColor)
-  hairColor?: HairColor;
 }
 
 export class CreateReservationDto {

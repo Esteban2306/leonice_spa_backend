@@ -110,8 +110,6 @@ export class ClientsService {
       birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
       allergies: dto.allergies,
       isPregnant: dto.isPregnant,
-      hairLength: dto.hairLength,
-      hairColor: dto.hairColor,
     });
   }
 }

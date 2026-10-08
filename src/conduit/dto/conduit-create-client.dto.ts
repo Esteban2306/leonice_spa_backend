@@ -9,7 +9,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { ConsentType, HairColor, HairLength } from '@prisma/client';
+import { ConsentType } from '@prisma/client';
 
 class ConduitConsentDto {
   @IsEnum(ConsentType)
@@ -38,13 +38,6 @@ export class ConduitCreateClientDto {
   @IsOptional()
   @IsDateString()
   birthDate?: string;
-  @IsOptional()
-  @IsEnum(HairLength)
-  hairLength?: HairLength;
-
-  @IsOptional()
-  @IsEnum(HairColor)
-  hairColor?: HairColor;
 
   @IsOptional()
   @IsBoolean()

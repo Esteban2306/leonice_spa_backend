@@ -1,5 +1,3 @@
-import { HairColor, HairLength } from '@prisma/client';
-
 export interface CreateClientData {
   phone: string;
   name: string;
@@ -7,8 +5,6 @@ export interface CreateClientData {
   whatsappJid?: string;
   allergies?: string;
   isPregnant?: boolean;
-  hairLength?: HairLength;
-  hairColor?: HairColor;
 }
 
 export interface UpdateClientData {
@@ -16,6 +12,4 @@ export interface UpdateClientData {
   birthDate?: Date;
   allergies?: string;
   isPregnant?: boolean;
-  hairLength?: HairLength;
-  hairColor?: HairColor;
 }

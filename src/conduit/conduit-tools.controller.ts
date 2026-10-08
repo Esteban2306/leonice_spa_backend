@@ -66,8 +66,6 @@ export class ConduitToolsController {
         whatsappJid: dto.whatsappJid,
         allergies: dto.allergies,
         isPregnant: dto.isPregnant || false,
-        hairLength: dto.hairLength,
-        hairColor: dto.hairColor,
       });
 
       // Registrar consentimientos

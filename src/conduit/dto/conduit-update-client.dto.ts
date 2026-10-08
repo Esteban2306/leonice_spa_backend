@@ -7,7 +7,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { ConsentType, HairColor, HairLength } from '@prisma/client';
+import { ConsentType } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 export class ConduitConsentDto {
@@ -25,14 +25,6 @@ export class ConduitUpdateClientDto {
   @IsString()
   @MinLength(10)
   phone: string;
-
-  @IsOptional()
-  @IsEnum(HairLength)
-  hairLength?: HairLength;
-
-  @IsOptional()
-  @IsEnum(HairColor)
-  hairColor?: HairColor;
 
   @IsOptional()
   @IsBoolean()
