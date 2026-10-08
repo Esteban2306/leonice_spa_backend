@@ -244,6 +244,27 @@ export class ReservationsRepository {
     return rows.map((r) => r.id);
   }
 
+  findClientReservationsOnDay(
+    params: { clientId: string; dayStart: Date; dayEnd: Date },
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.reservation.findMany({
+      where: {
+        clientId: params.clientId,
+        scheduledStart: { gte: params.dayStart, lt: params.dayEnd },
+      },
+      orderBy: { scheduledStart: 'asc' },
+      select: {
+        id: true,
+        status: true,
+        scheduledStart: true,
+        scheduledEnd: true,
+        cancellationSource: true,
+        treatment: { select: { name: true } },
+      },
+    });
+  }
+
   async findOverdueConfirmedIds(
     params: { startedBefore: Date; startedAfter: Date },
     limit: number,

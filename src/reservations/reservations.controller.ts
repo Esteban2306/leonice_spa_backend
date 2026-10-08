@@ -91,7 +91,13 @@ export class ReservationsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelReservationDto,
   ) {
-    return this.cancelOrchestrator.execute(id, dto.phone, dto.reason);
+    return this.cancelOrchestrator.executeVerifiedByPhone({
+      reservationId: id,
+      phone: dto.phone,
+      scope: dto.scope ?? 'SINGLE',
+      channel: 'WEB',
+      reason: dto.reason,
+    });
   }
 
   @Patch(':id/admin-cancel')

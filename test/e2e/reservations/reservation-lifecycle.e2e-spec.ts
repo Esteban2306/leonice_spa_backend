@@ -222,11 +222,13 @@ describe('Reservation lifecycle (e2e)', () => {
       }),
     ).rejects.toThrow();
 
-    await cancelO.execute(
-      first.reservations[0].id,
-      '+57TESTLIFECYCLE3',
-      'Prueba',
-    );
+    await cancelO.executeVerifiedByPhone({
+      reservationId: first.reservations[0].id,
+      phone: '+57TESTLIFECYCLE3',
+      scope: 'SINGLE',
+      channel: 'WEB',
+      reason: 'Prueba',
+    });
 
     const third = await createO.execute({
       client: { phone: '+57TESTLIFECYCLE4' },
@@ -452,11 +454,13 @@ describe('Reservation lifecycle (e2e)', () => {
       treatments: [treatmentSimpleId],
       scheduledStart: futureDate(97, 8).toISOString(),
     });
-    await cancelO.execute(
-      result.reservations[0].id,
-      '+57TESTADMIN_TERMINAL',
-      'Prueba',
-    );
+    await cancelO.executeVerifiedByPhone({
+      reservationId: result.reservations[0].id,
+      phone: '+57TESTADMIN_TERMINAL',
+      scope: 'SINGLE',
+      channel: 'WEB',
+      reason: 'Prueba',
+    });
 
     await expect(
       adminRescheduleO.execute(

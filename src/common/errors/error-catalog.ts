@@ -149,6 +149,19 @@ const RESERVATION = {
     status: HttpStatus.CONFLICT,
     message: 'La reserva cambió mientras se revivía. Revisa su estado actual.',
   },
+  RESERVATION_NOT_OWNED: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'No encontramos esa reserva para este cliente.',
+  },
+  RESERVATION_NOT_CANCELLABLE: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Esta reserva ya no se puede cancelar (está en curso, finalizada o la cerró el spa).',
+  },
+  RESERVATION_CANCEL_TOO_LATE: {
+    status: HttpStatus.CONFLICT,
+    message: 'La cita ya empezó; no se puede cancelar. Comunícate con el spa.',
+  },
   RESERVATION_CHECK_IN_NOT_TODAY: {
     status: HttpStatus.CONFLICT,
     message: 'El check-in solo se puede hacer el día de la cita.',

@@ -4,6 +4,7 @@ export const EVENT_TYPES = {
   RESERVATION_CREATED: 'reservation.created',
   RESERVATION_CONFIRMED: 'reservation.confirmed',
   RESERVATION_CANCELLED: 'reservation.cancelled',
+  CLIENT_CANCELLATION_COMPLETED: 'reservation.client_cancellation_completed',
   RESERVATION_RESCHEDULED: 'reservation.rescheduled',
   RESERVATION_COMPLETED: 'reservation.completed',
   RESERVATION_NO_SHOW: 'reservation.no_show',
@@ -86,6 +87,12 @@ export interface EventPayloadMap {
     reservationId: string;
     clientId: string;
     reason?: string;
+  };
+
+  [EVENT_TYPES.CLIENT_CANCELLATION_COMPLETED]: {
+    clientId: string;
+    reservationIds: string[];
+    channel: 'WEB' | 'LINK' | 'WHATSAPP';
   };
 
   [EVENT_TYPES.RESERVATION_RESCHEDULED]: {
