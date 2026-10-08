@@ -10,6 +10,7 @@ export const JOB_NAMES = {
   DEPOSITO_TIMEOUT: 'deposito-timeout',
   NO_SHOW_CHECK: 'no-show-check',
   DEPOSIT_EXPIRY_SWEEP: 'deposit-expiry-sweep',
+  NO_SHOW_SWEEP: 'no-show-sweep',
 
   // Comunicación saliente — corre en AUTOMATION_COMMUNICATIONS
   RESERVATION_REMINDER_CHECK: 'reservation-reminder-check',

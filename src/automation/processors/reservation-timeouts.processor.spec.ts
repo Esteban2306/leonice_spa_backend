@@ -29,6 +29,8 @@ interface FixtureOptions {
   cancelError?: Error;
   hasSubmittedProof?: boolean;
   depositExpiresAt?: Date | null;
+  overdueIds?: string[];
+  scheduledStart?: Date;
 }
 
 const EXPIRED_DEADLINE = new Date(Date.now() - 60_000);
@@ -44,6 +46,8 @@ const buildFixture = (
 ) => {
   const cancelCalls: CancelCall[] = [];
   const logged: LoggedExecution[] = [];
+  const noShowCalls: string[] = [];
+  const sweepWindows: Array<{ startedBefore: Date; startedAfter: Date }> = [];
 
   const repository = {
     findById: () =>
@@ -53,6 +57,7 @@ const buildFixture = (
               id: 'r1',
               status,
               checkedInAt: null,
+              scheduledStart: options.scheduledStart ?? new Date(0),
               depositExpiresAt:
                 options.depositExpiresAt === undefined
                   ? EXPIRED_DEADLINE
@@ -62,6 +67,19 @@ const buildFixture = (
       ),
     hasSubmittedProof: () =>
       Promise.resolve(options.hasSubmittedProof ?? false),
+    findOverdueConfirmedIds: (params: {
+      startedBefore: Date;
+      startedAfter: Date;
+    }) => {
+      sweepWindows.push(params);
+      return Promise.resolve(options.overdueIds ?? []);
+    },
+  };
+  const markNoShow = {
+    execute: (id: string) => {
+      noShowCalls.push(id);
+      return Promise.resolve({ id });
+    },
   };
   const adminCancel = {
     execute: (id: string, reason: string | undefined, notify: boolean) => {
@@ -81,11 +99,11 @@ const buildFixture = (
   const processor = new ReservationTimeoutsProcessor(
     repository as unknown as ReservationsRepository,
     adminCancel as unknown as AdminCancelReservationOrchestrator,
-    {} as unknown as MarkNoShowOrchestrator,
+    markNoShow as unknown as MarkNoShowOrchestrator,
     executions as unknown as AutomationExecutionRepository,
   );
 
-  return { processor, cancelCalls, logged };
+  return { processor, cancelCalls, logged, noShowCalls, sweepWindows };
 };
 
 describe('ReservationTimeoutsProcessor', () => {
@@ -169,5 +187,39 @@ describe('ReservationTimeoutsProcessor', () => {
 
     await expect(result).rejects.toThrow('conexión caída');
     await expect(result).rejects.not.toBeInstanceOf(UnrecoverableError);
+  });
+
+  it('el barrido no-show marca las citas confirmadas sin check-in pasada la gracia', async () => {
+    const { processor, noShowCalls, sweepWindows, logged } = buildFixture(
+      ReservationStatus.CONFIRMADA,
+      { overdueIds: ['r1'] },
+    );
+
+    await processor.process(buildJob(JOB_NAMES.NO_SHOW_SWEEP));
+
+    expect(noShowCalls).toEqual(['r1']);
+    const window = sweepWindows[0];
+    expect(Date.now() - window.startedBefore.getTime()).toBeGreaterThanOrEqual(
+      15 * 60_000,
+    );
+    expect(Date.now() - window.startedAfter.getTime()).toBeGreaterThanOrEqual(
+      7 * 24 * 3_600_000,
+    );
+    expect(logged.at(-1)).toMatchObject({
+      type: AutomationExecutionType.NO_SHOW_CHECK,
+      result: AutomationExecutionResult.EXECUTED,
+    });
+  });
+
+  it('el barrido no-show respeta una cita que ya hizo check-in o cambió', async () => {
+    const { processor, noShowCalls, logged } = buildFixture(
+      ReservationStatus.CITA_EN_CURSO,
+      { overdueIds: ['r1'] },
+    );
+
+    await processor.process(buildJob(JOB_NAMES.NO_SHOW_SWEEP));
+
+    expect(noShowCalls).toEqual([]);
+    expect(logged.at(-1)?.result).toBe(AutomationExecutionResult.SKIPPED);
   });
 });

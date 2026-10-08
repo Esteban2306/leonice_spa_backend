@@ -14,7 +14,7 @@ import { AutomationExecutionRepository } from './repositories/automation-executi
 import { AutomationRulesRepository } from './repositories/automation-rules.repository';
 import { AutomationRulesService } from './automation-rules.service';
 import { AutomationRulesController } from './automation-rules.controller';
-import { DepositExpirySweepScheduler } from './deposit-expiry-sweep.scheduler';
+import { ReservationSweepsScheduler } from './reservation-sweeps.scheduler';
 
 @Module({
   imports: [
@@ -35,7 +35,7 @@ import { DepositExpirySweepScheduler } from './deposit-expiry-sweep.scheduler';
     AutomationExecutionRepository,
     AutomationRulesRepository,
     AutomationRulesService,
-    DepositExpirySweepScheduler,
+    ReservationSweepsScheduler,
   ],
 })
 export class AutomationModule {}

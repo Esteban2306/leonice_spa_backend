@@ -244,6 +244,24 @@ export class ReservationsRepository {
     return rows.map((r) => r.id);
   }
 
+  async findOverdueConfirmedIds(
+    params: { startedBefore: Date; startedAfter: Date },
+    limit: number,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<string[]> {
+    const rows = await client.reservation.findMany({
+      where: {
+        status: ReservationStatus.CONFIRMADA,
+        checkedInAt: null,
+        scheduledStart: { lt: params.startedBefore, gte: params.startedAfter },
+      },
+      select: { id: true },
+      orderBy: { scheduledStart: 'asc' },
+      take: limit,
+    });
+    return rows.map((r) => r.id);
+  }
+
   async setCoveredByDeposit(
     reservationIds: readonly string[],
     depositId: string,

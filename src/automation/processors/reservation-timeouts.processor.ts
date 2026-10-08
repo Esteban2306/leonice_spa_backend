@@ -18,6 +18,8 @@ import { AutomationExecutionRepository } from '../repositories/automation-execut
 import {
   DEPOSIT_SWEEP_BATCH_SIZE,
   NO_SHOW_GRACE_MS,
+  NO_SHOW_SWEEP_BATCH_SIZE,
+  NO_SHOW_SWEEP_LOOKBACK_MS,
 } from '../../reservations/domain/reservation-timing.constants';
 
 interface TimeoutJobData {
@@ -55,6 +57,9 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
   private async handle(job: Job<TimeoutJobData>): Promise<void> {
     if (job.name === JOB_NAMES.DEPOSIT_EXPIRY_SWEEP) {
       return this.sweepExpiredDeposits();
+    }
+    if (job.name === JOB_NAMES.NO_SHOW_SWEEP) {
+      return this.sweepNoShows();
     }
 
     const reservationId = this.requireReservationId(job);
@@ -114,6 +119,33 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(`Barrido: no se pudo procesar ${id}: ${message}`);
+      }
+    }
+  }
+
+  private async sweepNoShows(): Promise<void> {
+    const now = Date.now();
+    const ids = await this.repository.findOverdueConfirmedIds(
+      {
+        startedBefore: new Date(now - NO_SHOW_GRACE_MS),
+        startedAfter: new Date(now - NO_SHOW_SWEEP_LOOKBACK_MS),
+      },
+      NO_SHOW_SWEEP_BATCH_SIZE,
+    );
+    if (ids.length === 0) {
+      this.logger.debug('Barrido no-show: sin citas vencidas sin check-in');
+      return;
+    }
+
+    this.logger.log(`Barrido no-show: ${ids.length} cita(s) sin check-in`);
+    for (const id of ids) {
+      try {
+        await this.markNoShowIfStillConfirmed(id);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Barrido no-show: no se pudo procesar ${id}: ${message}`,
+        );
       }
     }
   }
