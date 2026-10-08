@@ -100,6 +100,31 @@ const reservationRow = (id) => {
   return { status, source, expires, start };
 };
 
+const BOGOTA_OFFSET_MS = 5 * 3_600_000;
+const BASE_MINUTES = { weekday: [[480, 720], [840, 960]], weekend: [[420, 720], [840, 960]] };
+function operatingMinutes(from, to) {
+  const f = from.getTime() - BOGOTA_OFFSET_MS;
+  const t = to.getTime() - BOGOTA_OFFSET_MS;
+  let total = 0;
+  const first = new Date(f);
+  for (let day = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate()); day < t; day += 86_400_000) {
+    const dow = new Date(day).getUTCDay();
+    for (const [a, b] of dow === 0 || dow === 6 ? BASE_MINUTES.weekend : BASE_MINUTES.weekday) {
+      const start = Math.max(day + a * 60_000, f);
+      const end = Math.min(day + b * 60_000, t);
+      if (end > start) total += (end - start) / 60_000;
+    }
+  }
+  return total;
+}
+const iso = (column) => `to_char(${column}, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
+const depositClock = (id) => {
+  const [clock, expires, start] = sql(
+    `select ${iso('deposit_clock_started_at')}, ${iso('deposit_expires_at')}, ${iso('scheduled_start')} from reservations where id='${id}'`,
+  ).split('|');
+  return { clock: new Date(clock), expires: new Date(expires), start: new Date(start) };
+};
+
 const scenarios = {
   async probe() {
     const r = await api('PATCH', '/reservations/00000000-0000-4000-8000-000000000000/revive');
@@ -449,6 +474,52 @@ const scenarios = {
     for (const id of created) await api('DELETE', `/admin/schedule/exceptions/${id}`);
     await api('PATCH', `/reservations/${bookedId}/admin-cancel`, { notifyClient: false, reason: 'QA fase 3' });
     eq('SC8 limpieza: sin excepciones en el rango', (await api('GET', '/admin/schedule/exceptions?from=2026-12-21&to=2026-12-24')).body?.length, 0);
+  },
+  async depositExpiry() {
+    eq('DX0 sin excepciones de horario en dev antes de empezar', sql('select count(*) from schedule_exceptions'), '0');
+    const phone = newPhone();
+    const r = await book(phone, [QA_TREATMENT], at('28', '08'));
+    eq('DX1 reserva creada', r.status, 201);
+    const id = r.body?.reservations?.[0]?.id;
+    let d = depositClock(id);
+    check('DX1 el reloj del plazo arranca al crear', Math.abs(d.clock.getTime() - Date.now()) < 60_000, d.clock.toISOString());
+    eq('DX1 el plazo equivale a 120 min de horario hábil', operatingMinutes(d.clock, d.expires), 120);
+
+    const live22 = sql(`select count(*) from reservations where status in ('PENDIENTE_DEPOSITO','CONFIRMADA','CITA_EN_CURSO') and scheduled_start >= '2026-12-22T05:00:00Z' and scheduled_start < '2026-12-23T05:00:00Z'`);
+    eq('DX2 precondición: sin reservas vivas el 22-dic (el bloqueo global no dará 409)', live22, '0');
+    sql(`update reservations set deposit_clock_started_at='2026-12-22T01:00:00Z', deposit_expires_at='2026-12-22T15:00:00Z' where id='${id}'`);
+    const block = await api('POST', '/admin/schedule/exceptions', { date: '2026-12-22', type: 'BLOCK', reason: 'QA fase 4' });
+    eq('DX2 bloqueo global del 22-dic → 201', block.status, 201);
+    const ext = block.body?.depositDeadlinesExtended?.find((e) => e.reservationId === id);
+    eq('DX2 la respuesta informa el plazo extendido', ext?.depositExpiresAt, '2026-12-23T15:00:00.000Z');
+    eq('DX2 en BD: vence el 23-dic 10:00 (el 22 no cuenta)', depositClock(id).expires.toISOString(), '2026-12-23T15:00:00.000Z');
+
+    sql(`update reservations set deposit_expires_at='2026-12-23T15:00:00Z' where id='${id}'`);
+    await enqueueTimeout(id);
+    await sleep(6000);
+    eq('DX3 el job deposito-timeout no cancela antes del plazo extendido', reservationRow(id).status, 'PENDIENTE_DEPOSITO');
+    const exec = sql(`select result || ':' || coalesce(reason,'') from automation_executions where reservation_id='${id}' order by executed_at desc limit 1`);
+    check('DX3 queda SKIPPED por plazo aún vigente', exec.startsWith('SKIPPED') && exec.includes('aún no vence'), exec);
+
+    const removed = await api('DELETE', `/admin/schedule/exceptions/${block.body?.id}`);
+    eq('DX4 quitar el bloqueo → 200', removed.status, 200);
+    eq('DX4 quitar no informa extensiones', removed.body?.depositDeadlinesExtended?.length, 0);
+    eq('DX4 el plazo comunicado no se acorta', depositClock(id).expires.toISOString(), '2026-12-23T15:00:00.000Z');
+
+    sql(`insert into deposit_records (id, reservation_id, status, method, image_url, created_at, updated_at)
+         values (gen_random_uuid()::text, '${id}', 'PENDIENTE', 'MANUAL', 'https://example.invalid/qa-proof.png', now(), now())`);
+    const t0 = new Date().toISOString();
+    const rej = await api('PATCH', `/reservations/${id}/deposits/reject`, { reason: 'QA fase 4 ilegible' });
+    eq('DX5 rechazar comprobante → 200', rej.status, 200);
+    d = depositClock(id);
+    check('DX5 el reloj se reinicia al rechazar', Math.abs(d.clock.getTime() - Date.now()) < 60_000, d.clock.toISOString());
+    eq('DX5 nuevo plazo = 120 min de horario hábil', operatingMinutes(d.clock, d.expires), 120);
+    await sleep(8000);
+    const notice = sinkSince(t0).find((e) => e.url === '/api/v1/messages' && e.body?.template?.id === 'qa-client-rejected');
+    check('DX5 aviso al cliente con la fecha límite real', /^hasta el /.test(notice?.body?.variables?.plazo ?? ''), notice?.body?.variables?.plazo);
+
+    await api('PATCH', `/reservations/${id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 4' });
+    eq('DX6 limpieza: sin excepciones', sql('select count(*) from schedule_exceptions'), '0');
   },
 };
 
