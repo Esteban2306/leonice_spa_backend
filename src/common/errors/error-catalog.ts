@@ -164,6 +164,23 @@ const CLIENT = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const SCHEDULE = {
+  SCHEDULE_EXCEPTION_INVALID_RANGE: {
+    status: HttpStatus.BAD_REQUEST,
+    message:
+      'El rango de horas no es válido: indica inicio y fin (HH:mm) con el inicio antes del fin.',
+  },
+  SCHEDULE_EXCEPTION_IN_THE_PAST: {
+    status: HttpStatus.CONFLICT,
+    message: 'No se puede modificar el horario de un día que ya pasó.',
+  },
+  SCHEDULE_CHANGE_HAS_RESERVATIONS: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Hay reservas dentro del horario que quieres cerrar. Reprográmalas o cancélalas y vuelve a intentarlo.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 const DEPOSIT = {
   DEPOSIT_AMOUNT_REQUIRED: {
     status: HttpStatus.BAD_REQUEST,
@@ -185,6 +202,7 @@ export const ERROR_CATALOG = {
   ...PLACEMENT,
   ...RESERVATION,
   ...CLIENT,
+  ...SCHEDULE,
   ...DEPOSIT,
 } as const;
 
