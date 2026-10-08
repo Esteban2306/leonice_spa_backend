@@ -8,6 +8,10 @@ import {
   fromScheduleDate,
 } from '../../reservations/repositories/operating-schedule.repository';
 import { OperatingScheduleService } from '../../reservations/service/operating-schedule.service';
+import {
+  DepositDeadlineService,
+  type ExtendedDepositDeadline,
+} from '../../reservations/service/deposit-deadline.service';
 import { availabilityCacheKey } from '../../reservations/reservations.service';
 import { getCalendarDayKey } from '../../reservations/domain/calendar-day-key';
 import { getDayBoundaries } from '../../reservations/domain/day-boundaries';
@@ -45,6 +49,7 @@ export class AdminScheduleService {
     private readonly operatingSchedule: OperatingScheduleService,
     private readonly availabilityRepository: AvailabilityRepository,
     private readonly cache: SafeCacheService,
+    private readonly depositDeadline: DepositDeadlineService,
   ) {}
 
   async getBaseSchedule() {
@@ -112,47 +117,59 @@ export class AdminScheduleService {
       ? [dto.categoryId]
       : await this.repository.findCategoryIds();
 
-    const created = await this.availabilityRepository.withCategoriesLock(
-      affected,
-      date,
-      async (tx) => {
-        const current = await this.operatingSchedule.loadDaySchedule(date, tx);
-        const proposed: DaySchedule = {
-          base: current.base,
-          exceptions: [
-            ...current.exceptions,
+    const { created, extended } =
+      await this.availabilityRepository.withCategoriesLock(
+        affected,
+        date,
+        async (tx) => {
+          const current = await this.operatingSchedule.loadDaySchedule(
+            date,
+            tx,
+          );
+          const proposed: DaySchedule = {
+            base: current.base,
+            exceptions: [
+              ...current.exceptions,
+              {
+                type: dto.type,
+                categoryId: dto.categoryId ?? null,
+                startMinute,
+                endMinute,
+              },
+            ],
+          };
+          await this.assertNoDisplacedReservations(
+            date,
+            affected,
+            current,
+            proposed,
+            tx,
+          );
+          const created = await this.repository.createException(
             {
+              dayKey: dto.date,
               type: dto.type,
               categoryId: dto.categoryId ?? null,
               startMinute,
               endMinute,
+              reason: dto.reason ?? null,
+              createdByUserId: adminUserId,
             },
-          ],
-        };
-        await this.assertNoDisplacedReservations(
-          date,
-          affected,
-          current,
-          proposed,
-          tx,
-        );
-        return this.repository.createException(
-          {
-            dayKey: dto.date,
-            type: dto.type,
-            categoryId: dto.categoryId ?? null,
-            startMinute,
-            endMinute,
-            reason: dto.reason ?? null,
-            createdByUserId: adminUserId,
-          },
-          tx,
-        );
-      },
-    );
+            tx,
+          );
+          const extended = await this.depositDeadline.extendForScheduleChange(
+            date,
+            tx,
+          );
+          return { created, extended };
+        },
+      );
 
-    await this.invalidateAvailability(affected, dto.date);
-    return this.toExceptionView(created);
+    await this.afterScheduleChange(affected, dto.date, extended);
+    return {
+      ...this.toExceptionView(created),
+      depositDeadlinesExtended: extended,
+    };
   }
 
   async deleteException(id: string) {
@@ -167,7 +184,7 @@ export class AdminScheduleService {
       ? [existing.categoryId]
       : await this.repository.findCategoryIds();
 
-    await this.availabilityRepository.withCategoriesLock(
+    const extended = await this.availabilityRepository.withCategoriesLock(
       affected,
       date,
       async (tx) => {
@@ -184,11 +201,15 @@ export class AdminScheduleService {
           tx,
         );
         await this.repository.deleteException(id, tx);
+        return this.depositDeadline.extendForScheduleChange(date, tx);
       },
     );
 
-    await this.invalidateAvailability(affected, dayKey);
-    return this.toExceptionView(existing);
+    await this.afterScheduleChange(affected, dayKey, extended);
+    return {
+      ...this.toExceptionView(existing),
+      depositDeadlinesExtended: extended,
+    };
   }
 
   private async assertNoDisplacedReservations(
@@ -238,6 +259,27 @@ export class AdminScheduleService {
         })),
       },
     });
+  }
+
+  private async afterScheduleChange(
+    categoryIds: readonly string[],
+    dayKey: string,
+    extended: readonly ExtendedDepositDeadline[],
+  ): Promise<void> {
+    await this.invalidateAvailability(categoryIds, dayKey);
+    await Promise.all(
+      extended.map((e) =>
+        this.depositDeadline.scheduleTimeout(
+          e.reservationId,
+          e.depositExpiresAt,
+        ),
+      ),
+    );
+    if (extended.length > 0) {
+      this.logger.log(
+        `Plazo de depósito extendido en ${extended.length} reserva(s) por el cambio de horario del ${dayKey}`,
+      );
+    }
   }
 
   private async invalidateAvailability(
