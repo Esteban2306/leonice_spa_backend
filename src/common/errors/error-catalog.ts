@@ -82,6 +82,11 @@ const PLACEMENT = {
     status: HttpStatus.CONFLICT,
     message: 'Hay otra reserva del cliente que se cruza con este horario.',
   },
+  PLACEMENT_NO_SLOT_THAT_DAY: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'No hay horario disponible ese día, ni siquiera ajustando la hora. Intenta otro día.',
+  },
   PLACEMENT_NO_CAPACITY: {
     status: HttpStatus.CONFLICT,
     message: 'Ya no hay cupo disponible para ese horario.',

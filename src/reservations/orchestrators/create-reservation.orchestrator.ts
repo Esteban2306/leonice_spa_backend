@@ -19,7 +19,6 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { PlacementCheckService } from '../service/placement-check.service';
 import { placementRejectionException } from '../domain/placement-rejection.exception';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
-import { DomainException } from 'src/common/exceptions/domain.exception';
 import { validateAdvancedWindow } from '../validators/validate-advance-window';
 import { assertNoSameDayCategoryConflict } from '../validators/assert-no-same-day-category-conflict';
 import { assertNoDuplicateCategoriesInCombo } from '../validators/assert-no-duplicate-categories-in-combo';
@@ -27,6 +26,7 @@ import { DEPOSITO_TIMEOUT_MS } from '../domain/reservation-timing.constants';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { getDayBoundaries } from '../domain/day-boundaries';
+import { getCalendarDayKey } from '../domain/calendar-day-key';
 import { OperatingScheduleService } from '../service/operating-schedule.service';
 import { generateAvailableSlots } from '../domain/availability-calculator';
 import {
@@ -392,9 +392,10 @@ export class CreateReservationOrchestrator {
 
     const nearest = findNearestSlot(validCandidates, idealStart);
     if (!nearest) {
-      throw new DomainException(
-        `No hay cupo disponible para ${categoryName} ese día, ni siquiera ajustando el horario. Intenta otro día.`,
-      );
+      throw new AppException('PLACEMENT_NO_SLOT_THAT_DAY', {
+        message: `No hay horario disponible para ${categoryName} ese día, ni siquiera ajustando la hora. Intenta otro día.`,
+        details: { categoryId, date: getCalendarDayKey(idealStart) },
+      });
     }
 
     candidateStart = nearest;
