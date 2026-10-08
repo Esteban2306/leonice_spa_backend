@@ -174,24 +174,6 @@ export class DepositsRepository {
     });
   }
 
-  async markExpiredBySystem(reservationId: string) {
-    const deposit = await this.prisma.client.depositRecord.findFirst({
-      where: { reservationId, status: DepositStatus.PENDIENTE },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!deposit) return;
-
-    return this.prisma.client.depositRecord.update({
-      where: { id: deposit.id },
-      data: {
-        status: DepositStatus.RECHAZADO,
-        rejectionReason:
-          'Reserva cancelada automáticamente por tiempo de espera',
-        verifiedAt: new Date(),
-      },
-    });
-  }
-
   markConfirmed(
     id: string,
     adminUserId: string,
