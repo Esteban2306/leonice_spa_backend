@@ -7,6 +7,7 @@ const LIVE = new URL('.', import.meta.url).pathname;
 const BACKEND = new URL('../../', import.meta.url).pathname;
 const QA_TREATMENT = '0159e8a4-a348-4d3b-bb1d-e9eddddd47de'; // "Tratamiento de Prueba" (categoría QA, pool 4)
 const NAILS_TREATMENT = '24336901-5493-46d5-8c22-07bdb4898254'; // Pedespa (Uñas)
+const HAIR_TREATMENT = '3a806ae0-7e83-41f9-a576-120cc474d345';
 const RUN = Date.now().toString().slice(-6); // sufijo único por corrida
 
 const results = [];
@@ -334,6 +335,50 @@ const scenarios = {
     await api('PATCH', `/reservations/${idb}/admin-cancel`, { notifyClient: false, reason: 'QA D1' });
     credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
     eq('S10 con todas las filas canceladas es crédito por el total', String(credits.body?.credits?.[0]?.amount), '50');
+  },
+
+  async hairProfile() {
+    const phone = newPhone();
+    const blocked = await api('POST', '/reservations', {
+      client: { phone, name: `QA Fase2 ${phone}`, birthDate: '1990-01-01', hairLength: 'LARGO', hairColor: 'OSCURO' },
+      treatments: [HAIR_TREATMENT],
+      scheduledStart: at('18', '08'),
+    });
+    eq('H1 reservar enviando perfil capilar → VALIDATION_FAILED (solo el admin lo escribe)', errCode(blocked), 'VALIDATION_FAILED');
+    const b = await book(phone, [HAIR_TREATMENT], at('18', '08'));
+    eq('H1 reserva capilar creada', b.status, 201);
+    const clientId = sql(`select client_id from reservations where id='${b.body.reservations[0].id}'`);
+    const pendingIds = async () => {
+      const r = await api('GET', '/clients/hair-profiles/pending?pageSize=100');
+      return { r, item: r.body?.data?.find((d) => d.clientId === clientId) };
+    };
+    let { r, item } = await pendingIds();
+    eq('H2 GET pendientes → 200', r.status, 200);
+    eq('H2 cliente sin perfil y con cita capilar aparece como MISSING', item?.hairProfile?.status, 'MISSING');
+    eq('H2 trae su próxima reserva', item?.nextReservation?.reservationId, b.body.reservations[0].id);
+    check('H2 total coincide con pagination', typeof r.body?.pagination?.total === 'number', JSON.stringify(r.body?.pagination));
+    let c = await api('POST', `/clients/${clientId}/hair-profile/confirm`);
+    eq('H3 confirmar sin perfil → HAIR_PROFILE_MISSING', errCode(c), 'HAIR_PROFILE_MISSING');
+    c = await api('PUT', `/clients/${clientId}/hair-profile`, { hairLength: 'LARGO', hairColor: 'OSCURO' });
+    eq('H4 registrar perfil → VALID', c.body?.status, 'VALID');
+    check('H4 validUntil a 4 meses', typeof c.body?.validUntil === 'string', c.body?.validUntil);
+    ({ item } = await pendingIds());
+    eq('H4 con perfil vigente sale de pendientes', item, undefined);
+    sql(`update clients set hair_profile_updated_at = now() - interval '5 months' where id='${clientId}'`);
+    ({ item } = await pendingIds());
+    eq('H5 perfil vencido vuelve a pendientes como EXPIRED', item?.hairProfile?.status, 'EXPIRED');
+    c = await api('POST', `/clients/${clientId}/hair-profile/confirm`);
+    eq('H6 confirmar vigente → 200', c.status, 200);
+    eq('H6 confirmar renueva a VALID', c.body?.status, 'VALID');
+    ({ item } = await pendingIds());
+    eq('H6 renovado sale de pendientes', item, undefined);
+    const detail = await api('GET', `/clients/${clientId}`);
+    eq('H7 detalle del cliente expone hairProfile', detail.body?.hairProfile?.status, 'VALID');
+    const qaPhone = newPhone();
+    const qa = await book(qaPhone, [QA_TREATMENT], at('18', '10'));
+    const qaClient = sql(`select client_id from reservations where id='${qa.body.reservations[0].id}'`);
+    const all = await api('GET', '/clients/hair-profiles/pending?pageSize=100');
+    eq('H8 categoría sin tracksHairProfile no cuenta', all.body?.data?.some((d) => d.clientId === qaClient), false);
   },
 };
 
