@@ -30,7 +30,7 @@ model Client {
   id                   String           @id @default(uuid())
   phone                String           @unique
   name                 String
-  birthDate            DateTime         @map("birth_date")
+  birthDate            DateTime         @map("birth_date") @db.Date
   allergies            String?
   isPregnant           Boolean          @default(false) @map("is_pregnant")
   creditBalance        Decimal          @default(0) @map("credit_balance") @db.Decimal(10, 2)

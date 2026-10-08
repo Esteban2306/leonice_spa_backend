@@ -1,9 +1,12 @@
+import {
+  IsCalendarDate,
+  IsZonedDateTime,
+} from '../../common/validation/date-input.validators';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
@@ -35,7 +38,7 @@ class ClientInputDto {
   name?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
   birthDate?: string;
 
   @IsOptional()
@@ -62,7 +65,7 @@ export class CreateReservationDto {
   @IsUUID('4', { each: true })
   treatments: string[];
 
-  @IsDateString()
+  @IsZonedDateTime()
   scheduledStart: string;
 
   @IsOptional()

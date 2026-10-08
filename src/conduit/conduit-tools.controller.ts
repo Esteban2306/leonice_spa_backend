@@ -1,3 +1,4 @@
+import { calendarDateToUtcMidnight } from '../common/validation/date-input.validators';
 import {
   Body,
   Controller,
@@ -62,7 +63,7 @@ export class ConduitToolsController {
       client = await this.clientsRepository.create({
         phone: normalizedPhone,
         name: dto.name,
-        birthDate: new Date(dto.birthDate),
+        birthDate: calendarDateToUtcMidnight(dto.birthDate),
         whatsappJid: dto.whatsappJid,
         allergies: dto.allergies,
         isPregnant: dto.isPregnant || false,

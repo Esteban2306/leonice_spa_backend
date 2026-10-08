@@ -15,6 +15,7 @@ import {
   toHairProfileView,
 } from './domain/hair-profile.util';
 import { AppException } from '../common/errors/app.exception';
+import { calendarDateToUtcMidnight } from '../common/validation/date-input.validators';
 import { getDayBoundaries } from '../reservations/domain/day-boundaries';
 
 @Injectable()
@@ -53,7 +54,7 @@ export class ClientsService {
       const created = await this.repository.create({
         phone: normalizedPhone,
         name: dto.name,
-        birthDate: new Date(dto.birthDate),
+        birthDate: calendarDateToUtcMidnight(dto.birthDate),
         whatsappJid: dto.whatsappJid,
         allergies: dto.allergies,
         isPregnant: dto.isPregnant || false,
@@ -178,7 +179,9 @@ export class ClientsService {
 
     return this.repository.update(id, {
       name: dto.name,
-      birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
+      birthDate: dto.birthDate
+        ? calendarDateToUtcMidnight(dto.birthDate)
+        : undefined,
       allergies: dto.allergies,
       isPregnant: dto.isPregnant,
     });

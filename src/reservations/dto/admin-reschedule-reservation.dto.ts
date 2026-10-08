@@ -1,7 +1,8 @@
-import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsZonedDateTime } from '../../common/validation/date-input.validators';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class AdminRescheduleReservationDto {
-  @IsDateString()
+  @IsZonedDateTime()
   newScheduledStart: string;
 
   @IsOptional()

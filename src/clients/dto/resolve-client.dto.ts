@@ -1,7 +1,7 @@
+import { IsCalendarDate } from '../../common/validation/date-input.validators';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
-  IsDateString,
   IsOptional,
   IsString,
   MinLength,
@@ -31,7 +31,7 @@ export class ResolveClientDto {
   name?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
   birthDate?: string;
 
   @IsOptional()

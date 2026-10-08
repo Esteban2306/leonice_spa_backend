@@ -1,6 +1,6 @@
+import { IsCalendarDate } from '../../common/validation/date-input.validators';
 import {
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
@@ -13,7 +13,7 @@ import { Transform } from 'class-transformer';
 
 export class FindReservationsQueryDto {
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
   date?: string;
 
   @IsOptional()

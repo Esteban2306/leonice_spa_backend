@@ -1,5 +1,5 @@
+import { IsZonedDateTime } from '../../common/validation/date-input.validators';
 import {
-  IsDateString,
   IsNumber,
   IsOptional,
   IsString,
@@ -19,10 +19,10 @@ export class CreatePromotionDto {
   @Max(100)
   discountPercentage: number;
 
-  @IsDateString()
+  @IsZonedDateTime()
   startsAt: string;
 
-  @IsDateString()
+  @IsZonedDateTime()
   endsAt: string;
 
   @IsOptional()

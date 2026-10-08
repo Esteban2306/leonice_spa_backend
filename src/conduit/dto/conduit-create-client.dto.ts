@@ -1,8 +1,8 @@
+import { IsCalendarDate } from '../../common/validation/date-input.validators';
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
@@ -36,7 +36,7 @@ export class ConduitCreateClientDto {
   name?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
   birthDate?: string;
 
   @IsOptional()

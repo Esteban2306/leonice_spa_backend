@@ -1,4 +1,5 @@
-import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsCalendarDate } from '../../common/validation/date-input.validators';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdateClientDto {
   @IsOptional()
@@ -6,7 +7,7 @@ export class UpdateClientDto {
   name?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
   birthDate?: string;
 
   @IsOptional()

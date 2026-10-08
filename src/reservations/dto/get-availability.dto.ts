@@ -1,9 +1,10 @@
-import { IsDateString, IsUUID } from 'class-validator';
+import { IsCalendarDate } from '../../common/validation/date-input.validators';
+import { IsUUID } from 'class-validator';
 
 export class GetAvailabilityDto {
   @IsUUID()
   treatmentId: string;
 
-  @IsDateString()
+  @IsCalendarDate()
   date: string;
 }
