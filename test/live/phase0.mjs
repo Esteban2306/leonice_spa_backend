@@ -154,23 +154,23 @@ const scenarios = {
     return id;
   },
 
-  // S2 — approve: validaciones de amount y default ANTICIPO
-  async approve() {
+  // S2 — approve: el monto real es obligatorio y no tiene mínimo que bloquee
+  async approve(amount = 15) {
     const id = await scenarios.create();
-    let r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'PAGO_COMPLETO' });
-    eq('S2 PAGO_COMPLETO sin amount → 400', r.status, 400);
+    let r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO' });
+    eq('S2 sin amount → 400', r.status, 400);
     eq('S2 code DEPOSIT_AMOUNT_REQUIRED', errCode(r), 'DEPOSIT_AMOUNT_REQUIRED');
-    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO', amount: 10 });
-    eq('S2 amount < mínimo → 409', r.status, 409);
-    eq('S2 code DEPOSIT_AMOUNT_BELOW_MINIMUM', errCode(r), 'DEPOSIT_AMOUNT_BELOW_MINIMUM');
+    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO', amount: 0 });
+    eq('S2 amount 0 → VALIDATION_FAILED', errCode(r), 'VALIDATION_FAILED');
     eq('S2 sin cambios tras rechazos', reservationRow(id).status, 'PENDIENTE_DEPOSITO');
-    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO' });
-    eq('S2 ANTICIPO sin amount → 200', r.status, 200);
+    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO', amount });
+    eq(`S2 amount ${amount} → 200 (sin mínimo)`, r.status, 200);
     eq('S2 reserva CONFIRMADA', reservationRow(id).status, 'CONFIRMADA');
     const dep = sql(`select status, amount, coverage from deposit_records where reservation_id='${id}' order by created_at desc limit 1`);
-    eq('S2 depósito CONFIRMADO con amount 20 (miles)', dep, 'CONFIRMADO|20.00|ANTICIPO');
-    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO' });
-    check('S2 re-aprobar una CONFIRMADA no es 2xx', r.status >= 400, `status=${r.status} code=${errCode(r) ?? '-'}`);
+    eq('S2 depósito CONFIRMADO con el monto real', dep, `CONFIRMADO|${amount}.00|ANTICIPO`);
+    check('S2 la respuesta trae depositId', typeof r.body?.depositId === 'string', JSON.stringify(r.body));
+    r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO', amount });
+    eq('S2 re-aprobar sin comprobante pendiente → DEPOSIT_NOT_PENDING', errCode(r), 'DEPOSIT_NOT_PENDING');
     return id;
   },
 
@@ -182,7 +182,7 @@ const scenarios = {
     eq('S3 crear fila A', a.status, 201);
     eq('S3 crear fila B', b.status, 201);
     const [ida, idb] = [a.body.reservations[0].id, b.body.reservations[0].id];
-    let r = await api('PATCH', `/reservations/${ida}/deposits/approve`, { coverage: 'ANTICIPO', scope: 'SINGLE' });
+    let r = await api('PATCH', `/reservations/${ida}/deposits/approve`, { coverage: 'ANTICIPO', amount: 20, scope: 'SINGLE' });
     eq('S3 SINGLE → 200', r.status, 200);
     eq('S3 SINGLE confirma A', reservationRow(ida).status, 'CONFIRMADA');
     eq('S3 SINGLE deja B pendiente', reservationRow(idb).status, 'PENDIENTE_DEPOSITO');
@@ -191,12 +191,16 @@ const scenarios = {
     const c = await book(p2, [QA_TREATMENT], at('11', '08'));
     const d = await book(p2, [NAILS_TREATMENT], at('11', '14'));
     const [idc, idd] = [c.body.reservations[0].id, d.body.reservations[0].id];
-    r = await api('PATCH', `/reservations/${idc}/deposits/approve`, { coverage: 'ANTICIPO' });
+    r = await api('PATCH', `/reservations/${idc}/deposits/approve`, { coverage: 'ANTICIPO', amount: 40 });
     eq('S3 GROUP (default) → 200', r.status, 200);
     eq('S3 GROUP confirma C', reservationRow(idc).status, 'CONFIRMADA');
     eq('S3 GROUP confirma D', reservationRow(idd).status, 'CONFIRMADA');
-    const amounts = sql(`select string_agg(amount::text, ',' order by amount desc) from deposit_records where reservation_id in ('${idc}','${idd}') and status='CONFIRMADO'`);
-    eq('S3 un depósito por fila (20 en ancla y 20 en la otra)', amounts, '20.00,20.00');
+    const groupDeposit = r.body?.depositId;
+    eq('S3 un solo depósito real con el monto total (40)', sql(`select string_agg(amount::text, ',') from deposit_records where reservation_id in ('${idc}','${idd}')`), '40.00');
+    eq('S3 la otra fila queda cubierta por ese depósito', sql(`select covered_by_deposit_id from reservations where id='${idd}'`), groupDeposit);
+    const listed = await api('GET', `/reservations?clientId=${sql(`select client_id from reservations where id='${idc}'`)}`);
+    const rowD = listed.body?.data?.[0]?.items?.find((i) => i.reservationId === idd);
+    eq('S3 GET /reservations expone coveredByDepositId', rowD?.coveredByDepositId, groupDeposit);
   },
 
   // S4 — reagendar en sitio (admin)
@@ -273,7 +277,7 @@ const scenarios = {
 
   // S7 — crédito: depósito confirmado de reserva cancelada se aplica a la siguiente
   async credit() {
-    const id = await scenarios.approve(); // CONFIRMADA con depósito 20 sin imagen
+    const id = await scenarios.approve(25); // CONFIRMADA con depósito 25 sin imagen
     const clientId = sql(`select client_id from reservations where id='${id}'`);
     const phone = sql(`select phone from clients where id='${clientId}'`);
     // el crédito exige comprobante con imagen: lo simulamos sobre el depósito confirmado
@@ -283,7 +287,7 @@ const scenarios = {
     r = await api('GET', `/deposits/credits?clientId=${clientId}`);
     eq('S7 GET /deposits/credits → 200', r.status, 200);
     eq('S7 un crédito disponible', r.body?.credits?.length, 1);
-    eq('S7 monto del crédito (miles)', String(r.body?.credits?.[0]?.amount), '20');
+    eq('S7 monto del crédito (miles)', String(r.body?.credits?.[0]?.amount), '25');
     const nb = await book(phone, [QA_TREATMENT], at('15', '08'));
     eq('S7 nueva reserva → 201', nb.status, 201);
     const nid = nb.body?.reservations?.[0]?.id;
@@ -298,7 +302,7 @@ const scenarios = {
     const item = listed.body?.data?.[0]?.items?.[0];
     check('S7 GET /reservations expone appliedCredit', item?.appliedCredit?.depositId !== undefined, JSON.stringify(item?.appliedCredit));
     const before = sql(`select count(*) from deposit_records where reservation_id='${nid}'`);
-    r = await api('PATCH', `/reservations/${nid}/deposits/approve`, { coverage: 'ANTICIPO' });
+    r = await api('PATCH', `/reservations/${nid}/deposits/approve`, { coverage: 'ANTICIPO' }); // con crédito no se pide monto
     eq('S7 aprobar reserva con crédito → 200', r.status, 200);
     eq('S7 aprobar con crédito no crea depósito nuevo', sql(`select count(*) from deposit_records where reservation_id='${nid}'`), before);
     eq('S7 queda CONFIRMADA', reservationRow(nid).status, 'CONFIRMADA');
@@ -306,6 +310,56 @@ const scenarios = {
     await api('PATCH', `/reservations/${nid}/admin-cancel`, { notifyClient: false, reason: 'QA fase 0' });
     r = await api('GET', `/deposits/credits?clientId=${clientId}`);
     eq('S7 cancelar la reserva destino libera el crédito', r.body?.credits?.length, 1);
+  },
+
+  // S8 — comprobante pendiente en reserva cancelada: se aprueba igual y queda como crédito
+  async proofOnCancelled() {
+    const id = await scenarios.create();
+    const clientId = sql(`select client_id from reservations where id='${id}'`);
+    sql(`insert into deposit_records (id, reservation_id, status, method, image_url, created_at, updated_at)
+         values (gen_random_uuid()::text, '${id}', 'PENDIENTE', 'MANUAL', 'https://example.invalid/qa-proof.png', now(), now())`);
+    await api('PATCH', `/reservations/${id}/admin-cancel`, { notifyClient: false, reason: 'QA D1' });
+    eq('S8 el comprobante sigue PENDIENTE tras cancelar', sql(`select status from deposit_records where reservation_id='${id}'`), 'PENDIENTE');
+    const r = await api('PATCH', `/reservations/${id}/deposits/approve`, { coverage: 'ANTICIPO', amount: 30 });
+    eq('S8 aprobar comprobante de reserva cancelada → 200', r.status, 200);
+    eq('S8 no confirma la reserva', JSON.stringify(r.body?.approvedReservationIds), '[]');
+    eq('S8 la reserva sigue CANCELADA', reservationRow(id).status, 'CANCELADA');
+    eq('S8 depósito CONFIRMADO con el monto real', sql(`select status || '|' || amount from deposit_records where reservation_id='${id}'`), 'CONFIRMADO|30.00');
+    const credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('S8 el dinero queda como crédito del cliente', String(credits.body?.credits?.[0]?.amount), '30');
+  },
+
+  // S9 — el cliente cancela con comprobante pendiente: el comprobante NO se rechaza
+  async clientCancelKeepsProof() {
+    const phone = newPhone();
+    const b = await book(phone, [QA_TREATMENT], at('16', '08'));
+    const id = b.body?.reservations?.[0]?.id;
+    sql(`insert into deposit_records (id, reservation_id, status, method, image_url, created_at, updated_at)
+         values (gen_random_uuid()::text, '${id}', 'PENDIENTE', 'MANUAL', 'https://example.invalid/qa-proof.png', now(), now())`);
+    const r = await api('PATCH', `/reservations/${id}/cancel`, { phone, reason: 'QA D1 cliente' });
+    eq('S9 cancelación del cliente → 200', r.status, 200);
+    eq('S9 reserva CANCELADA por el cliente', reservationRow(id).source, 'CLIENT');
+    await sleep(2000);
+    eq('S9 el comprobante sigue PENDIENTE para aprobación', sql(`select status from deposit_records where reservation_id='${id}'`), 'PENDIENTE');
+  },
+
+  // S10 — crédito de un depósito de grupo: solo cuando todas sus filas caen
+  async groupCredit() {
+    const phone = newPhone();
+    const a = await book(phone, [QA_TREATMENT], at('17', '08'));
+    const b = await book(phone, [NAILS_TREATMENT], at('17', '14'));
+    const [ida, idb] = [a.body.reservations[0].id, b.body.reservations[0].id];
+    const clientId = sql(`select client_id from reservations where id='${ida}'`);
+    sql(`insert into deposit_records (id, reservation_id, status, method, image_url, created_at, updated_at)
+         values (gen_random_uuid()::text, '${ida}', 'PENDIENTE', 'MANUAL', 'https://example.invalid/qa-proof.png', now(), now())`);
+    const r = await api('PATCH', `/reservations/${ida}/deposits/approve`, { coverage: 'ANTICIPO', amount: 50 });
+    eq('S10 aprobar grupo → 200', r.status, 200);
+    await api('PATCH', `/reservations/${ida}/admin-cancel`, { notifyClient: false, reason: 'QA D1' });
+    let credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('S10 con una fila viva el depósito NO es crédito', credits.body?.credits?.length, 0);
+    await api('PATCH', `/reservations/${idb}/admin-cancel`, { notifyClient: false, reason: 'QA D1' });
+    credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('S10 con todas las filas canceladas es crédito por el total', String(credits.body?.credits?.[0]?.amount), '50');
   },
 };
 
