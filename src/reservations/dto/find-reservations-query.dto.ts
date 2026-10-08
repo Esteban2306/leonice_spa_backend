@@ -8,13 +8,28 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { ReservationStatus } from '@prisma/client';
+import { CancellationSource, ReservationStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
 
 export class FindReservationsQueryDto {
   @IsOptional()
   @IsCalendarDate()
   date?: string;
+
+  @IsOptional()
+  @IsCalendarDate()
+  from?: string;
+
+  @IsOptional()
+  @IsCalendarDate()
+  to?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.split(',').filter(Boolean) : value,
+  )
+  @IsEnum(CancellationSource, { each: true })
+  cancellationSources?: CancellationSource[];
 
   @IsOptional()
   @IsEnum(ReservationStatus)

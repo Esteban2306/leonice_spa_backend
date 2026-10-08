@@ -7,7 +7,7 @@ import { SafeCacheService } from 'src/infrastructure/redis/safe-cache.service';
 import { ReservationsRepository } from './repositories/reservations.repository';
 import { formatLocalTime } from './domain/format-local-time';
 import { FindReservationsQueryDto } from './dto/find-reservations-query.dto';
-import { getDayBoundaries } from './domain/day-boundaries';
+import { resolveCalendarRange } from './domain/calendar-range';
 import {
   groupReservationsForDisplay,
   paginateReservationGroups,
@@ -65,14 +65,13 @@ export class ReservationsService {
   }
 
   async findMany(query: FindReservationsQueryDto) {
-    const dayBoundaries = query.date
-      ? getDayBoundaries(new Date(`${query.date}T00:00:00`))
-      : undefined;
+    const range = resolveCalendarRange(query);
 
     const rows = await this.reservationsRepository.findGroupingProjection({
-      dayStart: dayBoundaries?.dayStart,
-      dayEnd: dayBoundaries?.dayEnd,
+      dayStart: range.dayStart,
+      dayEnd: range.dayEnd,
       status: query.status,
+      cancellationSources: query.cancellationSources,
       categoryId: query.categoryId,
       clientId: query.clientId,
     });

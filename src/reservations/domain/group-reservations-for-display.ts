@@ -1,4 +1,5 @@
 import {
+  CancellationSource,
   DepositCoverage,
   DepositRecord,
   DepositStatus,
@@ -47,6 +48,10 @@ export interface GroupedReservation {
     depositExpiresAt: Date | null;
     appliedCredit: AppliedCreditSummary | null;
     coveredByDepositId: string | null;
+    cancellationSource: CancellationSource | null;
+    cancellationReason: string | null;
+    cancelledAt: Date | null;
+    checkedInAt: Date | null;
   }>;
 }
 
@@ -73,7 +78,7 @@ function getReservationGroupKey(r: {
   return `${r.clientId}:${getCalendarDayKey(r.scheduledStart)}`;
 }
 
-function toLatestDepositSummary(
+export function toLatestDepositSummary(
   deposits: DepositRecord[],
 ): LatestDepositSummary | null {
   const [latest] = deposits;
@@ -208,6 +213,10 @@ export function groupReservationsForDisplay(
         depositExpiresAt: r.depositExpiresAt,
         appliedCredit: resolveAppliedCredit(r, creditByCombo),
         coveredByDepositId: r.coveredByDepositId,
+        cancellationSource: r.cancellationSource,
+        cancellationReason: r.cancellationReason,
+        cancelledAt: r.cancelledAt,
+        checkedInAt: r.checkedInAt,
       })),
     };
   });

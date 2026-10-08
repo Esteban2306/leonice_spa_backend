@@ -1,7 +1,16 @@
+import { IsOptional } from 'class-validator';
 import { IsCalendarDate } from '../../../common/validation/date-input.validators';
-import {} from 'class-validator';
 
 export class FindCalendarQueryDto {
+  @IsOptional()
   @IsCalendarDate()
-  date: string;
+  date?: string;
+
+  @IsOptional()
+  @IsCalendarDate()
+  from?: string;
+
+  @IsOptional()
+  @IsCalendarDate()
+  to?: string;
 }

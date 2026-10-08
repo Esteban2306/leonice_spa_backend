@@ -27,6 +27,7 @@ export interface ReservationFilters {
   dayStart?: Date;
   dayEnd?: Date;
   status?: ReservationStatus;
+  cancellationSources?: readonly CancellationSource[];
   categoryId?: string;
   clientId?: string;
 }
@@ -561,11 +562,16 @@ export class ReservationsRepository {
   private buildWhere(
     filters: ReservationFilters,
   ): Prisma.ReservationWhereInput {
+    const scheduledStart: Prisma.DateTimeFilter = {
+      ...(filters.dayStart ? { gte: filters.dayStart } : {}),
+      ...(filters.dayEnd ? { lt: filters.dayEnd } : {}),
+    };
     return {
-      ...(filters.dayStart && filters.dayEnd
-        ? { scheduledStart: { gte: filters.dayStart, lt: filters.dayEnd } }
-        : {}),
+      ...(filters.dayStart || filters.dayEnd ? { scheduledStart } : {}),
       ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.cancellationSources?.length
+        ? { cancellationSource: { in: [...filters.cancellationSources] } }
+        : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
     };

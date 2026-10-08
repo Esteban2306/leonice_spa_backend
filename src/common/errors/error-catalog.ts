@@ -46,6 +46,10 @@ const GENERIC = {
     status: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
     message: 'El tipo de archivo no es compatible.',
   },
+  DATE_RANGE_INVALID: {
+    status: HttpStatus.BAD_REQUEST,
+    message: 'El rango de fechas no es válido.',
+  },
   RATE_LIMITED: {
     status: HttpStatus.TOO_MANY_REQUESTS,
     message: 'Demasiadas solicitudes. Intenta de nuevo en unos minutos.',
