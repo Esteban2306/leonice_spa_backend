@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller';
 import { PrismaModule } from './infrastructure/database/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
+import { RedisConnectionReporter } from './infrastructure/redis/redis-connection-reporter.service';
 import { EncryptionModule } from './infrastructure/encryption/encryption.module';
 import { ClientsModule } from './clients/clients.module';
 import { ReservationsModule } from './reservations/reservations.module';
@@ -41,8 +42,8 @@ import { AdminModule } from './admin/admin.module';
       validate: validateEnv,
     }),
     ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
+      imports: [ConfigModule, RedisModule],
+      inject: [ConfigService, RedisConnectionReporter],
       useFactory: getThrottlerConfig,
     }),
     EncryptionModule,

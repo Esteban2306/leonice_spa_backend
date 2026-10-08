@@ -4,6 +4,7 @@ import type { ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 import type { ThrottlerModuleOptions } from '@nestjs/throttler';
 import Redis from 'ioredis';
+import { RedisConnectionReporter } from '../infrastructure/redis/redis-connection-reporter.service';
 
 import {
   CLIENT_BOOKING_RATE_LIMIT,
@@ -62,6 +63,7 @@ export function shouldSkipThrottle(
 
 export function getThrottlerConfig(
   config: ConfigService,
+  reporter: RedisConnectionReporter,
 ): ThrottlerModuleOptions {
   const redis = new Redis(config.getOrThrow<string>('REDIS_URL'), {
     commandTimeout: 300,
@@ -71,6 +73,7 @@ export function getThrottlerConfig(
       return Math.min(times * 100, 2_000);
     },
   });
+  reporter.watchClient(redis, 'Rate limit');
 
   return {
     throttlers: [
