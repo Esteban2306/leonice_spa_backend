@@ -165,9 +165,12 @@ export class ReservationsService {
     const byIso = new Map(perTreatment[0].map((slot) => [slot.iso, slot]));
     const slots = starts.map((iso) => byIso.get(iso)!);
 
-    return slots.length > 0
-      ? { date, available: true, reason: null, slots }
-      : unavailable('FULL');
+    if (slots.length > 0) return { date, available: true, reason: null, slots };
+
+    const anyAfterEarliest = perTreatment[0].some(
+      (slot) => new Date(slot.iso).getTime() >= earliest.getTime(),
+    );
+    return unavailable(anyAfterEarliest ? 'FULL' : 'TOO_SOON');
   }
 
   async getById(id: string) {
