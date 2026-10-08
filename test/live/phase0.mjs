@@ -380,6 +380,76 @@ const scenarios = {
     const all = await api('GET', '/clients/hair-profiles/pending?pageSize=100');
     eq('H8 categoría sin tracksHairProfile no cuenta', all.body?.data?.some((d) => d.clientId === qaClient), false);
   },
+
+  async schedule() {
+    const QA_CATEGORY = sql(`select category_id from treatments where id='${QA_TREATMENT}'`);
+    const created = [];
+    const createException = async (body) => {
+      const r = await api('POST', '/admin/schedule/exceptions', body);
+      if (r.status === 201) created.push(r.body.id);
+      return r;
+    };
+    const day = (key) => api('GET', `/admin/schedule/days/${key}`);
+    const qaDay = async (key) => (await day(key)).body?.categories?.find((c) => c.categoryId === QA_CATEGORY);
+    const slots = async (key) => (await fetch(`${BASE}/reservations/availability?treatmentId=${QA_TREATMENT}&date=${key}`).then((r) => r.json())).slots;
+
+    const base = await api('GET', '/admin/schedule/base');
+    eq('SC1 horario base sembrado (14 franjas)', base.body?.length, 14);
+    eq('SC1 lunes 08:00-12:00', JSON.stringify(base.body?.find((w) => w.dayOfWeek === 1)), JSON.stringify({ dayOfWeek: 1, startTime: '08:00', endTime: '12:00' }));
+
+    let r = await createException({ date: '2026-12-21', type: 'BLOCK', categoryId: QA_CATEGORY, reason: 'QA fase 3' });
+    eq('SC2 bloqueo de día completo por categoría → 201', r.status, 201);
+    eq('SC2 la categoría queda cerrada ese día', (await qaDay('2026-12-21'))?.isClosed, true);
+    eq('SC2 las demás categorías siguen abiertas', (await day('2026-12-21')).body?.isClosed, false);
+    eq('SC2 disponibilidad vacía para la categoría bloqueada', JSON.stringify(await slots('2026-12-21')), '[]');
+    const blockedBook = await book(newPhone(), [QA_TREATMENT], at('21', '08'));
+    eq('SC2 reservar en día bloqueado → PLACEMENT_NO_SLOT_THAT_DAY', errCode(blockedBook), 'PLACEMENT_NO_SLOT_THAT_DAY');
+
+    const before = await slots('2026-12-22');
+    check('SC3 disponibilidad previa incluye la mañana (queda en caché)', before.some((x) => new Date(x.iso).getHours() < 12), JSON.stringify(before.slice(0, 2)));
+    r = await createException({ date: '2026-12-22', type: 'BLOCK', categoryId: QA_CATEGORY, startTime: '08:00', endTime: '12:00' });
+    eq('SC3 bloqueo de franja → 201', r.status, 201);
+    const after = await slots('2026-12-22');
+    eq('SC3 caché invalidada: la mañana desaparece de inmediato', after.some((x) => new Date(x.iso).getHours() < 12), false);
+
+    const booked = await book(newPhone(), [QA_TREATMENT], at('23', '09'));
+    const bookedId = booked.body?.reservations?.[0]?.id;
+    r = await createException({ date: '2026-12-23', type: 'BLOCK', startTime: '08:00', endTime: '10:00' });
+    eq('SC4 bloquear sobre una reserva → SCHEDULE_CHANGE_HAS_RESERVATIONS', errCode(r), 'SCHEDULE_CHANGE_HAS_RESERVATIONS');
+    eq('SC4 lista la reserva a resolver', r.body?.details?.reservations?.[0]?.reservationId, bookedId);
+    check('SC4 mensaje de resolución para el admin', /Reprográmalas o cancélalas/.test(r.body?.message ?? ''), r.body?.message);
+    r = await createException({ date: '2026-12-23', type: 'BLOCK', startTime: '14:00', endTime: '16:00' });
+    eq('SC4 bloquear una franja sin reservas sí se permite', r.status, 201);
+
+    r = await createException({ date: '2026-12-24', type: 'OPEN', categoryId: QA_CATEGORY, startTime: '12:00', endTime: '14:00' });
+    eq('SC5 abrir horario extra → 201', r.status, 201);
+    const openId = r.body?.id;
+    eq('SC5 la franja se une: 08:00-16:00', JSON.stringify((await qaDay('2026-12-24'))?.windows?.map((w) => `${w.startTime}-${w.endTime}`)), JSON.stringify(['08:00-16:00']));
+    const lunchBook = await book(newPhone(), [QA_TREATMENT], at('24', '12', '30'));
+    eq('SC5 se puede reservar dentro de la apertura', lunchBook.status, 201);
+    r = await api('DELETE', `/admin/schedule/exceptions/${openId}`);
+    eq('SC5 quitar la apertura con una reserva dentro → SCHEDULE_CHANGE_HAS_RESERVATIONS', errCode(r), 'SCHEDULE_CHANGE_HAS_RESERVATIONS');
+    await api('PATCH', `/reservations/${lunchBook.body.reservations[0].id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 3' });
+    r = await api('DELETE', `/admin/schedule/exceptions/${openId}`);
+    eq('SC5 resuelta la reserva, la apertura se puede quitar', r.status, 200);
+    created.splice(created.indexOf(openId), 1);
+
+    r = await api('POST', '/admin/schedule/exceptions', { date: '2026-12-24', type: 'OPEN', categoryId: QA_CATEGORY });
+    eq('SC6 abrir sin horas → SCHEDULE_EXCEPTION_INVALID_RANGE', errCode(r), 'SCHEDULE_EXCEPTION_INVALID_RANGE');
+    r = await api('POST', '/admin/schedule/exceptions', { date: '2026-12-24', type: 'BLOCK', startTime: '10:00', endTime: '09:00' });
+    eq('SC6 inicio después del fin → SCHEDULE_EXCEPTION_INVALID_RANGE', errCode(r), 'SCHEDULE_EXCEPTION_INVALID_RANGE');
+    r = await api('POST', '/admin/schedule/exceptions', { date: '2026-01-05', type: 'BLOCK' });
+    eq('SC6 día pasado → SCHEDULE_EXCEPTION_IN_THE_PAST', errCode(r), 'SCHEDULE_EXCEPTION_IN_THE_PAST');
+    r = await api('POST', '/admin/schedule/exceptions', { date: '2026-02-30', type: 'BLOCK' });
+    eq('SC6 fecha inexistente → BAD_REQUEST', errCode(r), 'BAD_REQUEST');
+
+    const listed = await api('GET', '/admin/schedule/exceptions?from=2026-12-21&to=2026-12-24');
+    eq('SC7 lista las excepciones vigentes del rango', listed.body?.length, created.length);
+
+    for (const id of created) await api('DELETE', `/admin/schedule/exceptions/${id}`);
+    await api('PATCH', `/reservations/${bookedId}/admin-cancel`, { notifyClient: false, reason: 'QA fase 3' });
+    eq('SC8 limpieza: sin excepciones en el rango', (await api('GET', '/admin/schedule/exceptions?from=2026-12-21&to=2026-12-24')).body?.length, 0);
+  },
 };
 
 const wanted = process.argv.slice(2);
