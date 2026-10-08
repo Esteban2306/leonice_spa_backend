@@ -63,17 +63,18 @@ model ConsentRecord {
 }
 
 model Category {
-  id              String           @id @default(uuid())
-  name            String           @unique
-  isActive        Boolean          @default(true) @map("is_active")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  isPrincipal     Boolean          @default(false) @map("is_principal")
-  automationRules AutomationRule[]
-  capacityPools   CapacityPool[]
-  promotions      Promotion[]
-  reservations    Reservation[]
-  treatments      Treatment[]
+  id                String           @id @default(uuid())
+  name              String           @unique
+  isActive          Boolean          @default(true) @map("is_active")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  isPrincipal       Boolean          @default(false) @map("is_principal")
+  tracksHairProfile Boolean          @default(false) @map("tracks_hair_profile")
+  automationRules   AutomationRule[]
+  capacityPools     CapacityPool[]
+  promotions        Promotion[]
+  reservations      Reservation[]
+  treatments        Treatment[]
 
   @@map("categories")
 }

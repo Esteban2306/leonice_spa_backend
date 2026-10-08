@@ -8,4 +8,8 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsBoolean()
   isPrincipal?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  tracksHairProfile?: boolean;
 }

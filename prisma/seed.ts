@@ -22,8 +22,8 @@ async function main() {
 
   const spaCapilar = await prisma.category.upsert({
     where: { name: 'Spa Capilar' },
-    update: {},
-    create: { name: 'Spa Capilar', isPrincipal: true },
+    update: { tracksHairProfile: true },
+    create: { name: 'Spa Capilar', isPrincipal: true, tracksHairProfile: true },
   });
 
   const spaCoreano = await prisma.category.upsert({
