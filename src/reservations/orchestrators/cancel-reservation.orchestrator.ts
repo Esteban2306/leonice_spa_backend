@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ReservationStatus } from '@prisma/client';
+import { CancellationSource, ReservationStatus } from '@prisma/client';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
 import { EventBusService } from 'src/common/events/event.service';
@@ -37,6 +37,7 @@ export class CancelReservationOrchestrator {
       status: ReservationStatus.CANCELADA,
       cancelledAt: new Date(),
       cancellationReason: reason,
+      cancellationSource: CancellationSource.CLIENT,
     });
 
     this.eventBus.publish(EVENT_TYPES.RESERVATION_CANCELLED, {
