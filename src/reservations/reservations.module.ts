@@ -22,10 +22,12 @@ import { DepositCreditService } from './service/deposit-credit.service';
 import { OperatingScheduleRepository } from './repositories/operating-schedule.repository';
 import { OperatingScheduleService } from './service/operating-schedule.service';
 import { DepositDeadlineService } from './service/deposit-deadline.service';
+import { CancellationLinkService } from './service/cancellation-link.service';
+import { CancellationLinksController } from './cancellation-links.controller';
 
 @Module({
   imports: [ClientsModule, PromotionsModule],
-  controllers: [ReservationsController],
+  controllers: [ReservationsController, CancellationLinksController],
   providers: [
     ReservationsService,
     AvailabilityRepository,
@@ -33,6 +35,7 @@ import { DepositDeadlineService } from './service/deposit-deadline.service';
     OperatingScheduleRepository,
     OperatingScheduleService,
     DepositDeadlineService,
+    CancellationLinkService,
     CreateReservationOrchestrator,
     CancelReservationOrchestrator,
     RescheduleReservationOrchestrator,
@@ -56,6 +59,7 @@ import { DepositDeadlineService } from './service/deposit-deadline.service';
     OperatingScheduleRepository,
     OperatingScheduleService,
     DepositDeadlineService,
+    CancellationLinkService,
     CreateReservationOrchestrator,
     CancelReservationOrchestrator,
     MarkNoShowOrchestrator,

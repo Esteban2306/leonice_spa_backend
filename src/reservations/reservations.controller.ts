@@ -33,6 +33,8 @@ import { SkipCsrf } from 'src/auth/decorators/skip-csrf.decorator';
 import { AdminCancelReservationOrchestrator } from './orchestrators/admin-cancel-reservation.orchestrator';
 import { AdminCancelReservationDto } from './dto/admin-cancel-reservation.dto';
 import { ReviveReservationOrchestrator } from './orchestrators/revive-reservation.orchestrator';
+import { CancellationLinkService } from './service/cancellation-link.service';
+import { IssueCancellationLinkDto } from './dto/cancellation-link.dto';
 
 @Controller({ path: 'reservations', version: '1' })
 export class ReservationsController {
@@ -47,6 +49,7 @@ export class ReservationsController {
     private readonly adminRescheduleOrchestrator: AdminRescheduleReservationOrchestrator,
     private readonly adminCancelOrchestrator: AdminCancelReservationOrchestrator,
     private readonly reviveOrchestrator: ReviveReservationOrchestrator,
+    private readonly cancellationLinks: CancellationLinkService,
   ) {}
 
   @Get()
@@ -98,6 +101,14 @@ export class ReservationsController {
       channel: 'WEB',
       reason: dto.reason,
     });
+  }
+
+  @Post(':id/cancellation-link')
+  issueCancellationLink(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: IssueCancellationLinkDto,
+  ) {
+    return this.cancellationLinks.issue(id, { send: dto.send ?? false });
   }
 
   @Patch(':id/admin-cancel')

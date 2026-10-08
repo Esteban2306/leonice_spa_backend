@@ -7,6 +7,8 @@ import {
   Length,
   Max,
   Min,
+  MinLength,
+  IsUrl,
   validateSync,
 } from 'class-validator';
 
@@ -72,6 +74,15 @@ class EnvironmentVariables {
   @IsString()
   @Length(64, 64)
   ENCRYPTION_KEY: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  CANCELLATION_LINK_SECRET?: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  CLIENT_CANCELLATION_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

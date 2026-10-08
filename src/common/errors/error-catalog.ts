@@ -162,6 +162,14 @@ const RESERVATION = {
     status: HttpStatus.CONFLICT,
     message: 'La cita ya empezó; no se puede cancelar. Comunícate con el spa.',
   },
+  CANCELLATION_LINK_INVALID: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Este enlace de cancelación no es válido. Pide uno nuevo al spa.',
+  },
+  CANCELLATION_LINK_EXPIRED: {
+    status: HttpStatus.GONE,
+    message: 'Este enlace de cancelación ya venció. Comunícate con el spa.',
+  },
   RESERVATION_CHECK_IN_NOT_TODAY: {
     status: HttpStatus.CONFLICT,
     message: 'El check-in solo se puede hacer el día de la cita.',

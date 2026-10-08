@@ -5,6 +5,7 @@ export const EVENT_TYPES = {
   RESERVATION_CONFIRMED: 'reservation.confirmed',
   RESERVATION_CANCELLED: 'reservation.cancelled',
   CLIENT_CANCELLATION_COMPLETED: 'reservation.client_cancellation_completed',
+  CANCELLATION_LINK_REQUESTED: 'reservation.cancellation_link_requested',
   RESERVATION_RESCHEDULED: 'reservation.rescheduled',
   RESERVATION_COMPLETED: 'reservation.completed',
   RESERVATION_NO_SHOW: 'reservation.no_show',
@@ -87,6 +88,12 @@ export interface EventPayloadMap {
     reservationId: string;
     clientId: string;
     reason?: string;
+  };
+
+  [EVENT_TYPES.CANCELLATION_LINK_REQUESTED]: {
+    reservationId: string;
+    url: string;
+    expiresAt: Date;
   };
 
   [EVENT_TYPES.CLIENT_CANCELLATION_COMPLETED]: {
