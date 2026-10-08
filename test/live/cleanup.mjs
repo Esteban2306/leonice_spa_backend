@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-const BASE = 'http://localhost:3921/api/v1'; const jar = new Map();
+const BASE = process.env.LIVE_BASE ?? 'http://localhost:3921/api/v1'; const jar = new Map();
 const keep = (res) => { for (const c of res.headers.getSetCookie()) { const [p] = c.split(';'); const i = p.indexOf('='); jar.set(p.slice(0, i), p.slice(i + 1)); } };
 const sql = (q) => execFileSync('docker', ['exec', '-i', 'leonice-postgres', 'sh', '-c', 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "$0"', q], { encoding: 'utf8' }).trim();
 const resetThrottle = () => { const k = execFileSync('docker', ['exec', 'leonice-redis', 'redis-cli', '--scan', '--pattern', '{*'], { encoding: 'utf8' }).split('\n').filter((x) => /\}:(hits|blocked)$/.test(x)); if (k.length) execFileSync('docker', ['exec', 'leonice-redis', 'redis-cli', 'del', ...k]); };
