@@ -244,6 +244,33 @@ export class ReservationsRepository {
     return rows.map((r) => r.id);
   }
 
+  findUpcomingForClientPhone(
+    params: {
+      phone: string;
+      from: Date;
+      statuses: readonly ReservationStatus[];
+    },
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.reservation.findMany({
+      where: {
+        client: { phone: params.phone },
+        status: { in: [...params.statuses] },
+        scheduledStart: { gt: params.from },
+      },
+      orderBy: { scheduledStart: 'asc' },
+      take: 50,
+      select: {
+        id: true,
+        status: true,
+        scheduledStart: true,
+        scheduledEnd: true,
+        comboGroupId: true,
+        treatment: { select: { name: true } },
+      },
+    });
+  }
+
   findClientReservationsOnDay(
     params: { clientId: string; dayStart: Date; dayEnd: Date },
     client: PrismaClientOrTx = this.prisma.client,

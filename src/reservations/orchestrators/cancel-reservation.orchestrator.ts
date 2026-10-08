@@ -7,7 +7,9 @@ import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { AppException } from '../../common/errors/app.exception';
 import { normalizePhone } from '../../clients/utils/normalize-phone.util';
 import { getDayBoundaries } from '../domain/day-boundaries';
+import { getCalendarDayKey } from '../domain/calendar-day-key';
 import {
+  CLIENT_CANCELLABLE_STATUSES,
   ClientCancellationChannel,
   ClientCancellationScope,
   planClientCancellation,
@@ -41,6 +43,32 @@ export class CancelReservationOrchestrator {
     private readonly repository: ReservationsRepository,
     private readonly eventBus: EventBusService,
   ) {}
+
+  async listUpcomingByPhone(phone: string, now: Date = new Date()) {
+    const reservations = await this.repository.findUpcomingForClientPhone({
+      phone: normalizePhone(phone),
+      from: now,
+      statuses: CLIENT_CANCELLABLE_STATUSES,
+    });
+    const days = new Map<string, typeof reservations>();
+    for (const r of reservations) {
+      const key = getCalendarDayKey(r.scheduledStart);
+      days.set(key, [...(days.get(key) ?? []), r]);
+    }
+    return {
+      days: [...days.entries()].map(([date, rows]) => ({
+        date,
+        reservations: rows.map((r) => ({
+          reservationId: r.id,
+          treatment: r.treatment.name,
+          scheduledStart: r.scheduledStart,
+          scheduledEnd: r.scheduledEnd,
+          status: r.status,
+          comboGroupId: r.comboGroupId,
+        })),
+      })),
+    };
+  }
 
   async executeVerifiedByPhone(
     params: Omit<ClientCancellationCommand, 'clientId'> & { phone: string },
