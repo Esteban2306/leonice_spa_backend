@@ -16,7 +16,10 @@ import {
   ADMIN_TIMEOUT_NOTICE_DELAY_MS,
   NOTICE_JOB_OPTIONS,
   type AdminDepositTimeoutNoticeJobData,
+  type AdminClientCancellationNoticeJobData,
   type AdminRescheduleNoticeJobData,
+  type CancellationLinkNoticeJobData,
+  type ClientCancellationNoticeJobData,
   type ClientDepositRejectedNoticeJobData,
   type RescheduleNoticeJobData,
 } from '../domain/operational-notifications.constants';
@@ -138,6 +141,69 @@ export class OperationalNotificationsListener {
       },
     );
   }
+  @OnEvent(EVENT_TYPES.CLIENT_CANCELLATION_COMPLETED)
+  async handleClientCancellation(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.CLIENT_CANCELLATION_COMPLETED
+    >,
+  ): Promise<void> {
+    const { reservationIds, channel } = event.payload;
+    const reservationId = reservationIds[0];
+    if (!reservationId) return;
+    const dedupeKey = [...reservationIds].sort().join('_');
+    const data: ClientCancellationNoticeJobData = {
+      reservationId,
+      reservationIds,
+      channel,
+    };
+
+    await this.guard(
+      'avisos por cancelación del cliente',
+      reservationId,
+      async () => {
+        await this.queue.add(
+          JOB_NAMES.NOTIFY_CLIENT_CANCELLATION_CONFIRMED,
+          data,
+          {
+            ...NOTICE_JOB_OPTIONS,
+            jobId: `client-cancelled-${dedupeKey}`,
+          },
+        );
+        await this.enqueueForAdmins<AdminClientCancellationNoticeJobData>(
+          JOB_NAMES.NOTIFY_ADMIN_CLIENT_CANCELLED,
+          'cancelación del cliente',
+          (recipientId) => ({
+            data: { ...data, recipientId },
+            opts: {
+              jobId: `admin-client-cancelled-${dedupeKey}-${recipientId}`,
+            },
+          }),
+        );
+      },
+    );
+  }
+
+  @OnEvent(EVENT_TYPES.CANCELLATION_LINK_REQUESTED)
+  async handleCancellationLinkRequested(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.CANCELLATION_LINK_REQUESTED
+    >,
+  ): Promise<void> {
+    const { reservationId, url } = event.payload;
+    const data: CancellationLinkNoticeJobData = { reservationId, url };
+    await this.guard(
+      'envío del enlace de cancelación',
+      reservationId,
+      async () => {
+        await this.queue.add(JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK, data, {
+          ...NOTICE_JOB_OPTIONS,
+        });
+      },
+    );
+  }
+
   private async enqueueClientRescheduled(
     data: RescheduleNoticeJobData,
   ): Promise<void> {

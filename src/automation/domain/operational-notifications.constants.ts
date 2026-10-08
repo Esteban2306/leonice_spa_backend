@@ -7,6 +7,10 @@ export const OPERATIONAL_TEMPLATE_ENV_KEYS = {
     'CONDUIT_TEMPLATE_CLIENT_DEPOSIT_REJECTED_NO_DEADLINE',
   CLIENT_RESCHEDULED: 'CONDUIT_TEMPLATE_CLIENT_RESCHEDULED',
   ADMIN_RESCHEDULED: 'CONDUIT_TEMPLATE_ADMIN_RESCHEDULED',
+  CLIENT_CANCELLATION_CONFIRMED:
+    'CONDUIT_TEMPLATE_CLIENT_CANCELLATION_CONFIRMED',
+  ADMIN_CLIENT_CANCELLED: 'CONDUIT_TEMPLATE_ADMIN_CLIENT_CANCELLED',
+  CLIENT_CANCELLATION_LINK: 'CONDUIT_TEMPLATE_CLIENT_CANCELLATION_LINK',
 } as const;
 
 export type OperationalTemplate = keyof typeof OPERATIONAL_TEMPLATE_ENV_KEYS;
@@ -33,6 +37,23 @@ export interface ClientDepositRejectedNoticeJobData {
 export interface RescheduleNoticeJobData {
   reservationId: string;
   previousScheduledStart: string;
+}
+
+export type CancellationChannel = 'WEB' | 'LINK' | 'WHATSAPP';
+
+export interface ClientCancellationNoticeJobData {
+  reservationId: string;
+  reservationIds: string[];
+  channel: CancellationChannel;
+}
+
+export interface AdminClientCancellationNoticeJobData extends ClientCancellationNoticeJobData {
+  recipientId: string;
+}
+
+export interface CancellationLinkNoticeJobData {
+  reservationId: string;
+  url: string;
 }
 
 export interface AdminRescheduleNoticeJobData extends RescheduleNoticeJobData {

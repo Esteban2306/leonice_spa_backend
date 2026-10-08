@@ -18,7 +18,11 @@ import { formatNotificationDateTime } from './utils/format-notification-date';
 import {
   OPERATIONAL_TEMPLATE_ENV_KEYS,
   type AdminDepositTimeoutNoticeJobData,
+  type AdminClientCancellationNoticeJobData,
   type AdminRescheduleNoticeJobData,
+  type CancellationChannel,
+  type CancellationLinkNoticeJobData,
+  type ClientCancellationNoticeJobData,
   type ClientDepositRejectedNoticeJobData,
   type OperationalTemplate,
   type RescheduleNoticeJobData,
@@ -27,6 +31,21 @@ import {
 const RECIPIENT_INACTIVE_REASON =
   'El destinatario fue desactivado o eliminado antes del envío';
 const RESERVATION_GONE_REASON = 'La reserva ya no existe';
+
+const CHANNEL_LABELS: Record<CancellationChannel, string> = {
+  WEB: 'la web',
+  LINK: 'el enlace de cancelación',
+  WHATSAPP: 'WhatsApp',
+};
+
+function isCancelledByClient(
+  reservation: Pick<Reservation, 'status' | 'cancellationSource'>,
+): boolean {
+  return (
+    reservation.status === ReservationStatus.CANCELADA &&
+    reservation.cancellationSource === CancellationSource.CLIENT
+  );
+}
 
 function isCancelledByTimeout(
   reservation: Pick<Reservation, 'status' | 'cancellationSource'>,
@@ -199,6 +218,97 @@ export class OperationalNotificationsService {
       origen: data.source === 'CLIENT' ? 'el cliente' : 'el administrador',
     });
     await this.executed(type, reservationId, `Destinatario ${recipient.id}`);
+  }
+
+  async notifyClientCancellationConfirmed(
+    data: ClientCancellationNoticeJobData,
+  ): Promise<void> {
+    const type = AutomationExecutionType.CLIENT_CANCELLATION_NOTICE;
+    const cancelled = await this.loadClientCancelled(data.reservationIds);
+    const first = cancelled[0];
+    if (!first) {
+      await this.skip(
+        type,
+        data.reservationId,
+        'Las reservas ya no están canceladas por el cliente',
+      );
+      return;
+    }
+
+    await this.send('CLIENT_CANCELLATION_CONFIRMED', first.client.phone, {
+      nombre: first.client.name,
+      tratamientos: cancelled.map((r) => r.treatment.name).join(', '),
+      fecha: formatNotificationDateTime(first.scheduledStart),
+    });
+    await this.executed(type, data.reservationId);
+  }
+
+  async notifyAdminClientCancelled(
+    data: AdminClientCancellationNoticeJobData,
+  ): Promise<void> {
+    const type = AutomationExecutionType.ADMIN_CLIENT_CANCELLATION_NOTICE;
+    const recipient = await this.findActiveRecipient(data.recipientId);
+    if (!recipient) {
+      await this.skip(type, data.reservationId, RECIPIENT_INACTIVE_REASON);
+      return;
+    }
+
+    const cancelled = await this.loadClientCancelled(data.reservationIds);
+    const first = cancelled[0];
+    if (!first) {
+      await this.skip(
+        type,
+        data.reservationId,
+        'Las reservas ya no están canceladas por el cliente',
+      );
+      return;
+    }
+
+    await this.send('ADMIN_CLIENT_CANCELLED', recipient.phone, {
+      cliente: first.client.name,
+      telefono: first.client.phone,
+      tratamientos: cancelled.map((r) => r.treatment.name).join(', '),
+      fecha: formatNotificationDateTime(first.scheduledStart),
+      canal: CHANNEL_LABELS[data.channel],
+    });
+    await this.executed(
+      type,
+      data.reservationId,
+      `Destinatario ${recipient.id}`,
+    );
+  }
+
+  async sendClientCancellationLink(
+    data: CancellationLinkNoticeJobData,
+  ): Promise<void> {
+    const type = AutomationExecutionType.CLIENT_CANCELLATION_LINK_NOTICE;
+    const reservation = await this.loadWithDetails(data.reservationId);
+    if (!reservation) {
+      await this.skip(type, data.reservationId, RESERVATION_GONE_REASON);
+      return;
+    }
+    if (ReservationStateMachine.isTerminal(reservation.status)) {
+      await this.skip(
+        type,
+        data.reservationId,
+        `La reserva ya está en estado final (${reservation.status})`,
+      );
+      return;
+    }
+
+    await this.send('CLIENT_CANCELLATION_LINK', reservation.client.phone, {
+      nombre: reservation.client.name,
+      tratamiento: reservation.treatment.name,
+      fecha: formatNotificationDateTime(reservation.scheduledStart),
+      enlace: data.url,
+    });
+    await this.executed(type, data.reservationId);
+  }
+
+  private async loadClientCancelled(reservationIds: string[]) {
+    const rows =
+      await this.reservations.findManyByIdsWithDetails(reservationIds);
+    return rows.filter(isCancelledByClient);
   }
 
   private async findActiveRecipient(recipientId: string) {

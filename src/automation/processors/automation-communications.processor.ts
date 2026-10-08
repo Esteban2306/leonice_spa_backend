@@ -20,7 +20,10 @@ import { ConsentService } from 'src/clients/consent/consent.service';
 import { CONDUIT_TEMPLATE_IDS } from '../domain/conduit-template-ids.constants';
 import {
   AdminDepositTimeoutNoticeJobData,
+  AdminClientCancellationNoticeJobData,
   AdminRescheduleNoticeJobData,
+  CancellationLinkNoticeJobData,
+  ClientCancellationNoticeJobData,
   ClientDepositRejectedNoticeJobData,
   RescheduleNoticeJobData,
 } from '../domain/operational-notifications.constants';
@@ -36,7 +39,10 @@ type AutomationJobData =
   | AdminDepositTimeoutNoticeJobData
   | ClientDepositRejectedNoticeJobData
   | RescheduleNoticeJobData
-  | AdminRescheduleNoticeJobData;
+  | AdminRescheduleNoticeJobData
+  | ClientCancellationNoticeJobData
+  | AdminClientCancellationNoticeJobData
+  | CancellationLinkNoticeJobData;
 @Processor(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS)
 export class AutomationCommunicationsProcessor extends WorkerHost {
   private readonly logger = new Logger(AutomationCommunicationsProcessor.name);
@@ -73,6 +79,18 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       case JOB_NAMES.NOTIFY_ADMIN_RESCHEDULED:
         return this.notifications.notifyAdminRescheduled(
           job.data as AdminRescheduleNoticeJobData,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_CANCELLATION_CONFIRMED:
+        return this.notifications.notifyClientCancellationConfirmed(
+          job.data as ClientCancellationNoticeJobData,
+        );
+      case JOB_NAMES.NOTIFY_ADMIN_CLIENT_CANCELLED:
+        return this.notifications.notifyAdminClientCancelled(
+          job.data as AdminClientCancellationNoticeJobData,
+        );
+      case JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK:
+        return this.notifications.sendClientCancellationLink(
+          job.data as CancellationLinkNoticeJobData,
         );
       default:
         this.logger.warn(`Job desconocido recibido: ${job.name}`);
@@ -127,6 +145,12 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.CLIENT_RESCHEDULE_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_RESCHEDULED:
         return AutomationExecutionType.ADMIN_RESCHEDULE_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_CANCELLATION_CONFIRMED:
+        return AutomationExecutionType.CLIENT_CANCELLATION_NOTICE;
+      case JOB_NAMES.NOTIFY_ADMIN_CLIENT_CANCELLED:
+        return AutomationExecutionType.ADMIN_CLIENT_CANCELLATION_NOTICE;
+      case JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK:
+        return AutomationExecutionType.CLIENT_CANCELLATION_LINK_NOTICE;
       default:
         return null;
     }

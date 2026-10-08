@@ -23,4 +23,7 @@ export const JOB_NAMES = {
   NOTIFY_CLIENT_DEPOSIT_REJECTED: 'notify-client-deposit-rejected',
   NOTIFY_CLIENT_RESCHEDULED: 'notify-client-rescheduled',
   NOTIFY_ADMIN_RESCHEDULED: 'notify-admin-rescheduled',
+  NOTIFY_CLIENT_CANCELLATION_CONFIRMED: 'notify-client-cancellation-confirmed',
+  NOTIFY_ADMIN_CLIENT_CANCELLED: 'notify-admin-client-cancelled',
+  SEND_CLIENT_CANCELLATION_LINK: 'send-client-cancellation-link',
 } as const;
