@@ -69,6 +69,7 @@ function fakeReservation(
     cancellationSource: null,
     rescheduledFromId: null,
     depositExpiresAt: null,
+    depositClockStartedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     client: { id: clientId, name: 'Test', phone: '123' },
