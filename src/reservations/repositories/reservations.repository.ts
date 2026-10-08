@@ -20,6 +20,7 @@ interface UpdateStatusData {
   checkedInAt?: Date;
   completedAt?: Date;
   depositExpiresAt?: Date | null;
+  depositClockStartedAt?: Date | null;
 }
 
 export interface ReservationFilters {
@@ -255,15 +256,51 @@ export class ReservationsRepository {
     });
   }
 
-  extendDepositDeadline(
+  restartDepositDeadline(
     id: string,
-    depositExpiresAt: Date,
+    deadline: { depositClockStartedAt: Date; depositExpiresAt: Date },
     client: PrismaClientOrTx = this.prisma.client,
   ): Promise<Reservation> {
     return client.reservation.update({
       where: { id },
-      data: { depositExpiresAt },
+      data: deadline,
     });
+  }
+
+  findDepositDeadlinesRunningDuring(
+    params: { from: Date; until: Date },
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.reservation.findMany({
+      where: {
+        status: ReservationStatus.PENDIENTE_DEPOSITO,
+        depositClockStartedAt: { not: null, lt: params.until },
+        depositExpiresAt: { not: null, gt: params.from },
+      },
+      select: {
+        id: true,
+        scheduledStart: true,
+        depositClockStartedAt: true,
+        depositExpiresAt: true,
+      },
+    });
+  }
+
+  async extendDepositDeadlineIfUnchanged(
+    id: string,
+    previous: Date,
+    next: Date,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<boolean> {
+    const result = await client.reservation.updateMany({
+      where: {
+        id,
+        status: ReservationStatus.PENDIENTE_DEPOSITO,
+        depositExpiresAt: previous,
+      },
+      data: { depositExpiresAt: next },
+    });
+    return result.count === 1;
   }
 
   async findByIdWithClientPhone(
@@ -444,6 +481,7 @@ export class ReservationsRepository {
       finalDurationMinutes: number;
       scheduledEnd: Date;
       status: ReservationStatus;
+      depositClockStartedAt: Date;
       depositExpiresAt: Date;
     },
     client: PrismaClientOrTx = this.prisma.client,

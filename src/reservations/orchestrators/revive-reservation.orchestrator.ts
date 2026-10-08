@@ -107,6 +107,7 @@ export class ReviveReservationOrchestrator {
                 cancellationReason: null,
                 cancellationSource: null,
                 depositExpiresAt: null,
+                depositClockStartedAt: null,
               },
               tx,
             );

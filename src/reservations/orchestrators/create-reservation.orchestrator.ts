@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
   Prisma,
@@ -10,19 +10,13 @@ import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { AvailabilityRepository } from '../repositories/availability.repository';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ClientsService } from 'src/clients/clients.service';
-import {
-  JOB_NAMES,
-  QUEUE_NAMES,
-} from 'src/infrastructure/queue/queue.constants';
-import { Queue } from 'bullmq';
-import { InjectQueue } from '@nestjs/bullmq';
 import { PlacementCheckService } from '../service/placement-check.service';
 import { placementRejectionException } from '../domain/placement-rejection.exception';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { validateAdvancedWindow } from '../validators/validate-advance-window';
 import { assertNoSameDayCategoryConflict } from '../validators/assert-no-same-day-category-conflict';
 import { assertNoDuplicateCategoriesInCombo } from '../validators/assert-no-duplicate-categories-in-combo';
-import { DEPOSITO_TIMEOUT_MS } from '../domain/reservation-timing.constants';
+import { DepositDeadlineService } from '../service/deposit-deadline.service';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { getDayBoundaries } from '../domain/day-boundaries';
@@ -59,8 +53,6 @@ export interface CreateReservationResult {
 
 @Injectable()
 export class CreateReservationOrchestrator {
-  private readonly logger = new Logger(CreateReservationOrchestrator.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly availabilityRepository: AvailabilityRepository,
@@ -71,8 +63,7 @@ export class CreateReservationOrchestrator {
     private readonly placementCheck: PlacementCheckService,
     private readonly depositCredit: DepositCreditService,
     private readonly operatingSchedule: OperatingScheduleService,
-    @InjectQueue(QUEUE_NAMES.RESERVATION_TIMEOUTS)
-    private readonly timeoutsQueue: Queue,
+    private readonly depositDeadline: DepositDeadlineService,
   ) {}
 
   async execute(dto: CreateReservationDto): Promise<CreateReservationResult> {
@@ -129,6 +120,7 @@ export class CreateReservationOrchestrator {
 
     const categoryIds = [...new Set(treatments.map((t) => t.categoryId))];
     const { dayStart, dayEnd } = getDayBoundaries(requestedStart);
+    const depositClockStartedAt = new Date();
 
     const { reservations, resolvedSegments, creditAppliedIds } =
       await this.availabilityRepository.withCategoriesLock(
@@ -151,6 +143,7 @@ export class CreateReservationOrchestrator {
             await this.depositCredit.findAvailableForClient(client.id, tx);
           const credit = availableCredits[0] ?? null;
           const hasCredit = credit !== null;
+          let depositExpiresAt: Date | null = null;
 
           for (const [index, draft] of draftSegments.entries()) {
             const treatment = treatments.find(
@@ -195,6 +188,13 @@ export class CreateReservationOrchestrator {
               ? (treatment.basePriceMax ?? 0)
               : (treatment.basePriceMin ?? 0);
             const initialStatus = ReservationStatus.PENDIENTE_DEPOSITO;
+            if (!hasCredit && depositExpiresAt === null) {
+              depositExpiresAt = await this.depositDeadline.computeExpiry(
+                depositClockStartedAt,
+                placement.scheduledStart,
+                tx,
+              );
+            }
 
             const createdReservation = await tx.reservation.create({
               data: {
@@ -208,9 +208,8 @@ export class CreateReservationOrchestrator {
                 finalPrice: price,
                 finalDurationMinutes: draft.durationMinutes,
                 comboGroupId,
-                depositExpiresAt: hasCredit
-                  ? null
-                  : new Date(Date.now() + DEPOSITO_TIMEOUT_MS),
+                depositClockStartedAt: hasCredit ? null : depositClockStartedAt,
+                depositExpiresAt,
               },
             });
 
@@ -253,7 +252,7 @@ export class CreateReservationOrchestrator {
         reservation.status === ReservationStatus.PENDIENTE_DEPOSITO &&
         reservation.depositExpiresAt
       ) {
-        await this.scheduleDepositTimeout(
+        await this.depositDeadline.scheduleTimeout(
           reservation.id,
           reservation.depositExpiresAt,
         );
@@ -407,23 +406,5 @@ export class CreateReservationOrchestrator {
       wasAdjusted: true,
       adjustmentReason: 'se reubicó al horario disponible más cercano ese día',
     };
-  }
-
-  private async scheduleDepositTimeout(
-    reservationId: string,
-    expiresAt: Date,
-  ): Promise<void> {
-    try {
-      await this.timeoutsQueue.add(
-        JOB_NAMES.DEPOSITO_TIMEOUT,
-        { reservationId },
-        { delay: Math.max(expiresAt.getTime() - Date.now(), 0) },
-      );
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `No se pudo encolar deposito-timeout de ${reservationId}; lo cubrirá el barrido: ${message}`,
-      );
-    }
   }
 }

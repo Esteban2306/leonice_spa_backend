@@ -1,27 +1,18 @@
-import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DepositStatus, ReservationStatus } from '@prisma/client';
-import { Queue } from 'bullmq';
 import { DepositsRepository } from '../repositories/deposits.repositories';
 import { ReservationsRepository } from '../../reservations/repositories/reservations.repository';
 import { DomainException } from '../../common/exceptions/domain.exception';
-import {
-  JOB_NAMES,
-  QUEUE_NAMES,
-} from '../../infrastructure/queue/queue.constants';
-import { DEPOSITO_TIMEOUT_MS } from '../../reservations/domain/reservation-timing.constants';
+import { DepositDeadlineService } from '../../reservations/service/deposit-deadline.service';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
 
 @Injectable()
 export class RejectDepositOrchestrator {
-  private readonly logger = new Logger(RejectDepositOrchestrator.name);
-
   constructor(
     private readonly repository: DepositsRepository,
     private readonly reservationsRepository: ReservationsRepository,
-    @InjectQueue(QUEUE_NAMES.RESERVATION_TIMEOUTS)
-    private readonly timeoutsQueue: Queue,
+    private readonly depositDeadline: DepositDeadlineService,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -42,15 +33,19 @@ export class RejectDepositOrchestrator {
       await this.reservationsRepository.findByIdWithClientPhone(reservationId);
     const isAwaitingDeposit =
       reservation?.status === ReservationStatus.PENDIENTE_DEPOSITO;
+    const depositClockStartedAt = new Date();
     const newExpiry = isAwaitingDeposit
-      ? new Date(Date.now() + DEPOSITO_TIMEOUT_MS)
+      ? await this.depositDeadline.computeExpiry(
+          depositClockStartedAt,
+          reservation.scheduledStart,
+        )
       : null;
 
     if (newExpiry) {
-      await this.reservationsRepository.extendDepositDeadline(
-        reservationId,
-        newExpiry,
-      );
+      await this.reservationsRepository.restartDepositDeadline(reservationId, {
+        depositClockStartedAt,
+        depositExpiresAt: newExpiry,
+      });
     }
 
     const rejected = await this.repository.markRejected(
@@ -60,7 +55,7 @@ export class RejectDepositOrchestrator {
     );
 
     if (newExpiry) {
-      await this.scheduleTimeout(reservationId, newExpiry);
+      await this.depositDeadline.scheduleTimeout(reservationId, newExpiry);
     }
 
     if (reservation) {
@@ -75,23 +70,5 @@ export class RejectDepositOrchestrator {
     }
 
     return rejected;
-  }
-
-  private async scheduleTimeout(
-    reservationId: string,
-    expiresAt: Date,
-  ): Promise<void> {
-    try {
-      await this.timeoutsQueue.add(
-        JOB_NAMES.DEPOSITO_TIMEOUT,
-        { reservationId },
-        { delay: Math.max(expiresAt.getTime() - Date.now(), 0) },
-      );
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `No se pudo encolar deposito-timeout de ${reservationId}; lo cubrirá el barrido: ${message}`,
-      );
-    }
   }
 }

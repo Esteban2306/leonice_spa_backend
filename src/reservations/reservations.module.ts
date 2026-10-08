@@ -21,6 +21,7 @@ import { ReservationRescheduler } from './service/reservation-rescheduler.servic
 import { DepositCreditService } from './service/deposit-credit.service';
 import { OperatingScheduleRepository } from './repositories/operating-schedule.repository';
 import { OperatingScheduleService } from './service/operating-schedule.service';
+import { DepositDeadlineService } from './service/deposit-deadline.service';
 
 @Module({
   imports: [ClientsModule, PromotionsModule],
@@ -31,6 +32,7 @@ import { OperatingScheduleService } from './service/operating-schedule.service';
     ReservationsRepository,
     OperatingScheduleRepository,
     OperatingScheduleService,
+    DepositDeadlineService,
     CreateReservationOrchestrator,
     CancelReservationOrchestrator,
     RescheduleReservationOrchestrator,
@@ -53,6 +55,7 @@ import { OperatingScheduleService } from './service/operating-schedule.service';
     ReservationsRepository,
     OperatingScheduleRepository,
     OperatingScheduleService,
+    DepositDeadlineService,
     CreateReservationOrchestrator,
     CancelReservationOrchestrator,
     MarkNoShowOrchestrator,

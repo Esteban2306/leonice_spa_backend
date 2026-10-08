@@ -63,6 +63,33 @@ export class OperatingScheduleRepository {
     });
   }
 
+  async findGlobalExceptionsBetween(
+    fromDayKey: string,
+    toDayKey: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<Array<DayException & { dayKey: string }>> {
+    const rows = await client.scheduleException.findMany({
+      where: {
+        categoryId: null,
+        date: {
+          gte: toScheduleDate(fromDayKey),
+          lte: toScheduleDate(toDayKey),
+        },
+      },
+      select: {
+        date: true,
+        type: true,
+        categoryId: true,
+        startMinute: true,
+        endMinute: true,
+      },
+    });
+    return rows.map(({ date, ...exception }) => ({
+      ...exception,
+      dayKey: fromScheduleDate(date),
+    }));
+  }
+
   findExceptionsInRange(params: {
     fromDayKey: string;
     toDayKey: string;

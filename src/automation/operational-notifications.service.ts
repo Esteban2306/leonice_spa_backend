@@ -11,12 +11,10 @@ import { UnrecoverableError } from 'bullmq';
 import { ConduitApiClient } from 'src/conduit/client/conduit-api.client';
 import { ReservationsRepository } from 'src/reservations/repositories/reservations.repository';
 import { ReservationStateMachine } from 'src/reservations/domain/reservation-state-machine';
-import { DEPOSITO_TIMEOUT_MS } from 'src/reservations/domain/reservation-timing.constants';
 import { AdminNotificationRecipientsRepository } from 'src/admin-notifications/repository/admin-notification-recipients.repository';
 import { AutomationExecutionRepository } from './repositories/automation-execution.repository';
 import { assertMessageDelivered } from './utils/assert-message-delivered';
 import { formatNotificationDateTime } from './utils/format-notification-date';
-import { describeDepositWindow } from './utils/describe-deposit-window';
 import {
   OPERATIONAL_TEMPLATE_ENV_KEYS,
   type AdminDepositTimeoutNoticeJobData,
@@ -123,10 +121,10 @@ export class OperationalNotificationsService {
       return;
     }
 
-    if (hasDeadline) {
+    if (hasDeadline && reservation.depositExpiresAt) {
       await this.send('CLIENT_DEPOSIT_REJECTED', reservation.client.phone, {
         nombre: reservation.client.name,
-        plazo: describeDepositWindow(DEPOSITO_TIMEOUT_MS),
+        plazo: `hasta el ${formatNotificationDateTime(reservation.depositExpiresAt)}`,
       });
     } else {
       await this.send(
