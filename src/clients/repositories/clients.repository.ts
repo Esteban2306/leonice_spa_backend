@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Client, HairColor, HairLength } from '@prisma/client';
-import { ReservationStatus } from '@prisma/client';
+import { Prisma, ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EncryptionService } from '../../infrastructure/encryption/encryption.service';
 import {
@@ -58,12 +58,20 @@ export class ClientsRepository {
     return client ? this.decryptSensitive(client) : null;
   }
 
-  async searchByName(query: string, page = 1, pageSize = 20) {
-    const where = {
-      name: {
-        contains: query,
-        mode: 'insensitive' as const,
-      },
+  async search(
+    params: { name?: string; phoneDigits?: string },
+    page = 1,
+    pageSize = 20,
+  ) {
+    const where: Prisma.ClientWhereInput = {
+      OR: [
+        ...(params.name
+          ? [{ name: { contains: params.name, mode: 'insensitive' as const } }]
+          : []),
+        ...(params.phoneDigits
+          ? [{ phone: { contains: params.phoneDigits } }]
+          : []),
+      ],
     };
 
     const skip = (page - 1) * pageSize;

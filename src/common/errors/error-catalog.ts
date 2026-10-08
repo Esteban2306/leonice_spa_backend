@@ -162,6 +162,24 @@ const RESERVATION = {
 } as const satisfies Record<string, ErrorDefinition>;
 
 const CLIENT = {
+  CLIENT_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'El cliente no existe.',
+  },
+  CLIENT_REQUIRED_FIELDS: {
+    status: HttpStatus.BAD_REQUEST,
+    message:
+      'Nombre y fecha de nacimiento son obligatorios para un cliente nuevo.',
+  },
+  CLIENT_SEARCH_TOO_SHORT: {
+    status: HttpStatus.BAD_REQUEST,
+    message: 'Escribe al menos 2 caracteres o 4 dígitos para buscar.',
+  },
+  CLIENT_HEALTH_CONSENT_REQUIRED: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'El cliente no tiene consentimiento de datos de salud registrado. Regístralo antes de guardar alergias o embarazo.',
+  },
   HAIR_PROFILE_MISSING: {
     status: HttpStatus.CONFLICT,
     message:

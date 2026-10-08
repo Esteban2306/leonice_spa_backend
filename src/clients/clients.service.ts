@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ClientsRepository } from './repositories/clients.repository';
 import { ResolveClientDto } from './dto/resolve-client.dto';
 import { normalizePhone } from './utils/normalize-phone.util';
@@ -17,6 +13,16 @@ import {
 import { AppException } from '../common/errors/app.exception';
 import { calendarDateToUtcMidnight } from '../common/validation/date-input.validators';
 import { getDayBoundaries } from '../reservations/domain/day-boundaries';
+import {
+  ClientDetailView,
+  ClientView,
+  computeReservationStats,
+  toClientReservationSummary,
+  toClientView,
+} from './domain/client-view';
+
+const MIN_NAME_QUERY = 2;
+const MIN_PHONE_DIGITS = 4;
 
 @Injectable()
 export class ClientsService {
@@ -42,9 +48,14 @@ export class ClientsService {
 
     if (!client) {
       if (!dto.name || !dto.birthDate) {
-        throw new BadRequestException(
-          'Nombre y fecha de nacimiento son obligatorios para un cliente nuevo',
-        );
+        throw new AppException('CLIENT_REQUIRED_FIELDS', {
+          details: {
+            missing: [
+              ...(dto.name ? [] : ['name']),
+              ...(dto.birthDate ? [] : ['birthDate']),
+            ],
+          },
+        });
       }
 
       if (hasSensitiveInput) {
@@ -81,21 +92,35 @@ export class ClientsService {
   }
 
   async search(query?: string, page = 1, pageSize = 20) {
-    if (!query || query.trim().length < 2) {
-      throw new BadRequestException(
-        'Escribe al menos 2 caracteres para buscar',
-      );
+    const term = query?.trim() ?? '';
+    const phoneDigits = term.replace(/\D/g, '');
+    const searchesPhone = phoneDigits.length >= MIN_PHONE_DIGITS;
+    const searchesName =
+      term.length >= MIN_NAME_QUERY && !/^[\d\s+()-]+$/.test(term);
+    if (!searchesPhone && !searchesName) {
+      throw new AppException('CLIENT_SEARCH_TOO_SHORT');
     }
 
-    return this.repository.searchByName(query.trim(), page, pageSize);
+    return this.repository.search(
+      {
+        name: searchesName ? term : undefined,
+        phoneDigits: searchesPhone ? phoneDigits : undefined,
+      },
+      page,
+      pageSize,
+    );
   }
 
-  async getDetail(id: string) {
-    const client = await this.repository.findById(id);
-    if (!client) throw new NotFoundException('Cliente no encontrado');
-
-    const history = await this.historyRepository.getReservationHistory(id);
-    return { ...client, hairProfile: toHairProfileView(client), ...history };
+  async getDetail(id: string): Promise<ClientDetailView> {
+    const client = await this.requireClient(id);
+    const now = new Date();
+    const history = await this.historyRepository.getReservationHistory(id, now);
+    return {
+      ...toClientView(client, now),
+      stats: computeReservationStats(history.statusCounts, history.upcoming),
+      reservations: history.reservations.map(toClientReservationSummary),
+      consents: history.consentRecords,
+    };
   }
 
   async setHairProfile(id: string, dto: SetHairProfileDto) {
@@ -158,26 +183,26 @@ export class ClientsService {
 
   private async requireClient(id: string) {
     const client = await this.repository.findById(id);
-    if (!client) throw new NotFoundException('Cliente no encontrado');
+    if (!client) {
+      throw new AppException('CLIENT_NOT_FOUND', { details: { clientId: id } });
+    }
     return client;
   }
 
-  async update(id: string, dto: UpdateClientDto) {
-    const existing = await this.repository.findById(id);
-
-    if (!existing) throw new NotFoundException('Cliente no encontrado');
+  async update(id: string, dto: UpdateClientDto): Promise<ClientView> {
+    await this.requireClient(id);
 
     if (dto.allergies !== undefined || dto.isPregnant !== undefined) {
       const alreadyConsented =
         await this.consentService.hasHealthDataConsent(id);
       if (!alreadyConsented) {
-        throw new BadRequestException(
-          'Este cliente no tiene consentimiento de datos de salud registrado — regístralo antes de guardar esta información',
-        );
+        throw new AppException('CLIENT_HEALTH_CONSENT_REQUIRED', {
+          details: { clientId: id },
+        });
       }
     }
 
-    return this.repository.update(id, {
+    const updated = await this.repository.update(id, {
       name: dto.name,
       birthDate: dto.birthDate
         ? calendarDateToUtcMidnight(dto.birthDate)
@@ -185,5 +210,6 @@ export class ClientsService {
       allergies: dto.allergies,
       isPregnant: dto.isPregnant,
     });
+    return toClientView(updated);
   }
 }

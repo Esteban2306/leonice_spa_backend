@@ -66,12 +66,15 @@ export class ClientsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.clientsService.getDetail(id);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateClientDto,
+  ) {
     return this.clientsService.update(id, dto);
   }
 }
