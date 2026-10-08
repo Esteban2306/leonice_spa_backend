@@ -7,9 +7,12 @@ import { clientsHistoryRepository } from './repositories/client-history.reposito
 import { ConsentService } from './consent/consent.service';
 import { SetHairProfileDto } from './dto/set-hair-profile.dto';
 import {
+  getHairProfileStatus,
   hairProfileExpiryCutoff,
   toHairProfileView,
 } from './domain/hair-profile.util';
+import { CreateClientDto } from './dto/create-client.dto';
+import { RecordConsentDto } from './dto/record-consent.dto';
 import { AppException } from '../common/errors/app.exception';
 import { calendarDateToUtcMidnight } from '../common/validation/date-input.validators';
 import { getDayBoundaries } from '../reservations/domain/day-boundaries';
@@ -97,11 +100,11 @@ export class ClientsService {
     const searchesPhone = phoneDigits.length >= MIN_PHONE_DIGITS;
     const searchesName =
       term.length >= MIN_NAME_QUERY && !/^[\d\s+()-]+$/.test(term);
-    if (!searchesPhone && !searchesName) {
+    if (term.length > 0 && !searchesPhone && !searchesName) {
       throw new AppException('CLIENT_SEARCH_TOO_SHORT');
     }
 
-    return this.repository.search(
+    const result = await this.repository.search(
       {
         name: searchesName ? term : undefined,
         phoneDigits: searchesPhone ? phoneDigits : undefined,
@@ -109,6 +112,61 @@ export class ClientsService {
       page,
       pageSize,
     );
+
+    const now = new Date();
+    return {
+      data: result.data.map((client) => ({
+        id: client.id,
+        name: client.name,
+        phone: client.phone,
+        createdAt: client.createdAt,
+        reservationCount: client._count.reservations,
+        lastReservation: client.reservations[0] ?? null,
+        hairProfileStatus: getHairProfileStatus(client, now),
+      })),
+      pagination: result.pagination,
+    };
+  }
+
+  async createByAdmin(dto: CreateClientDto): Promise<ClientView> {
+    const phone = normalizePhone(dto.phone);
+    const existing = await this.repository.findByPhone(phone);
+    if (existing) {
+      throw new AppException('CLIENT_ALREADY_EXISTS', {
+        details: { clientId: existing.id },
+      });
+    }
+
+    const hasSensitiveInput =
+      dto.allergies !== undefined || dto.isPregnant !== undefined;
+    if (hasSensitiveInput && !dto.healthDataPolicyVersion) {
+      throw new AppException('CLIENT_HEALTH_CONSENT_REQUIRED');
+    }
+
+    const created = await this.repository.create({
+      phone,
+      name: dto.name,
+      birthDate: calendarDateToUtcMidnight(dto.birthDate),
+      allergies: dto.allergies,
+      isPregnant: dto.isPregnant ?? false,
+    });
+
+    if (hasSensitiveInput && dto.healthDataPolicyVersion) {
+      await this.consentService.recordHealthDataConsent(
+        created.id,
+        dto.healthDataPolicyVersion,
+      );
+    }
+    return toClientView(created);
+  }
+
+  async recordConsent(id: string, dto: RecordConsentDto) {
+    await this.requireClient(id);
+    await this.consentService.ensureConsent(id, dto.type, {
+      accepted: true,
+      policyVersion: dto.policyVersion,
+    });
+    return this.getDetail(id);
   }
 
   async getDetail(id: string): Promise<ClientDetailView> {

@@ -63,16 +63,16 @@ export class ClientsRepository {
     page = 1,
     pageSize = 20,
   ) {
-    const where: Prisma.ClientWhereInput = {
-      OR: [
-        ...(params.name
-          ? [{ name: { contains: params.name, mode: 'insensitive' as const } }]
-          : []),
-        ...(params.phoneDigits
-          ? [{ phone: { contains: params.phoneDigits } }]
-          : []),
-      ],
-    };
+    const conditions: Prisma.ClientWhereInput[] = [
+      ...(params.name
+        ? [{ name: { contains: params.name, mode: 'insensitive' as const } }]
+        : []),
+      ...(params.phoneDigits
+        ? [{ phone: { contains: params.phoneDigits } }]
+        : []),
+    ];
+    const where: Prisma.ClientWhereInput =
+      conditions.length > 0 ? { OR: conditions } : {};
 
     const skip = (page - 1) * pageSize;
 
@@ -89,6 +89,15 @@ export class ClientsRepository {
           name: true,
           phone: true,
           createdAt: true,
+          hairLength: true,
+          hairColor: true,
+          hairProfileUpdatedAt: true,
+          _count: { select: { reservations: true } },
+          reservations: {
+            orderBy: { scheduledStart: 'desc' },
+            take: 1,
+            select: { scheduledStart: true, status: true },
+          },
         },
       }),
 

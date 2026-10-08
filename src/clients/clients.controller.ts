@@ -18,6 +18,8 @@ import { UpdateClientDto } from './dto/update-client.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { FindClientsQueryDto } from './dto/find-clients-query.dto';
 import { SetHairProfileDto } from './dto/set-hair-profile.dto';
+import { CreateClientDto } from './dto/create-client.dto';
+import { RecordConsentDto } from './dto/record-consent.dto';
 import { FindPendingHairProfilesQueryDto } from './dto/find-pending-hair-profiles-query.dto';
 
 @Controller({ path: 'clients', version: '1' })
@@ -34,6 +36,20 @@ export class ClientsController {
       name: client.name,
       hasHairProfile: Boolean(client.hairLength && client.hairColor),
     };
+  }
+
+  @Post()
+  async create(@Body() dto: CreateClientDto) {
+    return this.clientsService.createByAdmin(dto);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/consents')
+  async recordConsent(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RecordConsentDto,
+  ) {
+    return this.clientsService.recordConsent(id, dto);
   }
 
   @Get()
