@@ -4,7 +4,6 @@ import { Prisma } from '@prisma/client';
 import { AppException, type ErrorDetails } from './app.exception';
 import { ERROR_CATALOG, isErrorCode, type ErrorCode } from './error-catalog';
 
-/** Contrato de error de la API (cuerpo de toda respuesta 4xx/5xx). */
 export interface ErrorResponseBody {
   statusCode: number;
   code: ErrorCode;
@@ -55,7 +54,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Campos extra de un cuerpo legado ({code, message, reservationId…}) → details. */
 function collectDetails(
   body: Record<string, unknown>,
 ): ErrorDetails | undefined {
@@ -72,7 +70,6 @@ function normalizeHttpException(exception: HttpException): NormalizedError {
   const status: HttpStatus = exception.getStatus();
   const body = exception.getResponse();
 
-  // 5xx: nunca se filtra el mensaje interno al cliente.
   if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
     const code = genericCodeFor(status);
     return { status, code, message: ERROR_CATALOG[code].message };
@@ -87,7 +84,6 @@ function normalizeHttpException(exception: HttpException): NormalizedError {
     return { status, code, message: ERROR_CATALOG[code].message };
   }
 
-  // ValidationPipe (class-validator): message es la lista de violaciones.
   if (status === HttpStatus.BAD_REQUEST && Array.isArray(body.message)) {
     return {
       status,
@@ -109,7 +105,6 @@ function normalizeHttpException(exception: HttpException): NormalizedError {
     };
   }
 
-  // Código fuera del catálogo: se conserva como dato, el contrato sigue cerrado.
   const code = genericCodeFor(status);
   const unknownCode = typeof body.code === 'string' ? body.code : undefined;
   return {
@@ -146,10 +141,6 @@ function normalizePrismaError(
   }
 }
 
-/**
- * Traduce cualquier excepción al contrato único de errores. Pura: no loguea ni
- * conoce la request, para poder probarla de forma aislada.
- */
 export function normalizeException(exception: unknown): NormalizedError {
   if (exception instanceof AppException) {
     const body = exception.getResponse() as { message: string };

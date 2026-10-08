@@ -1,4 +1,3 @@
-// Cancela (soft) las reservas vivas de clientes sintéticos (+999…) creadas por la verificación.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 const BASE = 'http://localhost:3921/api/v1'; const jar = new Map();

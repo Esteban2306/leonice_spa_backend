@@ -1,4 +1,3 @@
-// Sink que reemplaza a Conduit durante la verificación: registra cada petición y responde 200.
 const http = require('http');
 const fs = require('fs');
 const LOG = process.argv[2];

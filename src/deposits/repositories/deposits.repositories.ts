@@ -193,7 +193,6 @@ export class DepositsRepository {
     });
   }
 
-  /** Confirma solo si sigue PENDIENTE (compare-and-set): evita aprobar algo ya rechazado o aprobado. */
   async markConfirmedIfPending(
     id: string,
     adminUserId: string,

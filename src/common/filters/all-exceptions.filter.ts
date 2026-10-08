@@ -12,11 +12,6 @@ import {
   type ErrorResponseBody,
 } from '../errors/normalize-exception';
 
-/**
- * Único punto de salida de errores HTTP. Toda excepción se normaliza al
- * contrato de `ErrorResponseBody` (code del catálogo + correlationId) y se
- * registra una sola vez: 5xx con stack, 4xx como advertencia con su code.
- */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionsFilter');

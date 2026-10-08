@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { RequestContextService } from './request-context.service';
 
 const CORRELATION_ID_HEADER = 'x-correlation-id';
-// Se acepta el id entrante solo si es un token seguro: termina en logs y respuestas.
 const SAFE_CORRELATION_ID = /^[A-Za-z0-9._-]{8,64}$/;
 
 export function resolveCorrelationId(incoming: unknown): string {

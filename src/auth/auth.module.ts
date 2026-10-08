@@ -20,7 +20,6 @@ import { CsrfGuard } from './guards/csrf.guard';
     RolesGuard,
     CsrfGuard,
   ],
-  // Se registran como APP_GUARD una sola vez, en orden explícito, desde GlobalGuardChain.
   exports: [JwtAuthGuard, RolesGuard, CsrfGuard],
 })
 export class AuthModule {}

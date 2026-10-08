@@ -3,12 +3,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
-/**
- * Rutas protegidas: exige sesión válida (401 si no).
- * Rutas @Public(): identifica al usuario si trae una sesión válida (para que los
- * guards siguientes, p. ej. el throttler, sepan que es un admin) pero nunca rechaza:
- * sin sesión o con sesión inválida la petición sigue como anónima.
- */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(private readonly reflector: Reflector) {
@@ -20,11 +14,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return (await super.canActivate(context)) as boolean;
     }
 
-    try {
-      await super.canActivate(context);
-    } catch {
-      // Ruta pública: una sesión ausente o inválida no bloquea, solo deja al usuario anónimo.
-    }
+    await this.identifyOptionalUser(context);
     return true;
   }
 
@@ -38,6 +28,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return (user || undefined) as TUser;
     }
     return super.handleRequest<TUser>(err, user, info, context);
+  }
+
+  private async identifyOptionalUser(context: ExecutionContext): Promise<void> {
+    try {
+      await super.canActivate(context);
+    } catch {
+      return;
+    }
   }
 
   private isPublic(context: ExecutionContext): boolean {

@@ -1,15 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
 
-/**
- * Catálogo único de errores de la API: cada `code` declara su status HTTP y un
- * mensaje por defecto (en español, apto para mostrar). Es la única fuente de
- * verdad del contrato de errores: el front decide SOLO por `code`.
- *
- * Reglas:
- * - Los códigos son estables: renombrar uno es un cambio incompatible.
- * - Un sitio que lanza puede dar un mensaje más específico, nunca otro status.
- * - Errores de Nest/infra sin código propio se mapean a los genéricos (GENERIC).
- */
 export interface ErrorDefinition {
   readonly status: HttpStatus;
   readonly message: string;

@@ -37,21 +37,12 @@ function isValidConduitRequest(
 
 const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-/**
- * Lecturas (navegar catálogo, filtrar, consultar) no cuentan para los límites
- * anti-abuso de reservas: solo las escrituras pueden comprometer la integridad.
- */
 export function isSafeMethod(context: ExecutionContext): boolean {
   return SAFE_METHODS.has(
     context.switchToHttp().getRequest<Request>().method.toUpperCase(),
   );
 }
 
-/**
- * Exento de todo rate limit: llamadas de Conduit con API key válida y
- * administradores autenticados. Depende de que req.user ya esté resuelto,
- * por eso GlobalGuardChain ejecuta JwtAuthGuard antes que el throttler.
- */
 export function shouldSkipThrottle(
   context: ExecutionContext,
   config: ConfigService,
@@ -119,8 +110,6 @@ export function getThrottlerConfig(
       },
 
       {
-        // Anti-abuso de escrituras anónimas (reservar, cancelar, reagendar,
-        // subir comprobante, resolver cliente…), contado por teléfono o IP.
         name: 'client-booking',
         ttl: CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
         limit: CLIENT_BOOKING_RATE_LIMIT,

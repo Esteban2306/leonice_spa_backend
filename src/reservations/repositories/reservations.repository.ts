@@ -243,7 +243,6 @@ export class ReservationsRepository {
     return rows.map((r) => r.id);
   }
 
-  /** Filas del grupo pagadas por el depósito de otra fila (una sola transferencia). */
   async setCoveredByDeposit(
     reservationIds: readonly string[],
     depositId: string,

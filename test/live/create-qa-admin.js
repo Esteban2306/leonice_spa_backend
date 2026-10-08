@@ -1,4 +1,3 @@
-// Crea (o reactiva) un admin de QA en la BD de desarrollo con una contraseña aleatoria.
 const { PrismaClient } = require('@prisma/client');
 const argon2 = require('argon2');
 const crypto = require('crypto');
