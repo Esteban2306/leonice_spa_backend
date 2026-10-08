@@ -113,6 +113,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    },
     "globalSetup": "<rootDir>/../test/jest-global-setup.js"
   }
 }
