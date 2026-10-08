@@ -25,6 +25,7 @@ import { ClientThrottlerGuard } from './reservations/guards/client-throttler.gua
 import { GlobalGuardChain } from './common/guards/global-guard-chain.guard';
 import { PromotionsModule } from './promotions/promotions.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
+import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { DepositsModule } from './deposits/deposits.module';
 import { CloudinaryModule } from './infrastructure/cloudinary/cloudinary.module';
 import { getThrottlerConfig } from './config/throttler.config';
@@ -70,6 +71,7 @@ import { AdminModule } from './admin/admin.module';
   ],
   controllers: [HealthController],
   providers: [
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,

@@ -9,6 +9,7 @@ import cookieParser from 'cookie-parser';
 import { json, type Request } from 'express';
 import { PinoLoggerService } from './common/logging/pino-logger.service';
 import { assertBusinessTimezone } from './config/timezone';
+import { IDEMPOTENT_REPLAY_HEADER } from './common/idempotency/idempotency.interceptor';
 
 async function bootstrap() {
   assertBusinessTimezone();
@@ -33,6 +34,7 @@ async function bootstrap() {
       'http://localhost:3000',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    exposedHeaders: [IDEMPOTENT_REPLAY_HEADER],
     credentials: true,
   });
 

@@ -48,6 +48,24 @@ export class SafeCacheService {
     }
   }
 
+  async setIfAbsent(
+    key: string,
+    value: unknown,
+    ttlSeconds: number,
+  ): Promise<boolean | null> {
+    try {
+      const result = await this.policy.execute(() =>
+        this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds, 'NX'),
+      );
+      return result === 'OK';
+    } catch (error) {
+      this.logger.warn(
+        `Caché no disponible al reservar "${key}": ${(error as Error).message}`,
+      );
+      return null;
+    }
+  }
+
   async delete(key: string): Promise<void> {
     try {
       await this.policy.execute(() => this.redis.del(key));

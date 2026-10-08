@@ -32,7 +32,6 @@ import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.serv
 import { ConduitToolAuthGuard } from '../conduit/guards/conduit-tool-auth.guard';
 import { SubmitDepositProofDto } from './dto/submit-deposit-proof.dto';
 import { assertValidImageDataUri } from './validators/assert-valid-image-data-uri';
-import { IdempotencyInterceptor } from 'src/common/idempotency/idempotency.interceptor';
 
 const IMAGE_UPLOAD_OPTIONS = {
   storage: memoryStorage(),
@@ -84,7 +83,6 @@ export class DepositsController {
   }
 
   @UseGuards(ConduitToolAuthGuard)
-  @UseInterceptors(IdempotencyInterceptor)
   @Post('automatic')
   async submitAutomaticProof(
     @Param('id', ParseUUIDPipe) reservationId: string,

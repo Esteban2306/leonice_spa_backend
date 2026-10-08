@@ -1,15 +1,6 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ReservationChannel } from '@prisma/client';
 import { ConduitToolAuthGuard } from './guards/conduit-tool-auth.guard';
-import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationOrchestrator } from '../reservations/orchestrators/create-reservation.orchestrator';
@@ -40,7 +31,6 @@ export class ConduitBookingToolsController {
   }
 
   @Post('reservations')
-  @UseInterceptors(IdempotencyInterceptor)
   create(@Body() dto: CreateReservationDto) {
     return this.createReservation.execute({
       ...dto,

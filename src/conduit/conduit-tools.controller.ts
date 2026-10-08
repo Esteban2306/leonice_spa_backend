@@ -6,11 +6,9 @@ import {
   Post,
   Patch,
   UseGuards,
-  UseInterceptors,
   ConflictException,
 } from '@nestjs/common';
 import { ConduitToolAuthGuard } from './guards/conduit-tool-auth.guard';
-import { IdempotencyInterceptor } from 'src/common/idempotency/idempotency.interceptor';
 import { ClientsRepository } from 'src/clients/repositories/clients.repository';
 import { ClientsService } from 'src/clients/clients.service';
 import { normalizePhone } from 'src/clients/utils/normalize-phone.util';
@@ -28,7 +26,6 @@ export class ConduitToolsController {
   ) {}
 
   @Post()
-  @UseInterceptors(IdempotencyInterceptor)
   async createOrUpdate(@Body() dto: ConduitCreateClientDto) {
     const normalizedPhone = normalizePhone(dto.phone);
 
@@ -103,8 +100,6 @@ export class ConduitToolsController {
     } = dto;
     return this.clientsService.update(client.id, updates);
   }
-
-  @UseInterceptors(IdempotencyInterceptor)
   @Patch()
   async update(@Body() dto: ConduitUpdateClientDto) {
     const client = await this.clientsRepository.findByPhone(

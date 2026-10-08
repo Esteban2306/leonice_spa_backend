@@ -220,8 +220,27 @@ const DEPOSIT = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const IDEMPOTENCY = {
+  IDEMPOTENCY_KEY_INVALID: {
+    status: HttpStatus.BAD_REQUEST,
+    message:
+      'La clave de idempotencia debe tener entre 8 y 128 caracteres (letras, números, ".", "_", ":" o "-").',
+  },
+  IDEMPOTENCY_KEY_REUSED: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'Esta clave de idempotencia ya se usó con otra solicitud. Genera una clave nueva por operación.',
+  },
+  IDEMPOTENCY_IN_PROGRESS: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Una solicitud con esta clave de idempotencia todavía se está procesando. Espera y consulta el resultado.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 export const ERROR_CATALOG = {
   ...GENERIC,
+  ...IDEMPOTENCY,
   ...PLACEMENT,
   ...RESERVATION,
   ...CLIENT,

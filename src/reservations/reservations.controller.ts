@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
   Query,
-  UseInterceptors,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ReservationsService } from './reservations.service';
@@ -33,7 +32,6 @@ import { FindReservationsQueryDto } from './dto/find-reservations-query.dto';
 import { SkipCsrf } from 'src/auth/decorators/skip-csrf.decorator';
 import { AdminCancelReservationOrchestrator } from './orchestrators/admin-cancel-reservation.orchestrator';
 import { AdminCancelReservationDto } from './dto/admin-cancel-reservation.dto';
-import { IdempotencyInterceptor } from 'src/common/idempotency/idempotency.interceptor';
 import { ReviveReservationOrchestrator } from './orchestrators/revive-reservation.orchestrator';
 
 @Controller({ path: 'reservations', version: '1' })
@@ -74,7 +72,6 @@ export class ReservationsController {
 
   @Public()
   @SkipCsrf()
-  @UseInterceptors(IdempotencyInterceptor)
   @Throttle({
     'client-booking': {
       limit: CLIENT_BOOKING_RATE_LIMIT,
