@@ -46,6 +46,7 @@ export interface GroupedReservation {
     isProofUnderReview: boolean;
     depositExpiresAt: Date | null;
     appliedCredit: AppliedCreditSummary | null;
+    coveredByDepositId: string | null;
   }>;
 }
 
@@ -206,6 +207,7 @@ export function groupReservationsForDisplay(
         isProofUnderReview: isProofUnderReview(r.status, r.deposit),
         depositExpiresAt: r.depositExpiresAt,
         appliedCredit: resolveAppliedCredit(r, creditByCombo),
+        coveredByDepositId: r.coveredByDepositId,
       })),
     };
   });

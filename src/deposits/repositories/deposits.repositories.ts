@@ -193,6 +193,27 @@ export class DepositsRepository {
     });
   }
 
+  /** Confirma solo si sigue PENDIENTE (compare-and-set): evita aprobar algo ya rechazado o aprobado. */
+  async markConfirmedIfPending(
+    id: string,
+    adminUserId: string,
+    coverage: DepositCoverage,
+    amount: number,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<boolean> {
+    const result = await client.depositRecord.updateMany({
+      where: { id, status: DepositStatus.PENDIENTE },
+      data: {
+        status: DepositStatus.CONFIRMADO,
+        coverage,
+        amount,
+        verifiedByUserId: adminUserId,
+        verifiedAt: new Date(),
+      },
+    });
+    return result.count === 1;
+  }
+
   markRejected(id: string, adminUserId: string, reason: string) {
     return this.prisma.client.depositRecord.update({
       where: { id },

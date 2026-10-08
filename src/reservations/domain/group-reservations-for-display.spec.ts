@@ -55,6 +55,7 @@ function fakeReservation(
     status: overrides.status ?? ReservationStatus.CONFIRMADA,
     channel: ReservationChannel.WEB,
     comboGroupId: overrides.comboGroupId ?? null,
+    coveredByDepositId: null,
     scheduledStart: overrides.scheduledStart,
     scheduledEnd: overrides.scheduledEnd,
     finalPrice: new Decimal(100),

@@ -243,6 +243,19 @@ export class ReservationsRepository {
     return rows.map((r) => r.id);
   }
 
+  /** Filas del grupo pagadas por el depósito de otra fila (una sola transferencia). */
+  async setCoveredByDeposit(
+    reservationIds: readonly string[],
+    depositId: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<void> {
+    if (reservationIds.length === 0) return;
+    await client.reservation.updateMany({
+      where: { id: { in: [...reservationIds] } },
+      data: { coveredByDepositId: depositId },
+    });
+  }
+
   extendDepositDeadline(
     id: string,
     depositExpiresAt: Date,

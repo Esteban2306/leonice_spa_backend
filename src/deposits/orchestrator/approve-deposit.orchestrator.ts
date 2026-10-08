@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   DepositCoverage,
   DepositRecord,
@@ -15,24 +11,23 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DepositsRepository } from '../repositories/deposits.repositories';
 import { ReservationsRepository } from '../../reservations/repositories/reservations.repository';
 import { ConfirmDepositOrchestrator } from '../../reservations/orchestrators/confirm-deposit.orchestrator';
-import { DepositCreditService } from 'src/reservations/service/deposit-credit.service';
-import {
-  MIN_ADVANCE_AMOUNT,
-  toCop,
-} from '../../reservations/domain/advance-payment.constants';
+import { DepositCreditService } from '../../reservations/service/deposit-credit.service';
 import { getDayBoundaries } from '../../reservations/domain/day-boundaries';
-import { DomainException } from '../../common/exceptions/domain.exception';
-import { resolveDepositAmount } from '../validators/resolve-deposit-amount';
+import { AppException } from '../../common/errors/app.exception';
 import type { ApproveScope } from '../dto/approve-deposit.dto';
+
+export interface ApproveDepositCommand {
+  reservationId: string;
+  adminUserId: string;
+  coverage: DepositCoverage;
+  amount?: number;
+  scope?: ApproveScope;
+}
 
 export interface ApproveDepositResult {
   approvedReservationIds: string[];
+  depositId: string | null;
 }
-
-export const APPROVE_DEPOSIT_ERROR_CODES = {
-  AMOUNT_REQUIRED: 'DEPOSIT_AMOUNT_REQUIRED',
-  AMOUNT_BELOW_MINIMUM: 'DEPOSIT_AMOUNT_BELOW_MINIMUM',
-} as const;
 
 @Injectable()
 export class ApproveDepositOrchestrator {
@@ -44,68 +39,119 @@ export class ApproveDepositOrchestrator {
     private readonly depositCredit: DepositCreditService,
   ) {}
 
-  async execute(
-    reservationId: string,
-    adminUserId: string,
-    coverage: DepositCoverage,
-    requestedAmount?: number,
-    scope: ApproveScope = 'GROUP',
-  ): Promise<ApproveDepositResult> {
-    const anchor = await this.reservationsRepository.findById(reservationId);
+  async execute(command: ApproveDepositCommand): Promise<ApproveDepositResult> {
+    const anchor = await this.reservationsRepository.findById(
+      command.reservationId,
+    );
     if (!anchor) throw new NotFoundException('Reserva no encontrada');
 
     if (anchor.status !== ReservationStatus.PENDIENTE_DEPOSITO) {
-      throw new DomainException(
-        `Esta reserva no está esperando un depósito (estado actual: ${anchor.status})`,
-      );
+      return this.approvePendingProofOnly(anchor, command);
     }
+    return this.approveAndConfirm(anchor, command);
+  }
 
-    const group = scope === 'SINGLE' ? [anchor] : await this.findGroup(anchor);
+  private async approveAndConfirm(
+    anchor: Reservation,
+    command: ApproveDepositCommand,
+  ): Promise<ApproveDepositResult> {
+    const group =
+      (command.scope ?? 'GROUP') === 'SINGLE'
+        ? [anchor]
+        : await this.findGroup(anchor);
 
-    const confirmed = await this.prisma.client.$transaction(async (tx) => {
-      const result: Reservation[] = [];
+    const { confirmed, depositId } = await this.prisma.client.$transaction(
+      async (tx) => {
+        const confirmedRows: Reservation[] = [];
+        const needsPayment: Reservation[] = [];
 
-      for (const reservation of group) {
-        const confirmedReservation =
-          await this.confirmDepositOrchestrator.confirmStatus(
-            reservation.id,
+        for (const reservation of group) {
+          confirmedRows.push(
+            await this.confirmDepositOrchestrator.confirmStatus(
+              reservation.id,
+              tx,
+            ),
+          );
+          const coveredByCredit = await this.depositCredit.isCoveredByCredit(
+            reservation,
             tx,
           );
-
-        const covered = await this.depositCredit.isCoveredByCredit(
-          reservation,
-          tx,
-        );
-        if (!covered) {
-          const amount =
-            reservation.id === anchor.id
-              ? this.resolveAnchorAmount(coverage, requestedAmount)
-              : MIN_ADVANCE_AMOUNT;
-          const latest = await this.repository.findLatestByReservationId(
-            reservation.id,
-            tx,
-          );
-          await this.resolveConfirmedDeposit(
-            latest,
-            reservation.id,
-            adminUserId,
-            coverage,
-            amount,
-            tx,
-          );
+          if (!coveredByCredit) needsPayment.push(reservation);
         }
 
-        result.push(confirmedReservation);
-      }
+        if (needsPayment.length === 0) {
+          return { confirmed: confirmedRows, depositId: null };
+        }
 
-      return result;
-    });
+        const amount = this.requireAmount(command.amount);
+        const payer =
+          needsPayment.find((r) => r.id === anchor.id) ?? needsPayment[0];
+        const latest = await this.repository.findLatestByReservationId(
+          payer.id,
+          tx,
+        );
+        const deposit = await this.resolveConfirmedDeposit(
+          latest,
+          payer.id,
+          command,
+          amount,
+          tx,
+        );
+
+        const coveredIds = needsPayment
+          .filter((r) => r.id !== payer.id)
+          .map((r) => r.id);
+        await this.reservationsRepository.setCoveredByDeposit(
+          coveredIds,
+          deposit.id,
+          tx,
+        );
+
+        return { confirmed: confirmedRows, depositId: deposit.id };
+      },
+    );
 
     for (const reservation of confirmed) {
       await this.confirmDepositOrchestrator.afterConfirmed(reservation);
     }
 
-    return { approvedReservationIds: confirmed.map((r) => r.id) };
+    return {
+      approvedReservationIds: confirmed.map((r) => r.id),
+      depositId,
+    };
+  }
+
+  private async approvePendingProofOnly(
+    reservation: Reservation,
+    command: ApproveDepositCommand,
+  ): Promise<ApproveDepositResult> {
+    const latest = await this.repository.findLatestByReservationId(
+      reservation.id,
+    );
+    if (!latest || latest.status !== DepositStatus.PENDIENTE) {
+      throw new AppException('DEPOSIT_NOT_PENDING', {
+        details: {
+          reservationId: reservation.id,
+          reservationStatus: reservation.status,
+          depositStatus: latest?.status ?? null,
+        },
+      });
+    }
+
+    const amount = this.requireAmount(command.amount);
+    const applied = await this.repository.markConfirmedIfPending(
+      latest.id,
+      command.adminUserId,
+      command.coverage,
+      amount,
+    );
+    if (!applied) {
+      throw new AppException('DEPOSIT_CONCURRENT_CHANGE', {
+        details: { depositId: latest.id },
+      });
+    }
+
+    return { approvedReservationIds: [], depositId: latest.id };
   }
 
   private findGroup(anchor: Reservation) {
@@ -118,44 +164,25 @@ export class ApproveDepositOrchestrator {
     );
   }
 
-  private resolveAnchorAmount(
-    coverage: DepositCoverage,
-    requested: number | undefined,
-  ): number {
-    const resolution = resolveDepositAmount({
-      coverage,
-      requested,
-      minimum: MIN_ADVANCE_AMOUNT,
-    });
-    if (resolution.ok) return resolution.amount;
-
-    if (resolution.reason === 'AMOUNT_REQUIRED_FOR_FULL_PAYMENT') {
-      throw new BadRequestException({
-        code: APPROVE_DEPOSIT_ERROR_CODES.AMOUNT_REQUIRED,
-        message: 'Para registrar un pago completo debes indicar el monto.',
-      });
+  private requireAmount(amount: number | undefined): number {
+    if (amount === undefined) {
+      throw new AppException('DEPOSIT_AMOUNT_REQUIRED');
     }
-    throw new DomainException({
-      code: APPROVE_DEPOSIT_ERROR_CODES.AMOUNT_BELOW_MINIMUM,
-      message: `El monto no puede ser menor al adelanto mínimo ($${toCop(MIN_ADVANCE_AMOUNT).toLocaleString('es-CO')}).`,
-      minimum: MIN_ADVANCE_AMOUNT,
-      unit: 'THOUSANDS_COP',
-    });
+    return amount;
   }
 
   private resolveConfirmedDeposit(
     latest: DepositRecord | null,
     reservationId: string,
-    adminUserId: string,
-    coverage: DepositCoverage,
+    command: ApproveDepositCommand,
     amount: number,
     tx: Prisma.TransactionClient,
   ): Promise<DepositRecord> {
     if (!latest || latest.status === DepositStatus.RECHAZADO) {
       return this.repository.createConfirmedWithoutProof(
         reservationId,
-        adminUserId,
-        coverage,
+        command.adminUserId,
+        command.coverage,
         amount,
         tx,
       );
@@ -164,8 +191,8 @@ export class ApproveDepositOrchestrator {
     if (latest.status === DepositStatus.PENDIENTE) {
       return this.repository.markConfirmed(
         latest.id,
-        adminUserId,
-        coverage,
+        command.adminUserId,
+        command.coverage,
         amount,
         tx,
       );
@@ -175,8 +202,8 @@ export class ApproveDepositOrchestrator {
       return Promise.resolve(latest);
     }
 
-    throw new DomainException(
-      `Este comprobante ya fue procesado (estado: ${latest.status})`,
-    );
+    throw new AppException('DEPOSIT_NOT_PENDING', {
+      details: { reservationId, depositStatus: latest.status },
+    });
   }
 }

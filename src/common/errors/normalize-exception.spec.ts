@@ -145,16 +145,16 @@ describe('normalizeException', () => {
 
     it('cuerpo legado con code del catálogo: aplana y mueve el resto a details', () => {
       const legacy = new ConflictException({
-        code: 'DEPOSIT_AMOUNT_BELOW_MINIMUM',
+        code: 'RESERVATION_NOT_REVIVABLE',
         message: 'menor al mínimo',
-        minimum: 20,
-        unit: 'THOUSANDS_COP',
+        reservationId: 'r1',
+        comboGroupId: 'c1',
       });
       expect(normalizeException(legacy)).toEqual({
         status: 409,
-        code: 'DEPOSIT_AMOUNT_BELOW_MINIMUM',
+        code: 'RESERVATION_NOT_REVIVABLE',
         message: 'menor al mínimo',
-        details: { minimum: 20, unit: 'THOUSANDS_COP' },
+        details: { reservationId: 'r1', comboGroupId: 'c1' },
       });
     });
 

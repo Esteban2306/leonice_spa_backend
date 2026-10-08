@@ -111,13 +111,13 @@ export class DepositsController {
     @Body() dto: ApproveDepositDto,
     @CurrentUser() user: { id: string },
   ) {
-    return this.approveOrchestrator.execute(
+    return this.approveOrchestrator.execute({
       reservationId,
-      user.id,
-      dto.coverage,
-      dto.amount,
-      dto.scope,
-    );
+      adminUserId: user.id,
+      coverage: dto.coverage,
+      amount: dto.amount,
+      scope: dto.scope,
+    });
   }
 
   @Patch('reject')

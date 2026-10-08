@@ -171,9 +171,14 @@ const DEPOSIT = {
     status: HttpStatus.BAD_REQUEST,
     message: 'Debes indicar el monto que entregó el cliente.',
   },
-  DEPOSIT_AMOUNT_BELOW_MINIMUM: {
+  DEPOSIT_NOT_PENDING: {
     status: HttpStatus.CONFLICT,
-    message: 'El monto no puede ser menor al adelanto mínimo.',
+    message: 'No hay un comprobante pendiente por aprobar en esta reserva.',
+  },
+  DEPOSIT_CONCURRENT_CHANGE: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'El comprobante cambió mientras se aprobaba. Revisa su estado actual.',
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
