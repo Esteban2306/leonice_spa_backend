@@ -9,6 +9,13 @@ import { normalizePhone } from './utils/normalize-phone.util';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { clientsHistoryRepository } from './repositories/client-history.repository';
 import { ConsentService } from './consent/consent.service';
+import { SetHairProfileDto } from './dto/set-hair-profile.dto';
+import {
+  hairProfileExpiryCutoff,
+  toHairProfileView,
+} from './domain/hair-profile.util';
+import { AppException } from '../common/errors/app.exception';
+import { getDayBoundaries } from '../reservations/domain/day-boundaries';
 
 @Injectable()
 export class ClientsService {
@@ -87,7 +94,71 @@ export class ClientsService {
     if (!client) throw new NotFoundException('Cliente no encontrado');
 
     const history = await this.historyRepository.getReservationHistory(id);
-    return { ...client, ...history };
+    return { ...client, hairProfile: toHairProfileView(client), ...history };
+  }
+
+  async setHairProfile(id: string, dto: SetHairProfileDto) {
+    await this.requireClient(id);
+    const updated = await this.repository.setHairProfile(
+      id,
+      { hairLength: dto.hairLength, hairColor: dto.hairColor },
+      new Date(),
+    );
+    return toHairProfileView(updated);
+  }
+
+  async confirmHairProfile(id: string) {
+    await this.requireClient(id);
+    const renewed = await this.repository.renewHairProfileIfComplete(
+      id,
+      new Date(),
+    );
+    if (!renewed) {
+      throw new AppException('HAIR_PROFILE_MISSING', {
+        details: { clientId: id },
+      });
+    }
+    const client = await this.requireClient(id);
+    return toHairProfileView(client);
+  }
+
+  async findPendingHairProfiles(page: number, pageSize: number) {
+    const now = new Date();
+    const { clients, total } = await this.repository.findPendingHairProfiles({
+      upcomingFrom: getDayBoundaries(now).dayStart,
+      expiredBefore: hairProfileExpiryCutoff(now),
+      page,
+      pageSize,
+    });
+
+    return {
+      data: clients.map((client) => ({
+        clientId: client.id,
+        name: client.name,
+        phone: client.phone,
+        hairProfile: toHairProfileView(client, now),
+        nextReservation: client.reservations[0]
+          ? {
+              reservationId: client.reservations[0].id,
+              scheduledStart: client.reservations[0].scheduledStart,
+              status: client.reservations[0].status,
+              treatment: client.reservations[0].treatment.name,
+            }
+          : null,
+      })),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
+  }
+
+  private async requireClient(id: string) {
+    const client = await this.repository.findById(id);
+    if (!client) throw new NotFoundException('Cliente no encontrado');
+    return client;
   }
 
   async update(id: string, dto: UpdateClientDto) {

@@ -156,6 +156,14 @@ const RESERVATION = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const CLIENT = {
+  HAIR_PROFILE_MISSING: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'El cliente no tiene perfil capilar registrado. Regístralo antes de confirmarlo.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 const DEPOSIT = {
   DEPOSIT_AMOUNT_REQUIRED: {
     status: HttpStatus.BAD_REQUEST,
@@ -176,6 +184,7 @@ export const ERROR_CATALOG = {
   ...GENERIC,
   ...PLACEMENT,
   ...RESERVATION,
+  ...CLIENT,
   ...DEPOSIT,
 } as const;
 

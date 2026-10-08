@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { Client } from '@prisma/client';
+import type { Client, HairColor, HairLength } from '@prisma/client';
+import { ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EncryptionService } from '../../infrastructure/encryption/encryption.service';
 import {
@@ -179,6 +180,84 @@ export class ClientsRepository {
       },
     });
     return this.decryptSensitive(client);
+  }
+
+  async setHairProfile(
+    id: string,
+    profile: { hairLength: HairLength; hairColor: HairColor },
+    at: Date,
+  ) {
+    const client = await this.prisma.client.client.update({
+      where: { id },
+      data: { ...profile, hairProfileUpdatedAt: at },
+    });
+    return this.decryptSensitive(client);
+  }
+
+  async renewHairProfileIfComplete(id: string, at: Date): Promise<boolean> {
+    const result = await this.prisma.client.client.updateMany({
+      where: { id, hairLength: { not: null }, hairColor: { not: null } },
+      data: { hairProfileUpdatedAt: at },
+    });
+    return result.count === 1;
+  }
+
+  async findPendingHairProfiles(params: {
+    upcomingFrom: Date;
+    expiredBefore: Date;
+    page: number;
+    pageSize: number;
+  }) {
+    const upcomingHairReservation = {
+      status: {
+        in: [
+          ReservationStatus.PENDIENTE_DEPOSITO,
+          ReservationStatus.CONFIRMADA,
+        ],
+      },
+      scheduledStart: { gte: params.upcomingFrom },
+      category: { tracksHairProfile: true },
+    };
+    const where = {
+      reservations: { some: upcomingHairReservation },
+      OR: [
+        { hairLength: null },
+        { hairColor: null },
+        { hairProfileUpdatedAt: null },
+        { hairProfileUpdatedAt: { lt: params.expiredBefore } },
+      ],
+    };
+
+    const [clients, total] = await this.prisma.client.$transaction([
+      this.prisma.client.client.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          hairLength: true,
+          hairColor: true,
+          hairProfileUpdatedAt: true,
+          reservations: {
+            where: upcomingHairReservation,
+            orderBy: { scheduledStart: 'asc' },
+            take: 1,
+            select: {
+              id: true,
+              scheduledStart: true,
+              status: true,
+              treatment: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.client.client.count({ where }),
+    ]);
+
+    return { clients, total };
   }
 
   private decryptSensitive<T extends DecryptableClient>(client: T): T {
