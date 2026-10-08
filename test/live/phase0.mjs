@@ -27,9 +27,9 @@ function storeCookies(res) {
   }
 }
 let isolateThrottle = false; // la sonda de rate limit lo desactiva
-async function api(method, path, body) {
+async function api(method, path, body, extraHeaders = {}) {
   if (isolateThrottle) resetThrottle();
-  const headers = { 'content-type': 'application/json' };
+  const headers = { 'content-type': 'application/json', ...extraHeaders };
   if (jar.size) headers.cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
   if (method !== 'GET' && jar.has('csrf_token')) headers['x-csrf-token'] = jar.get('csrf_token');
   const res = await fetch(BASE + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -37,7 +37,7 @@ async function api(method, path, body) {
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch { json = text; }
-  return { status: res.status, body: json };
+  return { status: res.status, body: json, headers: res.headers };
 }
 function resetThrottle() {
   const keys = execFileSync('docker', ['exec', 'leonice-redis', 'redis-cli', '--scan', '--pattern', '{*'], { encoding: 'utf8' })
@@ -123,6 +123,20 @@ const depositClock = (id) => {
     `select ${iso('deposit_clock_started_at')}, ${iso('deposit_expires_at')}, ${iso('scheduled_start')} from reservations where id='${id}'`,
   ).split('|');
   return { clock: new Date(clock), expires: new Date(expires), start: new Date(start) };
+};
+
+const envValue = (name) =>
+  readFileSync(BACKEND + '.env', 'utf8').split('\n').find((l) => l.startsWith(`${name}=`))?.slice(name.length + 1).trim();
+const toolHeaders = () => ({ 'x-api-key': envValue('CONDUIT_TOOL_API_KEY') });
+async function enqueueSweep(name) {
+  const { Queue } = require('bullmq');
+  const q = new Queue('reservation-timeouts', { connection: { host: 'localhost', port: 6379 } });
+  await q.add(name, {});
+  await q.close();
+}
+const todayAt = (hour) => {
+  const d = new Date(Date.now() - 5 * 3_600_000);
+  return `${d.toISOString().slice(0, 10)}T${String(hour).padStart(2, '0')}:00:00-05:00`;
 };
 
 const scenarios = {
@@ -466,7 +480,7 @@ const scenarios = {
     r = await api('POST', '/admin/schedule/exceptions', { date: '2026-01-05', type: 'BLOCK' });
     eq('SC6 día pasado → SCHEDULE_EXCEPTION_IN_THE_PAST', errCode(r), 'SCHEDULE_EXCEPTION_IN_THE_PAST');
     r = await api('POST', '/admin/schedule/exceptions', { date: '2026-02-30', type: 'BLOCK' });
-    eq('SC6 fecha inexistente → BAD_REQUEST', errCode(r), 'BAD_REQUEST');
+    eq('SC6 fecha inexistente → VALIDATION_FAILED (rechazada por @IsCalendarDate)', errCode(r), 'VALIDATION_FAILED');
 
     const listed = await api('GET', '/admin/schedule/exceptions?from=2026-12-21&to=2026-12-24');
     eq('SC7 lista las excepciones vigentes del rango', listed.body?.length, created.length);
@@ -521,8 +535,223 @@ const scenarios = {
     await api('PATCH', `/reservations/${id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 4' });
     eq('DX6 limpieza: sin excepciones', sql('select count(*) from schedule_exceptions'), '0');
   },
-};
 
+  async dates() {
+    const phone = newPhone();
+    let r = await api('POST', '/reservations', {
+      client: { phone, name: `QA Fase5 ${phone}`, birthDate: '1990-01-01' },
+      treatments: [QA_TREATMENT],
+      scheduledStart: '2026-12-21T08:00:00',
+    });
+    eq('DT1 instante sin zona → VALIDATION_FAILED', errCode(r), 'VALIDATION_FAILED');
+    r = await api('POST', '/reservations', {
+      client: { phone, name: `QA Fase5 ${phone}`, birthDate: '1990-02-30' },
+      treatments: [QA_TREATMENT],
+      scheduledStart: at('21', '08'),
+    });
+    eq('DT2 fecha de nacimiento inexistente → VALIDATION_FAILED', errCode(r), 'VALIDATION_FAILED');
+    r = await api('GET', `/reservations/availability?treatmentId=${QA_TREATMENT}&date=2026-12-21T10:00:00Z`);
+    eq('DT3 availability con timestamp en vez de fecha → VALIDATION_FAILED', errCode(r), 'VALIDATION_FAILED');
+    r = await api('GET', `/reservations/availability?treatmentId=${QA_TREATMENT}&date=2026-12-21`);
+    eq('DT4 availability con fecha de calendario → 200', r.status, 200);
+    r = await book(phone, [QA_TREATMENT], at('21', '08'));
+    eq('DT5 reserva con instante con zona → 201', r.status, 201);
+    const clientId = sql(`select client_id from reservations where id='${r.body?.reservations?.[0]?.id}'`);
+    eq('DT6 birth_date guardada como DATE sin corrimiento', sql(`select birth_date::text from clients where id='${clientId}'`), '1990-01-01');
+    await api('PATCH', `/reservations/${r.body.reservations[0].id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' });
+  },
+
+  async crm() {
+    const phone = newPhone();
+    const b = await book(phone, [QA_TREATMENT], at('21', '09'));
+    const id = b.body?.reservations?.[0]?.id;
+    const clientId = sql(`select client_id from reservations where id='${id}'`);
+    let r = await api('GET', `/clients/${clientId}`);
+    eq('CRM1 detalle → 200', r.status, 200);
+    eq('CRM1 birthDate como fecha de calendario', r.body?.birthDate, '1990-01-01');
+    check('CRM1 no expone creditBalance', r.body && !('creditBalance' in r.body));
+    eq('CRM1 stats.upcoming cuenta la cita', r.body?.stats?.upcoming, 1);
+    eq('CRM1 reservas resumidas (tratamiento plano)', r.body?.reservations?.[0]?.treatment, 'Tratamiento de Prueba');
+    r = await api('GET', '/clients/no-es-uuid');
+    eq('CRM2 id inválido → BAD_REQUEST (mismo contrato que el resto de :id)', errCode(r), 'BAD_REQUEST');
+    r = await api('GET', '/clients/00000000-0000-4000-8000-000000000000');
+    eq('CRM3 cliente inexistente → CLIENT_NOT_FOUND', errCode(r), 'CLIENT_NOT_FOUND');
+    r = await api('GET', '/clients?q=a');
+    eq('CRM4 búsqueda corta → CLIENT_SEARCH_TOO_SHORT', errCode(r), 'CLIENT_SEARCH_TOO_SHORT');
+    r = await api('GET', `/clients?q=${encodeURIComponent(phone.slice(-6))}`);
+    check('CRM5 búsqueda por dígitos del teléfono encuentra al cliente', r.body?.data?.some((c) => c.id === clientId), `total=${r.body?.pagination?.total}`);
+    r = await api('PATCH', `/clients/${clientId}`, { allergies: 'polen' });
+    eq('CRM6 alergias sin consentimiento → CLIENT_HEALTH_CONSENT_REQUIRED', errCode(r), 'CLIENT_HEALTH_CONSENT_REQUIRED');
+    r = await api('PATCH', `/clients/${clientId}`, { name: '  QA   Fase5  Nombre ' });
+    eq('CRM7 nombre normalizado al actualizar', r.body?.name, 'QA Fase5 Nombre');
+    await api('PATCH', `/reservations/${id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' });
+  },
+
+  async idempotency() {
+    const phone = newPhone();
+    const payload = { client: { phone, name: `QA Fase5 ${phone}`, birthDate: '1990-01-01' }, treatments: [QA_TREATMENT], scheduledStart: at('22', '08') };
+    const key = `qa-idem-${RUN}-${phoneSeq}`;
+    const first = await api('POST', '/reservations', payload, { 'idempotency-key': key });
+    eq('ID1 primera petición → 201', first.status, 201);
+    const again = await api('POST', '/reservations', payload, { 'idempotency-key': key });
+    eq('ID2 repetir → misma reserva', again.body?.reservations?.[0]?.id, first.body?.reservations?.[0]?.id);
+    eq('ID2 marca Idempotent-Replayed', again.headers.get('idempotent-replayed'), 'true');
+    eq('ID2 una sola reserva en BD', sql(`select count(*) from reservations r join clients c on c.id=r.client_id where c.phone='${phone}'`), '1');
+    const reused = await api('POST', '/reservations', { ...payload, scheduledStart: at('22', '09') }, { 'idempotency-key': key });
+    eq('ID3 misma clave con otro cuerpo → IDEMPOTENCY_KEY_REUSED', errCode(reused), 'IDEMPOTENCY_KEY_REUSED');
+    const bad = await api('POST', '/reservations', payload, { 'idempotency-key': 'x' });
+    eq('ID4 clave inválida → IDEMPOTENCY_KEY_INVALID', errCode(bad), 'IDEMPOTENCY_KEY_INVALID');
+    const phone2 = newPhone();
+    const payload2 = { ...payload, client: { ...payload.client, phone: phone2, name: `QA Fase5 ${phone2}` }, scheduledStart: at('22', '10') };
+    const key2 = `qa-idem-par-${RUN}`;
+    const parallel = await Promise.all([1, 2, 3].map(() => api('POST', '/reservations', payload2, { 'idempotency-key': key2 })));
+    const statuses = parallel.map((p) => p.status).sort();
+    eq('ID5 3 peticiones simultáneas con la misma clave crean UNA reserva', sql(`select count(*) from reservations r join clients c on c.id=r.client_id where c.phone='${phone2}'`), '1');
+    check('ID5 las duplicadas reciben 409 IN_PROGRESS o la repetición', statuses.filter((s) => s === 201).length >= 1 && parallel.every((p) => p.status === 201 || errCode(p) === 'IDEMPOTENCY_IN_PROGRESS'), statuses.join(','));
+    const adminKey = `qa-idem-adm-${RUN}`;
+    const id = first.body.reservations[0].id;
+    const c1 = await api('PATCH', `/reservations/${id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' }, { 'idempotency-key': adminKey });
+    const c2 = await api('PATCH', `/reservations/${id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' }, { 'idempotency-key': adminKey });
+    eq('ID6 cancelación admin repetida con la clave → misma respuesta 200', `${c1.status}/${c2.status}`, '200/200');
+    await api('PATCH', `/reservations/${parallel.find((p) => p.status === 201)?.body?.reservations?.[0]?.id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' });
+  },
+
+  async checkInAndNoShow() {
+    const id = (await scenarios.approve(20));
+    let r = await api('PATCH', `/reservations/${id}/check-in`);
+    eq('CI1 check-in de una cita futura → RESERVATION_CHECK_IN_NOT_TODAY', errCode(r), 'RESERVATION_CHECK_IN_NOT_TODAY');
+    const later = new Date(Date.now() + 60 * 60_000).toISOString();
+    sql(`update reservations set scheduled_start='${later}', scheduled_end=timestamp '${later}' + interval '1 hour' where id='${id}'`);
+    const sameDay = sql(`select (scheduled_start at time zone 'UTC' at time zone 'America/Bogota')::date = (now() at time zone 'America/Bogota')::date from reservations where id='${id}'`);
+    if (sameDay === 't') {
+      r = await api('PATCH', `/reservations/${id}/check-in`);
+      eq('CI2 check-in el mismo día → CITA_EN_CURSO', r.body?.status, 'CITA_EN_CURSO');
+      r = await api('PATCH', `/reservations/${id}/check-in`);
+      eq('CI3 repetir check-in es idempotente (200)', r.status, 200);
+      r = await api('PATCH', `/reservations/${id}/complete`);
+      const r2 = await api('PATCH', `/reservations/${id}/complete`);
+      eq('CI4 completar dos veces es idempotente', `${r.status}/${r2.status}`, '200/200');
+    } else {
+      check('CI2-CI4 omitidos: falta menos de 1 h para medianoche', true);
+    }
+
+    const ns = await scenarios.approve(20);
+    const past = new Date(Date.now() - 60 * 60_000).toISOString();
+    sql(`update reservations set scheduled_start='${past}', scheduled_end=timestamp '${past}' + interval '1 hour' where id='${ns}'`);
+    await enqueueSweep('no-show-sweep');
+    const marked = await waitFor('barrido no-show', () => reservationRow(ns).status === 'NO_SHOW', 20_000, 1000);
+    check('NS1 el barrido marca NO_SHOW una cita confirmada sin check-in pasada la gracia', Boolean(marked), reservationRow(ns).status);
+    const old = await scenarios.approve(20);
+    sql(`update reservations set scheduled_start=now() - interval '8 days', scheduled_end=now() - interval '8 days' + interval '1 hour' where id='${old}'`);
+    await enqueueSweep('no-show-sweep');
+    await sleep(4000);
+    eq('NS2 el barrido no toca citas de hace más de 7 días', reservationRow(old).status, 'CONFIRMADA');
+    await api('PATCH', `/reservations/${old}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' });
+  },
+
+  async clientCancel() {
+    const phone = newPhone();
+    const t0 = new Date().toISOString();
+    const combo = await book(phone, [QA_TREATMENT, NAILS_TREATMENT], at('23', '08'));
+    eq('CC0 combo creado', combo.status, 201);
+    const [a, b] = combo.body.reservations.map((x) => x.id);
+    let r = await api('PATCH', `/reservations/${a}/cancel`, { phone: '+999000000001', scope: 'SINGLE' });
+    eq('CC1 teléfono ajeno → RESERVATION_NOT_OWNED', errCode(r), 'RESERVATION_NOT_OWNED');
+    r = await api('PATCH', `/reservations/${a}/cancel`, { phone, scope: 'SINGLE', reason: 'QA fase 5' });
+    eq('CC2 cancelar un tratamiento → 200', r.status, 200);
+    eq('CC2 cancela solo ese', JSON.stringify(r.body?.cancelled?.map((x) => x.reservationId)), JSON.stringify([a]));
+    eq('CC2 el otro sigue vivo', reservationRow(b).status, 'PENDIENTE_DEPOSITO');
+    r = await api('PATCH', `/reservations/${a}/cancel`, { phone, scope: 'SINGLE' });
+    eq('CC3 repetir es idempotente (alreadyCancelled)', JSON.stringify(r.body?.alreadyCancelled?.map((x) => x.reservationId)), JSON.stringify([a]));
+    r = await api('PATCH', `/reservations/${b}/cancel`, { phone, scope: 'DAY' });
+    eq('CC4 cancelar el día cancela lo que quedaba', JSON.stringify(r.body?.cancelled?.map((x) => x.reservationId)), JSON.stringify([b]));
+    eq('CC4 ambas canceladas por el cliente', `${reservationRow(a).source}/${reservationRow(b).source}`, 'CLIENT/CLIENT');
+    await sleep(8000);
+    const msgs = sinkSince(t0).filter((e) => e.url === '/api/v1/messages');
+    check('CC5 confirmación al cliente enviada', msgs.some((m) => m.body?.template?.id === 'qa-client-cancellation-confirmed' && m.body?.recipient?.address === phone), msgs.map((m) => m.body?.template?.id).join(','));
+    check('CC5 aviso al admin enviado', msgs.some((m) => m.body?.template?.id === 'qa-admin-client-cancelled'), msgs.map((m) => m.body?.template?.id).join(','));
+
+    const p2 = newPhone();
+    const one = await book(p2, [QA_TREATMENT], at('23', '10'));
+    const started = one.body.reservations[0].id;
+    sql(`update reservations set scheduled_start=now() - interval '1 minute' where id='${started}'`);
+    r = await api('PATCH', `/reservations/${started}/cancel`, { phone: p2 });
+    eq('CC6 cita ya empezada → RESERVATION_CANCEL_TOO_LATE', errCode(r), 'RESERVATION_CANCEL_TOO_LATE');
+    await api('PATCH', `/reservations/${started}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' });
+  },
+
+  async cancellationLink() {
+    const phone = newPhone();
+    const t0 = new Date().toISOString();
+    const combo = await book(phone, [QA_TREATMENT, NAILS_TREATMENT], at('24', '08'));
+    const [a, b] = combo.body.reservations.map((x) => x.id);
+    let r = await api('POST', `/reservations/${a}/cancellation-link`, { send: true });
+    eq('LK1 admin emite enlace → 201', r.status, 201);
+    const url = r.body?.url ?? '';
+    const token = url.split('/').pop();
+    check('LK1 url apunta a /cancelar/<token>', /\/cancelar\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(url), url.replace(/\/[^/]+$/, '/<token>'));
+    const pub = (method, path, body) => fetch(`${BASE}${path}`, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (res) => ({ status: res.status, body: await res.json().catch(() => null) }));
+    r = await pub('GET', `/cancellation-links/${token}`);
+    eq('LK2 la página pública lista las 2 citas del día', r.body?.reservations?.length, 2);
+    check('LK2 sin teléfono en la respuesta pública', !JSON.stringify(r.body).includes(phone));
+    const [payload, sig] = token.split('.');
+    r = await pub('POST', `/cancellation-links/${payload}.${sig.slice(0, -2)}AA/cancel`, { scope: 'DAY' });
+    eq('LK3 token alterado → CANCELLATION_LINK_INVALID', r.body?.code, 'CANCELLATION_LINK_INVALID');
+    const other = await book(newPhone(), [QA_TREATMENT], at('24', '10'));
+    r = await pub('POST', `/cancellation-links/${token}/cancel`, { scope: 'SINGLE', reservationId: other.body.reservations[0].id });
+    eq('LK4 el enlace no sirve para la reserva de otro cliente', r.body?.code, 'RESERVATION_NOT_OWNED');
+    r = await pub('POST', `/cancellation-links/${token}/cancel`, { scope: 'DAY', reason: 'QA enlace' });
+    eq('LK5 cancelar el día desde el enlace → 200', r.status, 200);
+    eq('LK5 canceló las dos', r.body?.cancelled?.length, 2);
+    eq('LK5 origen CLIENT', `${reservationRow(a).source}/${reservationRow(b).source}`, 'CLIENT/CLIENT');
+    await sleep(8000);
+    const msgs = sinkSince(t0).filter((e) => e.url === '/api/v1/messages');
+    const link = msgs.find((m) => m.body?.template?.id === 'qa-client-cancellation-link');
+    check('LK6 plantilla con enlace enviada al cliente', link?.body?.variables?.enlace === url, link ? 'enviada' : msgs.map((m) => m.body?.template?.id).join(','));
+    await api('PATCH', `/reservations/${other.body.reservations[0].id}/admin-cancel`, { notifyClient: false, reason: 'QA fase 5' });
+  },
+
+  async conduitCancel() {
+    const phone = newPhone();
+    const combo = await book(phone, [QA_TREATMENT, NAILS_TREATMENT], at('28', '08'));
+    const [a, b] = combo.body.reservations.map((x) => x.id);
+    let r = await api('GET', `/conduit/booking/reservations/upcoming?phone=${encodeURIComponent(phone)}`, undefined, toolHeaders());
+    eq('CT1 reservas_proximas agrupa el combo en un día', r.body?.days?.[0]?.reservations?.length, 2);
+    r = await api('GET', `/conduit/booking/reservations/upcoming?phone=${encodeURIComponent(phone)}`);
+    check('CT2 sin X-API-Key → rechazado', r.status === 401 || r.status === 403, String(r.status));
+    const key = `qa-ct-${RUN}`;
+    r = await api('POST', '/conduit/booking/reservations/cancel', { phone, reservationId: a, scope: 'DAY' }, { ...toolHeaders(), 'idempotency-key': key });
+    eq('CT3 cancelar_reserva_whatsapp DAY → 200', r.status, 200);
+    eq('CT3 canceló el combo completo', r.body?.cancelled?.length, 2);
+    const again = await api('POST', '/conduit/booking/reservations/cancel', { phone, reservationId: a, scope: 'DAY' }, { ...toolHeaders(), 'idempotency-key': key });
+    eq('CT4 reintento del bot con la misma clave repite la respuesta', again.headers.get('idempotent-replayed'), 'true');
+    eq('CT4 sigue habiendo 2 canceladas (no duplica eventos)', sql(`select count(*) from reservations where id in ('${a}','${b}') and status='CANCELADA'`), '2');
+  },
+
+  async creditAfterClientCancel() {
+    const phone = newPhone();
+    const combo = await book(phone, [QA_TREATMENT, NAILS_TREATMENT], at('29', '08'));
+    const [a, b] = combo.body.reservations.map((x) => x.id);
+    const clientId = sql(`select client_id from reservations where id='${a}'`);
+    sql(`insert into deposit_records (id, reservation_id, status, method, image_url, created_at, updated_at)
+         values (gen_random_uuid()::text, '${a}', 'PENDIENTE', 'MANUAL', 'https://example.invalid/qa-proof.png', now(), now())`);
+    let r = await api('PATCH', `/reservations/${a}/deposits/approve`, { coverage: 'ANTICIPO', amount: 60 });
+    eq('CR1 aprobar depósito del combo → 200', r.status, 200);
+    await api('PATCH', `/reservations/${a}/cancel`, { phone, scope: 'SINGLE' });
+    let credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('CR2 cancelar un tratamiento NO libera crédito (la otra fila sigue viva)', credits.body?.credits?.length, 0);
+    await api('PATCH', `/reservations/${b}/cancel`, { phone, scope: 'DAY' });
+    credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('CR3 cancelado el día completo, el depósito es crédito por 60', String(credits.body?.credits?.[0]?.amount), '60');
+    const nb = await book(phone, [QA_TREATMENT], at('30', '08'));
+    eq('CR4 nueva reserva usa el crédito', JSON.stringify(nb.body?.creditAppliedReservationIds), JSON.stringify([nb.body?.reservations?.[0]?.id]));
+    credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('CR5 el crédito ya no está disponible tras aplicarse', credits.body?.credits?.length, 0);
+    r = await api('PATCH', `/reservations/${nb.body.reservations[0].id}/cancel`, { phone, scope: 'SINGLE' });
+    credits = await api('GET', `/deposits/credits?clientId=${clientId}`);
+    eq('CR6 si se cancela la reserva que lo usó, el crédito vuelve a estar disponible', String(credits.body?.credits?.[0]?.amount), '60');
+  },
+};
 const wanted = process.argv.slice(2);
 await login();
 for (const name of wanted.length ? wanted : Object.keys(scenarios)) {
