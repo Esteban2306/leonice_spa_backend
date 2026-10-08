@@ -57,6 +57,7 @@ export class DepositCreditService {
         appliedToReservationId: true,
         appliedToReservation: { select: { status: true, comboGroupId: true } },
         reservation: { select: { status: true } },
+        coveredReservations: { select: { status: true } },
       },
     });
 
@@ -70,6 +71,7 @@ export class DepositCreditService {
         status: row.status,
         hasProofImage: row.imageUrl !== null,
         originStatus: row.reservation.status,
+        coveredStatuses: row.coveredReservations.map((r) => r.status),
         appliedToReservationId: row.appliedToReservationId,
         appliedToStatus: destination
           ? await this.resolveEffectiveStatus(destination, client)

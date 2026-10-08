@@ -15,6 +15,7 @@ const make = (
   status: DepositStatus.CONFIRMADO,
   hasProofImage: true,
   originStatus: ReservationStatus.CANCELADA,
+  coveredStatuses: [],
   appliedToReservationId: null,
   appliedToStatus: null,
   confirmedAt: new Date('2026-10-01T10:00:00Z'),
@@ -24,6 +25,25 @@ const make = (
 const ids = (list: CreditCandidate[]) => list.map((c) => c.depositId);
 
 describe('selectAvailableCredits', () => {
+  it('un depósito de grupo no es crédito mientras alguna fila cubierta siga viva', () => {
+    const groupDeposit = make({
+      depositId: 'g',
+      coveredStatuses: [
+        ReservationStatus.CANCELADA,
+        ReservationStatus.CONFIRMADA,
+      ],
+    });
+    expect(ids(selectAvailableCredits([groupDeposit], MIN))).toEqual([]);
+  });
+
+  it('un depósito de grupo es crédito cuando todas sus filas están canceladas o no-show', () => {
+    const groupDeposit = make({
+      depositId: 'g',
+      coveredStatuses: [ReservationStatus.CANCELADA, ReservationStatus.NO_SHOW],
+    });
+    expect(ids(selectAvailableCredits([groupDeposit], MIN))).toEqual(['g']);
+  });
+
   it('acepta un depósito confirmado con imagen de una reserva cancelada', () => {
     expect(
       ids(selectAvailableCredits([make({ depositId: 'a' })], MIN)),

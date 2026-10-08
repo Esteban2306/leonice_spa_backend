@@ -17,6 +17,7 @@ export interface CreditCandidate {
   status: DepositStatus;
   hasProofImage: boolean;
   originStatus: ReservationStatus;
+  coveredStatuses: readonly ReservationStatus[];
   appliedToReservationId: string | null;
   appliedToStatus: ReservationStatus | null;
   confirmedAt: Date;
@@ -30,6 +31,10 @@ export function isCreditAvailable(
   if (!candidate.hasProofImage) return false;
   if (candidate.amount === null || candidate.amount < minAmount) return false;
   if (!CREDIT_ORIGIN_STATUSES.includes(candidate.originStatus)) return false;
+  if (
+    !candidate.coveredStatuses.every((s) => CREDIT_ORIGIN_STATUSES.includes(s))
+  )
+    return false;
 
   if (candidate.appliedToReservationId === null) return true;
   return (
