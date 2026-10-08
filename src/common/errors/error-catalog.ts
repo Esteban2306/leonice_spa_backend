@@ -195,6 +195,10 @@ const CLIENT = {
     status: HttpStatus.NOT_FOUND,
     message: 'El cliente no existe.',
   },
+  CLIENT_ALREADY_EXISTS: {
+    status: HttpStatus.CONFLICT,
+    message: 'Ya existe un cliente con ese teléfono.',
+  },
   CLIENT_REQUIRED_FIELDS: {
     status: HttpStatus.BAD_REQUEST,
     message:

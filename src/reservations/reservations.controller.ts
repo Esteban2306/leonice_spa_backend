@@ -11,6 +11,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { ReservationsService } from './reservations.service';
 import { GetAvailabilityDto } from './dto/get-availability.dto';
+import { GetAvailabilityCalendarDto } from './dto/get-availability-calendar.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CancelReservationDto } from './dto/cancel-reservation.dto';
 import { RescheduleReservationDto } from './dto/reschedule-reservation.dto';
@@ -66,6 +67,11 @@ export class ReservationsController {
       query.date,
     );
     return { treatmentId: query.treatmentId, date: query.date, slots };
+  }
+
+  @Get('availability/calendar')
+  getAvailabilityCalendar(@Query() query: GetAvailabilityCalendarDto) {
+    return this.reservationsService.getAvailabilityCalendar(query);
   }
 
   @Get(':id')
