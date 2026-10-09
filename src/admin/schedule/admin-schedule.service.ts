@@ -25,8 +25,24 @@ import {
   formatTimeOfDay,
   parseTimeOfDay,
 } from '../../reservations/domain/schedule-time';
+import {
+  describeWeeklyScheduleIssue,
+  normalizeWeeklySchedule,
+} from '../../reservations/domain/weekly-schedule';
 import { CreateScheduleExceptionDto } from './dto/create-schedule-exception.dto';
+import { UpdateBaseScheduleDto } from './dto/update-base-schedule.dto';
 import { FindScheduleExceptionsQueryDto } from './dto/find-schedule-exceptions-query.dto';
+
+interface LiveReservation {
+  id: string;
+  categoryId: string;
+  status: string;
+  scheduledStart: Date;
+  scheduledEnd: Date;
+  client: { id: string; name: string; phone: string };
+  treatment: { name: string };
+  category: { name: string };
+}
 
 interface ExceptionRecord {
   id: string;
@@ -59,6 +75,66 @@ export class AdminScheduleService {
       startTime: formatTimeOfDay(w.startMinute),
       endTime: formatTimeOfDay(w.endMinute),
     }));
+  }
+
+  async updateBaseSchedule(dto: UpdateBaseScheduleDto) {
+    const { windows, issues } = normalizeWeeklySchedule(dto.days);
+    if (issues.length > 0) {
+      throw new AppException('SCHEDULE_BASE_INVALID', {
+        message: issues.map(describeWeeklyScheduleIssue).join(' '),
+        details: { issues },
+      });
+    }
+
+    const now = new Date();
+    const extended = await this.repository.withBaseScheduleLock(async (tx) => {
+      const live = await this.repository.findLiveReservationsFrom(now, tx);
+      const byDay = new Map<string, LiveReservation[]>();
+      for (const reservation of live) {
+        const dayKey = getCalendarDayKey(reservation.scheduledStart);
+        byDay.set(dayKey, [...(byDay.get(dayKey) ?? []), reservation]);
+      }
+
+      const displaced: LiveReservation[] = [];
+      for (const [dayKey, reservations] of byDay) {
+        const date = new Date(`${dayKey}T00:00:00`);
+        const current = await this.operatingSchedule.loadDaySchedule(date, tx);
+        const proposed: DaySchedule = { ...current, base: windows };
+        displaced.push(
+          ...this.findDisplaced(date, reservations, current, proposed),
+        );
+      }
+
+      if (displaced.length > 0) {
+        throw new AppException('SCHEDULE_CHANGE_HAS_RESERVATIONS', {
+          message: `Hay ${displaced.length} reserva(s) que quedarían fuera del nuevo horario semanal. Reprográmalas o cancélalas y vuelve a intentarlo.`,
+          details: {
+            resolution: ['RESCHEDULE', 'CANCEL'],
+            reservations: displaced.map((r) => this.toConflictView(r)),
+          },
+        });
+      }
+
+      await this.repository.replaceWeeklyWindows(windows, tx);
+      return this.depositDeadline.extendForBaseScheduleChange(now, tx);
+    });
+
+    await Promise.all(
+      extended.map((e) =>
+        this.depositDeadline.scheduleTimeout(
+          e.reservationId,
+          e.depositExpiresAt,
+        ),
+      ),
+    );
+    this.logger.log(
+      `Horario semanal actualizado (${windows.length} franjas); plazos de depósito extendidos: ${extended.length}`,
+    );
+
+    return {
+      base: await this.getBaseSchedule(),
+      depositDeadlinesExtended: extended,
+    };
   }
 
   async listExceptions(query: FindScheduleExceptionsQueryDto) {
@@ -225,7 +301,28 @@ export class AdminScheduleService {
       tx,
     );
 
-    const displaced = categoryIds.flatMap((categoryId) => {
+    const displaced = this.findDisplaced(date, reservations, current, proposed);
+
+    if (displaced.length === 0) return;
+
+    throw new AppException('SCHEDULE_CHANGE_HAS_RESERVATIONS', {
+      message: `Hay ${displaced.length} reserva(s) dentro del horario que quieres cerrar el ${getCalendarDayKey(date)}. Reprográmalas o cancélalas y vuelve a intentarlo.`,
+      details: {
+        date: getCalendarDayKey(date),
+        resolution: ['RESCHEDULE', 'CANCEL'],
+        reservations: displaced.map((r) => this.toConflictView(r)),
+      },
+    });
+  }
+
+  private findDisplaced<T extends LiveReservation>(
+    date: Date,
+    reservations: readonly T[],
+    current: DaySchedule,
+    proposed: DaySchedule,
+  ): T[] {
+    const categoryIds = [...new Set(reservations.map((r) => r.categoryId))];
+    return categoryIds.flatMap((categoryId) => {
       const own = reservations.filter((r) => r.categoryId === categoryId);
       const outsideNow = new Set(
         findIntervalsOutsideWindows(
@@ -238,27 +335,20 @@ export class AdminScheduleService {
         getOperatingWindowsForDate(date, proposed, categoryId),
       ).filter((r) => !outsideNow.has(r.id));
     });
+  }
 
-    if (displaced.length === 0) return;
-
-    throw new AppException('SCHEDULE_CHANGE_HAS_RESERVATIONS', {
-      message: `Hay ${displaced.length} reserva(s) dentro del horario que quieres cerrar el ${getCalendarDayKey(date)}. Reprográmalas o cancélalas y vuelve a intentarlo.`,
-      details: {
-        date: getCalendarDayKey(date),
-        resolution: ['RESCHEDULE', 'CANCEL'],
-        reservations: displaced.map((r) => ({
-          reservationId: r.id,
-          status: r.status,
-          clientId: r.client.id,
-          clientName: r.client.name,
-          clientPhone: r.client.phone,
-          treatment: r.treatment.name,
-          category: r.category.name,
-          scheduledStart: r.scheduledStart,
-          scheduledEnd: r.scheduledEnd,
-        })),
-      },
-    });
+  private toConflictView(r: LiveReservation) {
+    return {
+      reservationId: r.id,
+      status: r.status,
+      clientId: r.client.id,
+      clientName: r.client.name,
+      clientPhone: r.client.phone,
+      treatment: r.treatment.name,
+      category: r.category.name,
+      scheduledStart: r.scheduledStart,
+      scheduledEnd: r.scheduledEnd,
+    };
   }
 
   private async afterScheduleChange(

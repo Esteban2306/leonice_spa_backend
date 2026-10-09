@@ -19,6 +19,8 @@ import { ReservationsRepository } from '../repositories/reservations.repository'
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 
+const BASE_CHANGE_LOOKAHEAD_MS = 365 * 24 * 60 * 60 * 1000;
+
 export interface ExtendedDepositDeadline {
   reservationId: string;
   depositExpiresAt: Date;
@@ -71,9 +73,26 @@ export class DepositDeadlineService {
     client: PrismaClientOrTx,
   ): Promise<ExtendedDepositDeadline[]> {
     const { dayStart, dayEnd } = getDayBoundaries(date);
+    return this.extendRunningDuring({ from: dayStart, until: dayEnd }, client);
+  }
+
+  async extendForBaseScheduleChange(
+    now: Date,
+    client: PrismaClientOrTx,
+  ): Promise<ExtendedDepositDeadline[]> {
+    return this.extendRunningDuring(
+      { from: now, until: new Date(now.getTime() + BASE_CHANGE_LOOKAHEAD_MS) },
+      client,
+    );
+  }
+
+  private async extendRunningDuring(
+    range: { from: Date; until: Date },
+    client: PrismaClientOrTx,
+  ): Promise<ExtendedDepositDeadline[]> {
     const running =
       await this.reservationsRepository.findDepositDeadlinesRunningDuring(
-        { from: dayStart, until: dayEnd },
+        range,
         client,
       );
 

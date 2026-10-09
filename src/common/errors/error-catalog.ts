@@ -230,6 +230,10 @@ const SCHEDULE = {
     status: HttpStatus.CONFLICT,
     message: 'No se puede modificar el horario de un día que ya pasó.',
   },
+  SCHEDULE_BASE_INVALID: {
+    status: HttpStatus.BAD_REQUEST,
+    message: 'El horario semanal tiene franjas inválidas o cruzadas.',
+  },
   SCHEDULE_CHANGE_HAS_RESERVATIONS: {
     status: HttpStatus.CONFLICT,
     message:

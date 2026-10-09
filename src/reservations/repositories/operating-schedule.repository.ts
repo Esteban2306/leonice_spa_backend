@@ -16,6 +16,8 @@ export const LIVE_RESERVATION_STATUSES: readonly ReservationStatus[] = [
   ReservationStatus.CITA_EN_CURSO,
 ];
 
+const BASE_SCHEDULE_LOCK_KEY = 'operating-schedule:base';
+
 export function toScheduleDate(dayKey: string): Date {
   return new Date(`${dayKey}T00:00:00.000Z`);
 }
@@ -164,6 +166,46 @@ export class OperatingScheduleRepository {
         select: { id: true },
       })
       .then((rows) => rows.map((r) => r.id));
+  }
+
+  withBaseScheduleLock<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${BASE_SCHEDULE_LOCK_KEY}))`;
+      return fn(tx);
+    });
+  }
+
+  async replaceWeeklyWindows(
+    windows: readonly WeeklyWindow[],
+    client: Prisma.TransactionClient,
+  ): Promise<void> {
+    await client.operatingWindow.deleteMany({});
+    await client.operatingWindow.createMany({ data: [...windows] });
+  }
+
+  findLiveReservationsFrom(
+    from: Date,
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.reservation.findMany({
+      where: {
+        status: { in: [...LIVE_RESERVATION_STATUSES] },
+        scheduledEnd: { gt: from },
+      },
+      orderBy: { scheduledStart: 'asc' },
+      select: {
+        id: true,
+        categoryId: true,
+        status: true,
+        scheduledStart: true,
+        scheduledEnd: true,
+        client: { select: { id: true, name: true, phone: true } },
+        treatment: { select: { name: true } },
+        category: { select: { name: true } },
+      },
+    });
   }
 
   findLiveReservationsOnDay(
