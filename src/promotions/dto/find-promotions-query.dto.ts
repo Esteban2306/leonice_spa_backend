@@ -1,5 +1,22 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
+
+export enum PromotionValidity {
+  CURRENT = 'CURRENT',
+  UPCOMING = 'UPCOMING',
+  EXPIRED = 'EXPIRED',
+}
+
+export enum PromotionTarget {
+  TREATMENT = 'TREATMENT',
+  CATEGORY = 'CATEGORY',
+}
 
 export class FindPromotionsQueryDto {
   @IsOptional()
@@ -23,4 +40,16 @@ export class FindPromotionsQueryDto {
   @Transform(({ value }) => value === 'true')
   @IsBoolean()
   currentlyValid?: boolean;
+
+  @IsOptional()
+  @IsEnum(PromotionValidity)
+  validity?: PromotionValidity;
+
+  @IsOptional()
+  @IsEnum(PromotionTarget)
+  appliesTo?: PromotionTarget;
+
+  @IsOptional()
+  @IsUUID()
+  withinCategoryId?: string;
 }

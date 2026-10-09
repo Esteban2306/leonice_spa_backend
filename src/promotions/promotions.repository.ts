@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../infrastructure/database/prisma.service';
+import {
+  PromotionTarget,
+  PromotionValidity,
+} from './dto/find-promotions-query.dto';
 
 export interface FindPromotionsFilters {
   name?: string;
@@ -8,6 +12,30 @@ export interface FindPromotionsFilters {
   categoryId?: string;
   isActive?: boolean;
   currentlyValid?: boolean;
+  validity?: PromotionValidity;
+  appliesTo?: PromotionTarget;
+  withinCategoryId?: string;
+}
+
+function validityWhere(
+  validity: PromotionValidity | undefined,
+  now: Date,
+): Prisma.PromotionWhereInput {
+  if (validity === PromotionValidity.CURRENT)
+    return { startsAt: { lte: now }, endsAt: { gte: now } };
+  if (validity === PromotionValidity.UPCOMING) return { startsAt: { gt: now } };
+  if (validity === PromotionValidity.EXPIRED) return { endsAt: { lt: now } };
+  return {};
+}
+
+function targetWhere(
+  appliesTo: PromotionTarget | undefined,
+): Prisma.PromotionWhereInput {
+  if (appliesTo === PromotionTarget.TREATMENT)
+    return { treatmentId: { not: null } };
+  if (appliesTo === PromotionTarget.CATEGORY)
+    return { categoryId: { not: null }, treatmentId: null };
+  return {};
 }
 
 interface CreatePromotionData {
@@ -35,6 +63,18 @@ export class PromotionsRepository {
       ...(filters.currentlyValid
         ? { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } }
         : {}),
+      AND: [
+        validityWhere(filters.validity, now),
+        targetWhere(filters.appliesTo),
+        filters.withinCategoryId
+          ? {
+              OR: [
+                { categoryId: filters.withinCategoryId },
+                { treatment: { categoryId: filters.withinCategoryId } },
+              ],
+            }
+          : {},
+      ],
     };
 
     return this.prisma.client.promotion.findMany({
