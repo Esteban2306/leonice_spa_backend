@@ -145,8 +145,24 @@ export class ReservationsRepository {
       where: { id: { in: ids } },
       orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
       include: {
-        client: { select: { id: true, name: true, phone: true } },
-        treatment: { select: { id: true, name: true } },
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            hairLength: true,
+            hairColor: true,
+            hairProfileUpdatedAt: true,
+          },
+        },
+        treatment: {
+          select: {
+            id: true,
+            name: true,
+            requiresPriorAssessment: true,
+            hasHairVariablePricing: true,
+          },
+        },
         category: { select: { id: true, name: true } },
         deposit: { orderBy: { createdAt: 'desc' }, take: 1 },
         appliedDeposits: { select: { id: true, amount: true } },
@@ -171,12 +187,17 @@ export class ReservationsRepository {
             id: true,
             name: true,
             phone: true,
+            hairLength: true,
+            hairColor: true,
+            hairProfileUpdatedAt: true,
           },
         },
         treatment: {
           select: {
             id: true,
             name: true,
+            requiresPriorAssessment: true,
+            hasHairVariablePricing: true,
           },
         },
         category: {

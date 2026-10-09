@@ -1,16 +1,26 @@
 import {
   CancellationSource,
+  Client,
   DepositCoverage,
   DepositRecord,
   DepositStatus,
   Reservation,
   ReservationStatus,
+  Treatment,
 } from '@prisma/client';
+import {
+  resolveReservationAssessment,
+  type ReservationAssessment,
+} from './reservation-assessment';
 import { getCalendarDayKey } from './calendar-day-key';
 
 export type ReservationWithRelations = Reservation & {
-  client: { id: string; name: string; phone: string };
-  treatment: { id: string; name: string };
+  client: { id: string; name: string; phone: string } & Partial<
+    Pick<Client, 'hairLength' | 'hairColor' | 'hairProfileUpdatedAt'>
+  >;
+  treatment: { id: string; name: string } & Partial<
+    Pick<Treatment, 'requiresPriorAssessment' | 'hasHairVariablePricing'>
+  >;
   category: { id: string; name: string };
   deposit: DepositRecord[];
   depositExpiresAt: Date | null;
@@ -52,6 +62,7 @@ export interface GroupedReservation {
     cancellationReason: string | null;
     cancelledAt: Date | null;
     checkedInAt: Date | null;
+    assessment: ReservationAssessment;
   }>;
 }
 
@@ -198,7 +209,11 @@ export function groupReservationsForDisplay(
     return {
       isCombo: group.length > 1,
       comboGroupId: group[0].comboGroupId,
-      client: group[0].client,
+      client: {
+        id: group[0].client.id,
+        name: group[0].client.name,
+        phone: group[0].client.phone,
+      },
       items: group.map((r) => ({
         reservationId: r.id,
         treatment: r.treatment,
@@ -217,6 +232,7 @@ export function groupReservationsForDisplay(
         cancellationReason: r.cancellationReason,
         cancelledAt: r.cancelledAt,
         checkedInAt: r.checkedInAt,
+        assessment: resolveReservationAssessment(r),
       })),
     };
   });

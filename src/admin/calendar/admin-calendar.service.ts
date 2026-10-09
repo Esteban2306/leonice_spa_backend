@@ -5,6 +5,7 @@ import {
   isProofUnderReview,
   toLatestDepositSummary,
 } from '../../reservations/domain/group-reservations-for-display';
+import { resolveReservationAssessment } from '../../reservations/domain/reservation-assessment';
 import { FindCalendarQueryDto } from './dto/find-calendar-query.dto';
 
 export const CALENDAR_MAX_RANGE_DAYS = 62;
@@ -49,8 +50,16 @@ export class AdminCalendarService {
           reservation.status,
           reservation.deposit,
         ),
-        client: reservation.client,
-        treatment: reservation.treatment,
+        client: {
+          id: reservation.client.id,
+          name: reservation.client.name,
+          phone: reservation.client.phone,
+        },
+        treatment: {
+          id: reservation.treatment.id,
+          name: reservation.treatment.name,
+        },
+        assessment: resolveReservationAssessment(reservation),
         category: reservation.category,
         deposit: reservation.deposit[0]
           ? {
