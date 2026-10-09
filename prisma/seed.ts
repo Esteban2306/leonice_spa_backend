@@ -203,17 +203,14 @@ async function main() {
   });
 
   const unasTreatments = [
-    { name: 'Pedespa', baseDurationMinMinutes: 60, baseDurationMaxMinutes: 60 },
-    {
-      name: 'Permanente',
-      baseDurationMinMinutes: 90,
-      baseDurationMaxMinutes: 90,
-    },
-    {
-      name: 'Tradicional',
-      baseDurationMinMinutes: 60,
-      baseDurationMaxMinutes: 60,
-    },
+    { name: 'Pedespa tradicional', price: 35, minutes: 90 },
+    { name: 'Pedespa semipermanente', price: 55, minutes: 90 },
+    { name: 'Permanente', price: 60, minutes: 90 },
+    { name: 'Tradicional', price: 35, minutes: 90 },
+    { name: 'Uñas Press On soft gel', price: 75, minutes: 150 },
+    { name: 'Nivelación con base rubber', price: 65, minutes: 150 },
+    { name: 'Uñas Dipping', price: 65, minutes: 150 },
+    { name: 'Uñas Acrílicas', price: 100, minutes: 180 },
   ];
 
   for (const t of unasTreatments) {
@@ -224,16 +221,16 @@ async function main() {
         categoryId: unas.id,
         name: t.name,
         requiresPriorAssessment: false,
-        basePriceMin: null,
-        basePriceMax: null,
-        baseDurationMinMinutes: t.baseDurationMinMinutes,
-        baseDurationMaxMinutes: t.baseDurationMaxMinutes,
+        basePriceMin: t.price,
+        basePriceMax: t.price,
+        baseDurationMinMinutes: t.minutes,
+        baseDurationMaxMinutes: t.minutes,
       },
     });
   }
 
   console.log(
-    'Seed completado: 3 categorías, 3 capacity pools, 15 tratamientos.',
+    'Seed completado: 3 categorías, 3 capacity pools, 20 tratamientos.',
   );
 }
 

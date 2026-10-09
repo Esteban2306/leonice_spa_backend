@@ -6,7 +6,7 @@ const BASE = 'http://localhost:3921/api/v1';
 const LIVE = new URL('.', import.meta.url).pathname;
 const BACKEND = new URL('../../', import.meta.url).pathname;
 const QA_TREATMENT = '0159e8a4-a348-4d3b-bb1d-e9eddddd47de'; // "Tratamiento de Prueba" (categoría QA, pool 4)
-const NAILS_TREATMENT = '24336901-5493-46d5-8c22-07bdb4898254'; // Pedespa (Uñas)
+const NAILS_TREATMENT = '24336901-5493-46d5-8c22-07bdb4898254'; // Pedespa tradicional (Uñas)
 const HAIR_TREATMENT = '3a806ae0-7e83-41f9-a576-120cc474d345';
 const RUN = Date.now().toString().slice(-6); // sufijo único por corrida
 
