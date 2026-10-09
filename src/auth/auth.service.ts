@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../infrastructure/database/prisma.service';
+import { AppException } from '../common/errors/app.exception';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
@@ -153,7 +154,10 @@ export class AuthService {
     );
 
     if (!currentValid) {
-      throw new UnauthorizedException('La contraseña actual no es correcta');
+      throw new AppException('AUTH_CURRENT_PASSWORD_INVALID');
+    }
+    if (currentPassword === newPassword) {
+      throw new AppException('AUTH_PASSWORD_UNCHANGED');
     }
 
     await this.prisma.client.user.update({

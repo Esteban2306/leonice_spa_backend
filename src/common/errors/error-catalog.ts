@@ -257,6 +257,17 @@ const DEPOSIT = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const AUTH = {
+  AUTH_CURRENT_PASSWORD_INVALID: {
+    status: HttpStatus.BAD_REQUEST,
+    message: 'La contraseña actual no es correcta.',
+  },
+  AUTH_PASSWORD_UNCHANGED: {
+    status: HttpStatus.BAD_REQUEST,
+    message: 'La nueva contraseña debe ser distinta de la actual.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 const IDEMPOTENCY = {
   IDEMPOTENCY_KEY_INVALID: {
     status: HttpStatus.BAD_REQUEST,
@@ -277,6 +288,7 @@ const IDEMPOTENCY = {
 
 export const ERROR_CATALOG = {
   ...GENERIC,
+  ...AUTH,
   ...IDEMPOTENCY,
   ...PLACEMENT,
   ...RESERVATION,
