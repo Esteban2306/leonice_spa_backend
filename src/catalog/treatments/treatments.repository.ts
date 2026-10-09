@@ -3,6 +3,11 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
 import { HairColor, HairLength, Prisma } from '@prisma/client';
+import {
+  FindAdminTreatmentsQueryDto,
+  TreatmentSortField,
+} from './dto/find-admin-treatments-query.dto';
+import { isActiveWhere } from '../common/catalog-filters';
 
 const treatmentWithRelationsArgs = {
   include: {
@@ -16,6 +21,74 @@ export type TreatmentWithRelations = Prisma.TreatmentGetPayload<
   typeof treatmentWithRelationsArgs
 >;
 
+const adminTreatmentArgs = {
+  include: {
+    ...treatmentWithRelationsArgs.include,
+    _count: { select: { reservations: true } },
+  },
+} satisfies Prisma.TreatmentDefaultArgs;
+
+export type AdminTreatmentRecord = Prisma.TreatmentGetPayload<
+  typeof adminTreatmentArgs
+>;
+
+function rangeOverlapWhere(
+  minField: 'basePriceMin' | 'baseDurationMinMinutes',
+  maxField: 'basePriceMax' | 'baseDurationMaxMinutes',
+  lower?: number,
+  upper?: number,
+): Prisma.TreatmentWhereInput[] {
+  const conditions: Prisma.TreatmentWhereInput[] = [];
+  if (lower !== undefined) {
+    conditions.push({
+      OR: [
+        { [maxField]: { gte: lower } },
+        { [maxField]: null, [minField]: { gte: lower } },
+      ],
+    });
+  }
+  if (upper !== undefined) {
+    conditions.push({
+      OR: [
+        { [minField]: { lte: upper } },
+        { [minField]: null, [maxField]: { lte: upper } },
+      ],
+    });
+  }
+  return conditions;
+}
+
+function hasPriceWhere(hasPrice?: boolean): Prisma.TreatmentWhereInput[] {
+  if (hasPrice === undefined) return [];
+  if (hasPrice) {
+    return [
+      {
+        OR: [{ basePriceMin: { not: null } }, { basePriceMax: { not: null } }],
+      },
+    ];
+  }
+  return [{ basePriceMin: null, basePriceMax: null }];
+}
+
+function adminTreatmentOrder(
+  query: FindAdminTreatmentsQueryDto,
+): Prisma.TreatmentOrderByWithRelationInput[] {
+  const sort = query.sortOrder;
+  const tieBreaker = { name: 'asc' } as const;
+  switch (query.sortBy) {
+    case TreatmentSortField.PRICE:
+      return [{ basePriceMin: { sort, nulls: 'last' } }, tieBreaker];
+    case TreatmentSortField.DURATION:
+      return [{ baseDurationMinMinutes: { sort, nulls: 'last' } }, tieBreaker];
+    case TreatmentSortField.CREATED_AT:
+      return [{ createdAt: sort }, tieBreaker];
+    case TreatmentSortField.UPDATED_AT:
+      return [{ updatedAt: sort }, tieBreaker];
+    default:
+      return [{ name: sort }];
+  }
+}
+
 @Injectable()
 export class TreatmentsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -25,6 +98,41 @@ export class TreatmentsRepository {
       where: { isActive: true },
       orderBy: { name: 'asc' },
       ...treatmentWithRelationsArgs,
+    });
+  }
+
+  findForAdmin(query: FindAdminTreatmentsQueryDto) {
+    const where: Prisma.TreatmentWhereInput = {
+      ...(query.q && { name: { contains: query.q, mode: 'insensitive' } }),
+      ...(query.categoryId && { categoryId: query.categoryId }),
+      ...isActiveWhere(query.status),
+      ...(query.requiresPriorAssessment !== undefined && {
+        requiresPriorAssessment: query.requiresPriorAssessment,
+      }),
+      ...(query.hasHairVariablePricing !== undefined && {
+        hasHairVariablePricing: query.hasHairVariablePricing,
+      }),
+      AND: [
+        ...hasPriceWhere(query.hasPrice),
+        ...rangeOverlapWhere(
+          'basePriceMin',
+          'basePriceMax',
+          query.priceMin,
+          query.priceMax,
+        ),
+        ...rangeOverlapWhere(
+          'baseDurationMinMinutes',
+          'baseDurationMaxMinutes',
+          query.durationMin,
+          query.durationMax,
+        ),
+      ],
+    };
+
+    return this.prisma.client.treatment.findMany({
+      where,
+      orderBy: adminTreatmentOrder(query),
+      ...adminTreatmentArgs,
     });
   }
 

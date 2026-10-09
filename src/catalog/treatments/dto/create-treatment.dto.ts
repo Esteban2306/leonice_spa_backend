@@ -22,6 +22,10 @@ export class CreateTreatmentDto {
   requiresPriorAssessment?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  hasHairVariablePricing?: boolean;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   basePriceMin?: number;

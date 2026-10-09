@@ -5,9 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AdminTreatmentRecord,
   TreatmentsRepository,
   TreatmentWithRelations,
 } from './treatments.repository';
+import { FindAdminTreatmentsQueryDto } from './dto/find-admin-treatments-query.dto';
 import { CategoriesService } from '../categories/categories.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
@@ -55,6 +57,19 @@ export class TreatmentsService {
     return filtered.map((t) => this.withPromotion(t, activePromotions));
   }
 
+  async findAllForAdmin(query: FindAdminTreatmentsQueryDto) {
+    const [treatments, activePromotions] = await Promise.all([
+      this.repository.findForAdmin(query),
+      this.promotionsService.findAllCurrentlyValid(),
+    ]);
+
+    const views = treatments.map((t) => this.toAdminView(t, activePromotions));
+    if (query.hasActivePromotion === undefined) return views;
+    return views.filter(
+      (view) => (view.activePromotion !== null) === query.hasActivePromotion,
+    );
+  }
+
   async findOne(id: string) {
     const treatment = await this.repository.findById(id);
     if (!treatment) throw new NotFoundException('Tratamiento no encontrado');
@@ -83,6 +98,22 @@ export class TreatmentsService {
   async update(id: string, dto: UpdateTreatmentDto) {
     const current = await this.findOne(id);
     this.assertConsistentRanges({ ...current, ...dto });
+
+    const nextCategoryId = dto.categoryId ?? current.categoryId;
+    const nextName = dto.name ?? current.name;
+    if (nextCategoryId !== current.categoryId || nextName !== current.name) {
+      if (nextCategoryId !== current.categoryId) {
+        await this.categoriesService.findOne(nextCategoryId);
+      }
+      const existing = await this.repository.findByCategoryAndName(
+        nextCategoryId,
+        nextName,
+      );
+      if (existing && existing.id !== id)
+        throw new ConflictException(
+          `Ya existe "${nextName}" en esta categoría`,
+        );
+    }
 
     const treatment = await this.repository.update(id, dto);
     await this.invalidateCache();
@@ -215,8 +246,19 @@ export class TreatmentsService {
     return treatments;
   }
 
-  private withPromotion(
-    treatment: TreatmentWithRelations,
+  private toAdminView(
+    treatment: AdminTreatmentRecord,
+    activePromotions: Promotion[],
+  ) {
+    const { _count, ...rest } = treatment;
+    return {
+      ...this.withPromotion(rest, activePromotions),
+      reservationCount: _count.reservations,
+    };
+  }
+
+  private withPromotion<T extends TreatmentWithRelations>(
+    treatment: T,
     activePromotions: Promotion[],
   ) {
     const promo = resolveApplicablePromotion(activePromotions, {

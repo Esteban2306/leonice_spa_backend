@@ -12,6 +12,7 @@ import { TreatmentsService } from './treatments.service';
 import { CreateTreatmentDto } from './dto/create-treatment.dto';
 import { UpdateTreatmentDto } from './dto/update-treatment.dto';
 import { FindTreatmentsQueryDto } from './dto/find-treatments-query.dto';
+import { FindAdminTreatmentsQueryDto } from './dto/find-admin-treatments-query.dto';
 import { Public } from '../../auth/decorators/public.decorator';
 import { SetHairLengthPricingDto } from './dto/set-hair-length-pricing.dto';
 import { SetHairColorSurchargesDto } from './dto/set-hair-color-surcharges.dto';
@@ -24,6 +25,11 @@ export class TreatmentsController {
   @Get()
   findAll(@Query() query: FindTreatmentsQueryDto) {
     return this.service.findAll(query.categoryId);
+  }
+
+  @Get('admin')
+  findAllForAdmin(@Query() query: FindAdminTreatmentsQueryDto) {
+    return this.service.findAllForAdmin(query);
   }
 
   @Public()
