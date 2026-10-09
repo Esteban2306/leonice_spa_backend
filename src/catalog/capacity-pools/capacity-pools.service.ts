@@ -6,6 +6,7 @@ import {
 import { CapacityPoolsRepository } from './capacity-pools.repository';
 import { CategoriesService } from '../categories/categories.service';
 import { CreateCapacityPoolDto } from './dto/create-capacity-pool.dto';
+import { FindCapacityPoolsQueryDto } from './dto/find-capacity-pools-query.dto';
 import { UpdateCapacityPoolDto } from './dto/update-capacity-pool.dto';
 
 @Injectable()
@@ -15,9 +16,10 @@ export class CapacityPoolsService {
     private readonly categoriesService: CategoriesService,
   ) {}
 
-  async findByCategory(categoryId: string) {
-    await this.categoriesService.findOne(categoryId);
-    return this.repository.findByCategory(categoryId);
+  async findMany(query: FindCapacityPoolsQueryDto) {
+    if (query.categoryId)
+      await this.categoriesService.findOne(query.categoryId);
+    return this.repository.findMany(query);
   }
 
   async findOne(id: string) {
@@ -42,7 +44,24 @@ export class CapacityPoolsService {
   }
 
   async update(id: string, dto: UpdateCapacityPoolDto) {
-    await this.findOne(id);
+    const current = await this.findOne(id);
+
+    const nextCategoryId = dto.categoryId ?? current.categoryId;
+    const nextName = dto.name ?? current.name;
+    if (nextCategoryId !== current.categoryId || nextName !== current.name) {
+      if (nextCategoryId !== current.categoryId) {
+        await this.categoriesService.findOne(nextCategoryId);
+      }
+      const existing = await this.repository.findByCategoryAndName(
+        nextCategoryId,
+        nextName,
+      );
+      if (existing && existing.id !== id)
+        throw new ConflictException(
+          `Ya existe un pool llamado "${nextName}" en esta categoría`,
+        );
+    }
+
     return this.repository.update(id, dto);
   }
 }

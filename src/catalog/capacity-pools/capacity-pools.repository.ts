@@ -1,16 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateCapacityPoolDto } from './dto/create-capacity-pool.dto';
+import { FindCapacityPoolsQueryDto } from './dto/find-capacity-pools-query.dto';
+import { isActiveWhere } from '../common/catalog-filters';
 import { UpdateCapacityPoolDto } from './dto/update-capacity-pool.dto';
 
 @Injectable()
 export class CapacityPoolsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByCategory(categoryId: string) {
+  findMany(query: FindCapacityPoolsQueryDto) {
     return this.prisma.client.capacityPool.findMany({
-      where: { categoryId, isActive: true },
-      orderBy: { name: 'asc' },
+      where: {
+        ...(query.categoryId && { categoryId: query.categoryId }),
+        ...(query.q && { name: { contains: query.q, mode: 'insensitive' } }),
+        ...isActiveWhere(query.status),
+      },
+      orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
+      include: { category: { select: { id: true, name: true } } },
     });
   }
 

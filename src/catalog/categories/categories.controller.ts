@@ -6,9 +6,11 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { FindAdminCategoriesQueryDto } from './dto/find-admin-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Public } from '../../auth/decorators/public.decorator';
 
@@ -20,6 +22,11 @@ export class CategoriesController {
   @Get()
   findAll() {
     return this.service.findAll();
+  }
+
+  @Get('admin')
+  findAllForAdmin(@Query() query: FindAdminCategoriesQueryDto) {
+    return this.service.findAllForAdmin(query);
   }
 
   @Public()

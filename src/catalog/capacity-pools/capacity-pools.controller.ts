@@ -18,8 +18,8 @@ export class CapacityPoolsController {
   constructor(private readonly service: CapacityPoolsService) {}
 
   @Get()
-  findByCategory(@Query() query: FindCapacityPoolsQueryDto) {
-    return this.service.findByCategory(query.categoryId);
+  findMany(@Query() query: FindCapacityPoolsQueryDto) {
+    return this.service.findMany(query);
   }
 
   @Get(':id')

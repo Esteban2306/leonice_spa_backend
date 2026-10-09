@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { FindAdminCategoriesQueryDto } from './dto/find-admin-categories-query.dto';
+import { isActiveWhere } from '../common/catalog-filters';
 
 @Injectable()
 export class CategoriesRepository {
@@ -11,6 +13,26 @@ export class CategoriesRepository {
     return this.prisma.client.category.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  findForAdmin(query: FindAdminCategoriesQueryDto) {
+    return this.prisma.client.category.findMany({
+      where: {
+        ...(query.q && { name: { contains: query.q, mode: 'insensitive' } }),
+        ...isActiveWhere(query.status),
+        ...(query.isPrincipal !== undefined && {
+          isPrincipal: query.isPrincipal,
+        }),
+        ...(query.tracksHairProfile !== undefined && {
+          tracksHairProfile: query.tracksHairProfile,
+        }),
+      },
+      orderBy: [{ isPrincipal: 'desc' }, { name: 'asc' }],
+      include: {
+        treatments: { select: { isActive: true } },
+        capacityPools: { select: { isActive: true, maxConcurrent: true } },
+      },
     });
   }
 
