@@ -15,6 +15,7 @@ export const EVENT_TYPES = {
   DEPOSIT_SUBMITTED_FOR_REVIEW: 'deposit.submitted_for_review',
   DEPOSIT_REJECTED: 'deposit.rejected',
   RESERVATION_CANCELLED_BY_TIMEOUT: 'reservation.cancelled_by_timeout',
+  CONDUIT_HANDOFF_REQUESTED: 'conduit.handoff_requested',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -88,6 +89,16 @@ export interface EventPayloadMap {
     reservationId: string;
     clientId: string;
     reason?: string;
+  };
+
+  [EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED]: {
+    /** Teléfono verificado del chat; null si WhatsApp solo dio un LID. */
+    phone: string | null;
+    lid: string | null;
+    clientName: string | null;
+    reason: string;
+    summary: string | null;
+    requestId: string;
   };
 
   [EVENT_TYPES.CANCELLATION_LINK_REQUESTED]: {

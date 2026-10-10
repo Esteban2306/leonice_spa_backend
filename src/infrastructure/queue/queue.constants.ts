@@ -25,5 +25,6 @@ export const JOB_NAMES = {
   NOTIFY_ADMIN_RESCHEDULED: 'notify-admin-rescheduled',
   NOTIFY_CLIENT_CANCELLATION_CONFIRMED: 'notify-client-cancellation-confirmed',
   NOTIFY_ADMIN_CLIENT_CANCELLED: 'notify-admin-client-cancelled',
+  NOTIFY_ADMIN_HANDOFF: 'notify-admin-handoff',
   SEND_CLIENT_CANCELLATION_LINK: 'send-client-cancellation-link',
 } as const;

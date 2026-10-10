@@ -14,13 +14,21 @@ import { ConduitOutboxProcessor } from './processors/conduit-outbox.processor';
 import { ConduitBookingToolsController } from './conduit-booking-tools.controller';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { CatalogModule } from '../catalog/catalog.module';
+import { ConduitSupportToolsController } from './conduit-support-tools.controller';
+import { BusinessSettingsModule } from '../business-settings/business-settings.module';
 
 @Module({
-  imports: [ClientsModule, ReservationsModule, CatalogModule],
+  imports: [
+    ClientsModule,
+    ReservationsModule,
+    CatalogModule,
+    BusinessSettingsModule,
+  ],
   controllers: [
     ConduitWebhooksController,
     ConduitToolsController,
     ConduitBookingToolsController,
+    ConduitSupportToolsController,
   ],
   providers: [
     ConduitApiClient,

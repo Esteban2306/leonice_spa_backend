@@ -8,7 +8,10 @@ import {
   ReservationStatus,
 } from '@prisma/client';
 import { UnrecoverableError } from 'bullmq';
-import { ConduitApiClient } from 'src/conduit/client/conduit-api.client';
+import {
+  ConduitApiClient,
+  type ConduitSendContext,
+} from 'src/conduit/client/conduit-api.client';
 import { ReservationsRepository } from 'src/reservations/repositories/reservations.repository';
 import { ReservationStateMachine } from 'src/reservations/domain/reservation-state-machine';
 import { AdminNotificationRecipientsRepository } from 'src/admin-notifications/repository/admin-notification-recipients.repository';
@@ -19,6 +22,7 @@ import {
   OPERATIONAL_TEMPLATE_ENV_KEYS,
   type AdminDepositTimeoutNoticeJobData,
   type AdminClientCancellationNoticeJobData,
+  type AdminHandoffNoticeJobData,
   type AdminRescheduleNoticeJobData,
   type CancellationChannel,
   type CancellationLinkNoticeJobData,
@@ -68,6 +72,7 @@ export class OperationalNotificationsService {
 
   async notifyAdminDepositTimeout(
     data: AdminDepositTimeoutNoticeJobData,
+    ctx: ConduitSendContext,
   ): Promise<void> {
     const type = AutomationExecutionType.ADMIN_DEPOSIT_TIMEOUT_NOTICE;
     const { reservationId } = data;
@@ -107,7 +112,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send('ADMIN_DEPOSIT_TIMEOUT', recipient.phone, {
+    await this.send(ctx, 'ADMIN_DEPOSIT_TIMEOUT', recipient.phone, {
       cliente: first.client.name,
       telefono: first.client.phone,
       tratamientos: details.map((r) => r.treatment.name).join(', '),
@@ -118,6 +123,7 @@ export class OperationalNotificationsService {
 
   async notifyClientDepositRejected(
     data: ClientDepositRejectedNoticeJobData,
+    ctx: ConduitSendContext,
   ): Promise<void> {
     const type = AutomationExecutionType.CLIENT_DEPOSIT_REJECTED_NOTICE;
     const { reservationId, hasDeadline } = data;
@@ -141,12 +147,18 @@ export class OperationalNotificationsService {
     }
 
     if (hasDeadline && reservation.depositExpiresAt) {
-      await this.send('CLIENT_DEPOSIT_REJECTED', reservation.client.phone, {
-        nombre: reservation.client.name,
-        plazo: `hasta el ${formatNotificationDateTime(reservation.depositExpiresAt)}`,
-      });
+      await this.send(
+        ctx,
+        'CLIENT_DEPOSIT_REJECTED',
+        reservation.client.phone,
+        {
+          nombre: reservation.client.name,
+          plazo: `hasta el ${formatNotificationDateTime(reservation.depositExpiresAt)}`,
+        },
+      );
     } else {
       await this.send(
+        ctx,
         'CLIENT_DEPOSIT_REJECTED_NO_DEADLINE',
         reservation.client.phone,
         { nombre: reservation.client.name },
@@ -155,7 +167,10 @@ export class OperationalNotificationsService {
     await this.executed(type, reservationId);
   }
 
-  async notifyClientRescheduled(data: RescheduleNoticeJobData): Promise<void> {
+  async notifyClientRescheduled(
+    data: RescheduleNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
     const type = AutomationExecutionType.CLIENT_RESCHEDULE_NOTICE;
     const { reservationId } = data;
 
@@ -173,7 +188,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send('CLIENT_RESCHEDULED', reservation.client.phone, {
+    await this.send(ctx, 'CLIENT_RESCHEDULED', reservation.client.phone, {
       nombre: reservation.client.name,
       tratamiento: reservation.treatment.name,
       fecha: formatNotificationDateTime(reservation.scheduledStart),
@@ -183,6 +198,7 @@ export class OperationalNotificationsService {
 
   async notifyAdminRescheduled(
     data: AdminRescheduleNoticeJobData,
+    ctx: ConduitSendContext,
   ): Promise<void> {
     const type = AutomationExecutionType.ADMIN_RESCHEDULE_NOTICE;
     const { reservationId } = data;
@@ -207,7 +223,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send('ADMIN_RESCHEDULED', recipient.phone, {
+    await this.send(ctx, 'ADMIN_RESCHEDULED', recipient.phone, {
       cliente: reservation.client.name,
       telefono: reservation.client.phone,
       tratamiento: reservation.treatment.name,
@@ -222,6 +238,7 @@ export class OperationalNotificationsService {
 
   async notifyClientCancellationConfirmed(
     data: ClientCancellationNoticeJobData,
+    ctx: ConduitSendContext,
   ): Promise<void> {
     const type = AutomationExecutionType.CLIENT_CANCELLATION_NOTICE;
     const cancelled = await this.loadClientCancelled(data.reservationIds);
@@ -235,7 +252,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send('CLIENT_CANCELLATION_CONFIRMED', first.client.phone, {
+    await this.send(ctx, 'CLIENT_CANCELLATION_CONFIRMED', first.client.phone, {
       nombre: first.client.name,
       tratamientos: cancelled.map((r) => r.treatment.name).join(', '),
       fecha: formatNotificationDateTime(first.scheduledStart),
@@ -245,6 +262,7 @@ export class OperationalNotificationsService {
 
   async notifyAdminClientCancelled(
     data: AdminClientCancellationNoticeJobData,
+    ctx: ConduitSendContext,
   ): Promise<void> {
     const type = AutomationExecutionType.ADMIN_CLIENT_CANCELLATION_NOTICE;
     const recipient = await this.findActiveRecipient(data.recipientId);
@@ -264,7 +282,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send('ADMIN_CLIENT_CANCELLED', recipient.phone, {
+    await this.send(ctx, 'ADMIN_CLIENT_CANCELLED', recipient.phone, {
       cliente: first.client.name,
       telefono: first.client.phone,
       tratamientos: cancelled.map((r) => r.treatment.name).join(', '),
@@ -278,8 +296,39 @@ export class OperationalNotificationsService {
     );
   }
 
+  /** La clienta pidió (o el bot decidió) hablar con una persona. */
+  async notifyAdminHandoff(
+    data: AdminHandoffNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.ADMIN_HANDOFF_NOTICE;
+    const recipient = await this.findActiveRecipient(data.recipientId);
+    if (!recipient) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: RECIPIENT_INACTIVE_REASON,
+      });
+      return;
+    }
+
+    await this.send(ctx, 'ADMIN_HANDOFF', recipient.phone, {
+      cliente: data.clientName ?? 'Cliente sin registrar',
+      telefono:
+        data.phone ?? `(número oculto por WhatsApp, LID ${data.lid ?? '?'})`,
+      motivo: data.reason,
+      resumen: data.summary ?? 'Sin resumen',
+    });
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.EXECUTED,
+      reason: `Destinatario ${recipient.id}`,
+    });
+  }
+
   async sendClientCancellationLink(
     data: CancellationLinkNoticeJobData,
+    ctx: ConduitSendContext,
   ): Promise<void> {
     const type = AutomationExecutionType.CLIENT_CANCELLATION_LINK_NOTICE;
     const reservation = await this.loadWithDetails(data.reservationId);
@@ -296,7 +345,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send('CLIENT_CANCELLATION_LINK', reservation.client.phone, {
+    await this.send(ctx, 'CLIENT_CANCELLATION_LINK', reservation.client.phone, {
       nombre: reservation.client.name,
       tratamiento: reservation.treatment.name,
       fecha: formatNotificationDateTime(reservation.scheduledStart),
@@ -324,6 +373,7 @@ export class OperationalNotificationsService {
   }
 
   private async send(
+    ctx: ConduitSendContext,
     template: OperationalTemplate,
     phone: string,
     variables: Record<string, string>,
@@ -340,6 +390,8 @@ export class OperationalNotificationsService {
       phone,
       templateId,
       variables,
+      idempotencyKey: `${ctx.idempotencyKey}:${template}`,
+      companyEventId: ctx.companyEventId,
     });
     assertMessageDelivered(result);
   }

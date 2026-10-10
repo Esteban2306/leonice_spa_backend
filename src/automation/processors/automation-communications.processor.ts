@@ -11,7 +11,12 @@ import {
   JOB_NAMES,
 } from '../../infrastructure/queue/queue.constants';
 import { ReservationsRepository } from '../../reservations/repositories/reservations.repository';
-import { ConduitApiClient } from '../../conduit/client/conduit-api.client';
+import {
+  ConduitApiClient,
+  type ConduitSendContext,
+} from '../../conduit/client/conduit-api.client';
+import { conduitIdempotencyKey } from '../../conduit/client/conduit-idempotency-key';
+import { formatNotificationDateTime } from '../utils/format-notification-date';
 import { AutomationExecutionRepository } from '../repositories/automation-execution.repository';
 import { assertMessageDelivered } from '../utils/assert-message-delivered';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
@@ -22,6 +27,7 @@ import {
   AdminDepositTimeoutNoticeJobData,
   AdminClientCancellationNoticeJobData,
   AdminRescheduleNoticeJobData,
+  AdminHandoffNoticeJobData,
   CancellationLinkNoticeJobData,
   ClientCancellationNoticeJobData,
   ClientDepositRejectedNoticeJobData,
@@ -43,7 +49,8 @@ type AutomationJobData =
   | AdminRescheduleNoticeJobData
   | ClientCancellationNoticeJobData
   | AdminClientCancellationNoticeJobData
-  | CancellationLinkNoticeJobData;
+  | CancellationLinkNoticeJobData
+  | AdminHandoffNoticeJobData;
 @Processor(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS)
 export class AutomationCommunicationsProcessor extends WorkerHost {
   private readonly logger = new Logger(AutomationCommunicationsProcessor.name);
@@ -60,42 +67,60 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
   }
 
   async process(job: Job<AutomationJobData>): Promise<void> {
+    const ctx: ConduitSendContext = {
+      idempotencyKey: conduitIdempotencyKey(job),
+      companyEventId: `${job.name}:${job.id}`,
+    };
+
     switch (job.name) {
       case JOB_NAMES.RESERVATION_REMINDER_CHECK:
         return this.sendReminder(
           (job.data as ReminderJobData).reservationId,
+          ctx,
           job.data as ReminderJobData,
           job.timestamp,
         );
       case JOB_NAMES.REACTIVATION_CHECK:
-        return this.checkReactivation(job.data as ReactivationJobData);
+        return this.checkReactivation(job.data as ReactivationJobData, ctx);
       case JOB_NAMES.NOTIFY_ADMIN_DEPOSIT_TIMEOUT:
         return this.notifications.notifyAdminDepositTimeout(
           job.data as AdminDepositTimeoutNoticeJobData,
+          ctx,
         );
       case JOB_NAMES.NOTIFY_CLIENT_DEPOSIT_REJECTED:
         return this.notifications.notifyClientDepositRejected(
           job.data as ClientDepositRejectedNoticeJobData,
+          ctx,
         );
       case JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED:
         return this.notifications.notifyClientRescheduled(
           job.data as RescheduleNoticeJobData,
+          ctx,
         );
       case JOB_NAMES.NOTIFY_ADMIN_RESCHEDULED:
         return this.notifications.notifyAdminRescheduled(
           job.data as AdminRescheduleNoticeJobData,
+          ctx,
         );
       case JOB_NAMES.NOTIFY_CLIENT_CANCELLATION_CONFIRMED:
         return this.notifications.notifyClientCancellationConfirmed(
           job.data as ClientCancellationNoticeJobData,
+          ctx,
         );
       case JOB_NAMES.NOTIFY_ADMIN_CLIENT_CANCELLED:
         return this.notifications.notifyAdminClientCancelled(
           job.data as AdminClientCancellationNoticeJobData,
+          ctx,
+        );
+      case JOB_NAMES.NOTIFY_ADMIN_HANDOFF:
+        return this.notifications.notifyAdminHandoff(
+          job.data as AdminHandoffNoticeJobData,
+          ctx,
         );
       case JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK:
         return this.notifications.sendClientCancellationLink(
           job.data as CancellationLinkNoticeJobData,
+          ctx,
         );
       default:
         this.logger.warn(`Job desconocido recibido: ${job.name}`);
@@ -156,12 +181,17 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.ADMIN_CLIENT_CANCELLATION_NOTICE;
       case JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK:
         return AutomationExecutionType.CLIENT_CANCELLATION_LINK_NOTICE;
+      case JOB_NAMES.NOTIFY_ADMIN_HANDOFF:
+        return AutomationExecutionType.ADMIN_HANDOFF_NOTICE;
       default:
         return null;
     }
   }
 
-  private async checkReactivation(data: ReactivationJobData) {
+  private async checkReactivation(
+    data: ReactivationJobData,
+    ctx: ConduitSendContext,
+  ) {
     const type = AutomationExecutionType.REACTIVATION;
     const base = {
       type,
@@ -246,13 +276,8 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     const hasValidPromo =
       promo?.isActive && promo.startsAt <= now && now <= promo.endsAt;
 
-    await this.executions.log({
-      ...base,
-      result: AutomationExecutionResult.EXECUTED,
-      promotionId: hasValidPromo ? promo.id : undefined,
-    });
-
     const result = await this.conduitApiClient.sendWhatsappMessage({
+      ...ctx,
       phone: client.phone,
       templateId: hasValidPromo
         ? CONDUIT_TEMPLATE_IDS.REACTIVATION_WITH_PROMO
@@ -278,14 +303,18 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       throw error;
     }
 
+    // Se registra EXECUTED solo tras el envío: si se registrara antes, un
+    // fallo de Conduit dejaría el reintento convencido de que ya se envió.
     await this.executions.log({
       ...base,
       result: AutomationExecutionResult.EXECUTED,
+      promotionId: hasValidPromo ? promo.id : undefined,
     });
   }
 
   private async sendReminder(
     reservationId: string,
+    ctx: ConduitSendContext,
     reminder: ReminderJobData,
     queuedAt: number,
   ) {
@@ -337,11 +366,12 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     }
 
     const result = await this.conduitApiClient.sendWhatsappMessage({
+      ...ctx,
       phone: reservation.client.phone,
       templateId: CONDUIT_TEMPLATE_IDS.RESERVATION_REMINDER,
       variables: {
         nombre: reservation.client.name,
-        fecha: reservation.scheduledStart.toISOString(),
+        fecha: formatNotificationDateTime(reservation.scheduledStart),
       },
     });
 

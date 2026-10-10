@@ -18,6 +18,7 @@ import {
   type AdminDepositTimeoutNoticeJobData,
   type AdminClientCancellationNoticeJobData,
   type AdminRescheduleNoticeJobData,
+  type AdminHandoffNoticeJobData,
   type CancellationLinkNoticeJobData,
   type ClientCancellationNoticeJobData,
   type ClientDepositRejectedNoticeJobData,
@@ -210,6 +211,29 @@ export class OperationalNotificationsListener {
     await this.queue.add(JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED, data, {
       ...NOTICE_JOB_OPTIONS,
     });
+  }
+
+  @OnEvent(EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED)
+  async handleHandoffRequested(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED
+    >,
+  ): Promise<void> {
+    const { requestId, ...payload } = event.payload;
+    try {
+      await this.enqueueForAdmins<AdminHandoffNoticeJobData>(
+        JOB_NAMES.NOTIFY_ADMIN_HANDOFF,
+        'traspaso a una persona',
+        (recipientId) => ({
+          data: { ...payload, recipientId },
+          opts: { jobId: `admin-handoff-${requestId}-${recipientId}` },
+        }),
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`No se pudo encolar el aviso de traspaso: ${message}`);
+    }
   }
 
   private async enqueueForAdmins<T extends object>(

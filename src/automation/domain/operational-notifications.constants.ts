@@ -11,6 +11,7 @@ export const OPERATIONAL_TEMPLATE_ENV_KEYS = {
     'CONDUIT_TEMPLATE_CLIENT_CANCELLATION_CONFIRMED',
   ADMIN_CLIENT_CANCELLED: 'CONDUIT_TEMPLATE_ADMIN_CLIENT_CANCELLED',
   CLIENT_CANCELLATION_LINK: 'CONDUIT_TEMPLATE_CLIENT_CANCELLATION_LINK',
+  ADMIN_HANDOFF: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF',
 } as const;
 
 export type OperationalTemplate = keyof typeof OPERATIONAL_TEMPLATE_ENV_KEYS;
@@ -54,6 +55,15 @@ export interface AdminClientCancellationNoticeJobData extends ClientCancellation
 export interface CancellationLinkNoticeJobData {
   reservationId: string;
   url: string;
+}
+
+export interface AdminHandoffNoticeJobData {
+  recipientId: string;
+  phone: string | null;
+  lid: string | null;
+  clientName: string | null;
+  reason: string;
+  summary: string | null;
 }
 
 export interface AdminRescheduleNoticeJobData extends RescheduleNoticeJobData {
