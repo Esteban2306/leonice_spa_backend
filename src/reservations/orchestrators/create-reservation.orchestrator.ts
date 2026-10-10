@@ -184,9 +184,6 @@ export class CreateReservationOrchestrator {
               hasCategoryConflict,
             );
 
-            const price = treatment.requiresPriorAssessment
-              ? (treatment.basePriceMax ?? 0)
-              : (treatment.basePriceMin ?? 0);
             const initialStatus = ReservationStatus.PENDIENTE_DEPOSITO;
             if (!hasCredit && depositExpiresAt === null) {
               depositExpiresAt = await this.depositDeadline.computeExpiry(
@@ -205,7 +202,7 @@ export class CreateReservationOrchestrator {
                 channel: dto.channel ?? ReservationChannel.WEB,
                 scheduledStart: placement.scheduledStart,
                 scheduledEnd: placement.scheduledEnd,
-                finalPrice: price,
+                finalPrice: draft.price,
                 finalDurationMinutes: draft.durationMinutes,
                 comboGroupId,
                 depositClockStartedAt: hasCredit ? null : depositClockStartedAt,
