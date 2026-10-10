@@ -31,6 +31,7 @@ import { OperationalNotificationsService } from '../operational-notifications.se
 
 interface ReminderJobData {
   reservationId: string;
+  scheduledStart?: string;
 }
 
 type AutomationJobData =
@@ -61,7 +62,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
   async process(job: Job<AutomationJobData>): Promise<void> {
     switch (job.name) {
       case JOB_NAMES.RESERVATION_REMINDER_CHECK:
-        return this.sendReminder((job.data as ReminderJobData).reservationId);
+        return this.sendReminder(
+          (job.data as ReminderJobData).reservationId,
+          job.data as ReminderJobData,
+          job.timestamp,
+        );
       case JOB_NAMES.REACTIVATION_CHECK:
         return this.checkReactivation(job.data as ReactivationJobData);
       case JOB_NAMES.NOTIFY_ADMIN_DEPOSIT_TIMEOUT:
@@ -279,7 +284,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     });
   }
 
-  private async sendReminder(reservationId: string) {
+  private async sendReminder(
+    reservationId: string,
+    reminder: ReminderJobData,
+    queuedAt: number,
+  ) {
     const type = AutomationExecutionType.RESERVATION_REMINDER;
     const reservation =
       await this.reservationsRepository.findByIdWithClientPhone(reservationId);
@@ -296,7 +305,28 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       return;
     }
 
-    if (await this.executions.hasExecuted(type, reservationId)) {
+    if (
+      reminder.scheduledStart &&
+      new Date(reminder.scheduledStart).getTime() !==
+        reservation.scheduledStart.getTime()
+    ) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reservationId,
+        reason:
+          'La cita se reagendó; este recordatorio era para la fecha anterior',
+      });
+      return;
+    }
+
+    if (
+      await this.executions.hasExecuted(
+        type,
+        reservationId,
+        reminder.scheduledStart ? new Date(queuedAt) : undefined,
+      )
+    ) {
       await this.executions.log({
         type,
         result: AutomationExecutionResult.SKIPPED,

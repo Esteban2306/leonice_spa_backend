@@ -27,12 +27,14 @@ export class AutomationExecutionRepository {
   async hasExecuted(
     type: AutomationExecutionType,
     reservationId: string,
+    since?: Date,
   ): Promise<boolean> {
     const count = await this.prisma.client.automationExecution.count({
       where: {
         type,
         reservationId,
         result: AutomationExecutionResult.EXECUTED,
+        ...(since && { executedAt: { gte: since } }),
       },
     });
     return count > 0;

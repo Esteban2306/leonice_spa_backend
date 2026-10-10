@@ -15,6 +15,9 @@ import {
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DEFAULT_REMINDER_DAYS } from '../domain/automation-timing.constants';
 
+export const reminderJobId = (reservationId: string) =>
+  `reservation-reminder-${reservationId}`;
+
 @Injectable()
 export class ScheduleReminderListener {
   private readonly logger = new Logger(ScheduleReminderListener.name);
@@ -109,12 +112,16 @@ export class ScheduleReminderListener {
       reminderDays * 24 * 60 * 60 * 1000 -
       Date.now();
 
+    const jobId = reminderJobId(reservationId);
+    const previous = await this.queue.getJob(jobId);
+    if (previous && !(await previous.isActive())) await previous.remove();
+
     if (delay <= 0) return;
 
     await this.queue.add(
       JOB_NAMES.RESERVATION_REMINDER_CHECK,
-      { reservationId },
-      { delay },
+      { reservationId, scheduledStart: scheduledStart.toISOString() },
+      { delay, jobId },
     );
   }
 }
