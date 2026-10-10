@@ -39,6 +39,15 @@ async function api(method, path, body, extraHeaders = {}) {
   try { json = text ? JSON.parse(text) : null; } catch { json = text; }
   return { status: res.status, body: json, headers: res.headers };
 }
+// Llamada tal como la hace Conduit: solo X-API-Key, sin cookies de sesión ni CSRF.
+async function tool(method, path, body, extraHeaders = {}) {
+  const headers = { 'content-type': 'application/json', ...toolHeaders(), ...extraHeaders };
+  const res = await fetch(BASE + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const text = await res.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch { json = text; }
+  return { status: res.status, body: json, headers: res.headers };
+}
 function resetThrottle() {
   const keys = execFileSync('docker', ['exec', 'leonice-redis', 'redis-cli', '--scan', '--pattern', '{*'], { encoding: 'utf8' })
     .split('\n').filter((k) => /:(client-booking|reservations|default)\}:(hits|blocked)$/.test(k));
@@ -715,15 +724,15 @@ const scenarios = {
     const phone = newPhone();
     const combo = await book(phone, [QA_TREATMENT, NAILS_TREATMENT], at('28', '08'));
     const [a, b] = combo.body.reservations.map((x) => x.id);
-    let r = await api('GET', `/conduit/booking/reservations/upcoming?phone=${encodeURIComponent(phone)}`, undefined, toolHeaders());
+    let r = await tool('GET', `/conduit/booking/reservations/upcoming?phone=${encodeURIComponent(phone)}`);
     eq('CT1 reservas_proximas agrupa el combo en un día', r.body?.days?.[0]?.reservations?.length, 2);
     r = await api('GET', `/conduit/booking/reservations/upcoming?phone=${encodeURIComponent(phone)}`);
     check('CT2 sin X-API-Key → rechazado', r.status === 401 || r.status === 403, String(r.status));
     const key = `qa-ct-${RUN}`;
-    r = await api('POST', '/conduit/booking/reservations/cancel', { phone, reservationId: a, scope: 'DAY' }, { ...toolHeaders(), 'idempotency-key': key });
+    r = await tool('POST', '/conduit/booking/reservations/cancel', { phone, reservationId: a, scope: 'DAY' }, { 'x-conduit-idempotency-key': key });
     eq('CT3 cancelar_reserva_whatsapp DAY → 200', r.status, 200);
     eq('CT3 canceló el combo completo', r.body?.cancelled?.length, 2);
-    const again = await api('POST', '/conduit/booking/reservations/cancel', { phone, reservationId: a, scope: 'DAY' }, { ...toolHeaders(), 'idempotency-key': key });
+    const again = await tool('POST', '/conduit/booking/reservations/cancel', { phone, reservationId: a, scope: 'DAY' }, { 'x-conduit-idempotency-key': key });
     eq('CT4 reintento del bot con la misma clave repite la respuesta', again.headers.get('idempotent-replayed'), 'true');
     eq('CT4 sigue habiendo 2 canceladas (no duplica eventos)', sql(`select count(*) from reservations where id in ('${a}','${b}') and status='CANCELADA'`), '2');
   },

@@ -11,7 +11,6 @@ import {
   UseInterceptors,
   MaxFileSizeValidator,
   FileTypeValidator,
-  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -29,7 +28,7 @@ import { DepositsRepository } from './repositories/deposits.repositories';
 import { ManualDepositVerificationStrategy } from './strategies/manual-deposit-verification.strategy';
 import { AutomaticDepositVerificationStrategy } from './strategies/automatic-deposit-verification.strategy';
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
-import { ConduitToolAuthGuard } from '../conduit/guards/conduit-tool-auth.guard';
+import { ConduitTool } from '../conduit/decorators/conduit-tool.decorator';
 import { SubmitDepositProofDto } from './dto/submit-deposit-proof.dto';
 import { assertValidImageDataUri } from './validators/assert-valid-image-data-uri';
 
@@ -82,7 +81,7 @@ export class DepositsController {
     });
   }
 
-  @UseGuards(ConduitToolAuthGuard)
+  @ConduitTool({ requiresVerifiedContact: true })
   @Post('automatic')
   async submitAutomaticProof(
     @Param('id', ParseUUIDPipe) reservationId: string,

@@ -65,6 +65,7 @@ import { CancellationLinksController } from './cancellation-links.controller';
     MarkNoShowOrchestrator,
     ConfirmDepositOrchestrator,
     AdminCancelReservationOrchestrator,
+    RescheduleReservationOrchestrator,
   ],
 })
 export class ReservationsModule {}

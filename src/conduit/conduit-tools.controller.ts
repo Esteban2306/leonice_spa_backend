@@ -5,10 +5,15 @@ import {
   NotFoundException,
   Post,
   Patch,
-  UseGuards,
+  Req,
   ConflictException,
 } from '@nestjs/common';
-import { ConduitToolAuthGuard } from './guards/conduit-tool-auth.guard';
+import { ConduitTool } from './decorators/conduit-tool.decorator';
+import {
+  ConduitToolOptionsMeta,
+  type RequestWithConduitContact,
+} from './interceptors/conduit-contact.interceptor';
+import { AppException } from '../common/errors/app.exception';
 import { ClientsRepository } from 'src/clients/repositories/clients.repository';
 import { ClientsService } from 'src/clients/clients.service';
 import { normalizePhone } from 'src/clients/utils/normalize-phone.util';
@@ -17,7 +22,7 @@ import { ConduitCreateClientDto } from './dto/conduit-create-client.dto';
 import { ConsentService } from 'src/clients/consent/consent.service';
 
 @Controller({ path: 'conduit/clients', version: '1' })
-@UseGuards(ConduitToolAuthGuard)
+@ConduitTool()
 export class ConduitToolsController {
   constructor(
     private readonly clientsRepository: ClientsRepository,
@@ -26,7 +31,10 @@ export class ConduitToolsController {
   ) {}
 
   @Post()
-  async createOrUpdate(@Body() dto: ConduitCreateClientDto) {
+  async createOrUpdate(
+    @Body() dto: ConduitCreateClientDto,
+    @Req() req: RequestWithConduitContact,
+  ) {
     const normalizedPhone = normalizePhone(dto.phone);
 
     let client = dto.whatsappJid
@@ -35,6 +43,12 @@ export class ConduitToolsController {
 
     if (!client) {
       client = await this.clientsRepository.findByPhone(normalizedPhone);
+    }
+
+    // Un chat sin teléfono verificado (solo LID) puede registrar una clienta
+    // nueva, pero no modificar el perfil de una existente.
+    if (client && req.conduitContact?.lid && !req.conduitContact.phone) {
+      throw new AppException('CONTACT_NOT_VERIFIED');
     }
 
     if (!client) {
@@ -100,6 +114,7 @@ export class ConduitToolsController {
     } = dto;
     return this.clientsService.update(client.id, updates);
   }
+  @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
   @Patch()
   async update(@Body() dto: ConduitUpdateClientDto) {
     const client = await this.clientsRepository.findByPhone(

@@ -257,6 +257,33 @@ const DEPOSIT = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const CONDUIT = {
+  CONTACT_NOT_VERIFIED: {
+    status: HttpStatus.FORBIDDEN,
+    message:
+      'No pudimos verificar el número de WhatsApp de este chat. Para gestionar reservas existentes usa el enlace de cancelación o pide hablar con una persona del equipo.',
+  },
+  CONTACT_MISMATCH: {
+    status: HttpStatus.FORBIDDEN,
+    message:
+      'Por seguridad solo se pueden consultar o modificar las reservas del número que escribe.',
+  },
+  CONDUIT_UNAVAILABLE: {
+    status: HttpStatus.BAD_GATEWAY,
+    message:
+      'El servicio de WhatsApp (Conduit) no respondió. Intenta de nuevo en unos minutos.',
+  },
+  CONDUIT_REQUEST_REJECTED: {
+    status: HttpStatus.BAD_REQUEST,
+    message: 'El servicio de WhatsApp (Conduit) rechazó la solicitud.',
+  },
+  CONDUIT_NOT_CONFIGURED: {
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    message:
+      'La integración con WhatsApp no está configurada en este servidor (faltan variables CONDUIT_*).',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 const AUTH = {
   AUTH_CURRENT_PASSWORD_INVALID: {
     status: HttpStatus.BAD_REQUEST,
@@ -295,6 +322,7 @@ export const ERROR_CATALOG = {
   ...CLIENT,
   ...SCHEDULE,
   ...DEPOSIT,
+  ...CONDUIT,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { ConduitToolAuthGuard } from '../conduit/guards/conduit-tool-auth.guard';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { ConduitTool } from '../conduit/decorators/conduit-tool.decorator';
 import { PendingDepositLookupService } from './services/pending-deposit-lookup.service';
 import { SubmitDepositProofOrchestrator } from './orchestrator/submit-deposit-proof.orchestrator';
 import { AutomaticDepositVerificationStrategy } from './strategies/automatic-deposit-verification.strategy';
@@ -43,13 +43,13 @@ export class DepositsLookupController {
     return this.depositCredit.summarizeForClient(query.clientId);
   }
 
-  @UseGuards(ConduitToolAuthGuard)
+  @ConduitTool({ requiresVerifiedContact: true })
   @Get('pending')
   findPending(@Query('phone') phone: string) {
     return this.lookupService.findCandidates(phone);
   }
 
-  @UseGuards(ConduitToolAuthGuard)
+  @ConduitTool({ requiresVerifiedContact: true })
   @Post('automatic')
   async submitAutomaticProof(@Body() dto: SubmitAutomaticDepositDto) {
     const reservationId =
