@@ -1,6 +1,13 @@
+const fromEnv = (key: string) => process.env[key] ?? '';
+
 export const CONDUIT_TEMPLATE_IDS = {
-  RESERVATION_REMINDER: process.env.CONDUIT_TEMPLATE_RESERVATION_REMINDER ?? '',
-  REACTIVATION: process.env.CONDUIT_TEMPLATE_REACTIVATION ?? '',
-  REACTIVATION_WITH_PROMO:
-    process.env.CONDUIT_TEMPLATE_REACTIVATION_PROMO ?? '',
-} as const;
+  get RESERVATION_REMINDER() {
+    return fromEnv('CONDUIT_TEMPLATE_RESERVATION_REMINDER');
+  },
+  get REACTIVATION() {
+    return fromEnv('CONDUIT_TEMPLATE_REACTIVATION');
+  },
+  get REACTIVATION_WITH_PROMO() {
+    return fromEnv('CONDUIT_TEMPLATE_REACTIVATION_PROMO');
+  },
+};
