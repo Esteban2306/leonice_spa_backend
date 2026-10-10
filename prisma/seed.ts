@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { ARGON2_OPTIONS } from '../src/auth/constants/auth.constants';
 import { DEFAULT_WEEKLY_WINDOWS } from '../src/reservations/domain/operating-hours';
+import { seedConduitTemplates } from './seed-conduit-templates';
 
 const prisma = new PrismaClient();
 
@@ -232,6 +233,14 @@ async function main() {
   console.log(
     'Seed completado: 3 categorías, 3 capacity pools, 20 tratamientos.',
   );
+
+  try {
+    await seedConduitTemplates();
+  } catch (error) {
+    console.warn(
+      `[conduit] No se pudieron sembrar las plantillas: ${(error as Error).message}`,
+    );
+  }
 }
 
 main()
