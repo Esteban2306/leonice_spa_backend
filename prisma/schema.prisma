@@ -425,6 +425,24 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+/// Información del negocio que el bot comunica a las clientas y que el
+/// panel edita. Registro único (id = "default").
+model BusinessSettings {
+  id                     String   @id @default("default")
+  /// Valor del anticipo en miles de COP (35 = $35.000). Null = no se informa monto fijo.
+  depositAmount          Int?     @map("deposit_amount")
+  /// Cómo pagar el anticipo (cuentas, Nequi, llaves). Texto que el bot comparte tal cual.
+  depositInstructions    String?  @map("deposit_instructions") @db.Text
+  depositPolicy          String?  @map("deposit_policy") @db.Text
+  cancellationPolicy     String?  @map("cancellation_policy") @db.Text
+  address                String?
+  additionalInfo         String?  @map("additional_info") @db.Text
+  updatedByUserId        String?  @map("updated_by_user_id")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("business_settings")
+}
+
 model AdminNotificationRecipient {
   id        String   @id @default(uuid())
   name      String
@@ -505,6 +523,7 @@ enum AutomationExecutionType {
   CLIENT_CANCELLATION_NOTICE
   ADMIN_CLIENT_CANCELLATION_NOTICE
   CLIENT_CANCELLATION_LINK_NOTICE
+  ADMIN_HANDOFF_NOTICE
 }
 
 enum AutomationExecutionResult {
