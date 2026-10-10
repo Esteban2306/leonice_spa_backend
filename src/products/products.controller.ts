@@ -76,6 +76,23 @@ export class ProductsController {
   }
 
   @Public()
+  @Get('tags')
+  findAllTags() {
+    return this.service.findAllTags();
+  }
+
+  @Post('tags')
+  createTag(@Body() dto: CreateProductTagDto) {
+    return this.service.createTag(dto);
+  }
+
+  @Public()
+  @Get('recommended-for-client')
+  findRecommendedForClient(@Query('phone') phone: string) {
+    return this.service.findRecommendedForClient(phone);
+  }
+
+  @Public()
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);
@@ -110,23 +127,6 @@ export class ProductsController {
     @Body() dto: UpdateProductVariantDto,
   ) {
     return this.service.updateVariant(variantId, dto);
-  }
-
-  @Public()
-  @Get('tags')
-  findAllTags() {
-    return this.service.findAllTags();
-  }
-
-  @Post('tags')
-  createTag(@Body() dto: CreateProductTagDto) {
-    return this.service.createTag(dto);
-  }
-
-  @Public()
-  @Get('recommended-for-client')
-  findRecommendedForClient(@Query('phone') phone: string) {
-    return this.service.findRecommendedForClient(phone);
   }
 
   @Patch(':id/toggle')
