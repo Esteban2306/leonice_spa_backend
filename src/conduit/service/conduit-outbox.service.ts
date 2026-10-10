@@ -20,4 +20,18 @@ export class ConduitOutboxService {
       outboxEventId: event.id,
     });
   }
+
+  /** Reintento manual desde el panel de un evento que no llegó a Conduit. */
+  async retry(id: string): Promise<boolean> {
+    const event = await this.repository.findById(id);
+    if (!event || event.status === 'SENT') return false;
+
+    await this.repository.resetToPending(id);
+    await this.queue.add(
+      JOB_NAMES.PUBLISH_CONDUIT_EVENT,
+      { outboxEventId: id },
+      { jobId: `outbox-retry-${id}-${Date.now()}` },
+    );
+    return true;
+  }
 }

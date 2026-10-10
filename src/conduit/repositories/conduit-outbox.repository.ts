@@ -29,4 +29,28 @@ export class ConduitOutboxRepository {
       data: { status: 'FAILED', lastError: error, attempts: { increment: 1 } },
     });
   }
+
+  findMany(filters: {
+    status?: 'PENDING' | 'SENT' | 'FAILED';
+    page: number;
+    pageSize: number;
+  }) {
+    const where = filters.status ? { status: filters.status } : {};
+    return Promise.all([
+      this.prisma.client.conduitOutboxEvent.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+      }),
+      this.prisma.client.conduitOutboxEvent.count({ where }),
+    ]);
+  }
+
+  resetToPending(id: string) {
+    return this.prisma.client.conduitOutboxEvent.update({
+      where: { id },
+      data: { status: 'PENDING', lastError: null },
+    });
+  }
 }

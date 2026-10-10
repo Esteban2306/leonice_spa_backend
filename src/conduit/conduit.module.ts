@@ -15,6 +15,7 @@ import { ConduitBookingToolsController } from './conduit-booking-tools.controlle
 import { ReservationsModule } from '../reservations/reservations.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { ConduitSupportToolsController } from './conduit-support-tools.controller';
+import { ConduitAdminController } from './admin/conduit-admin.controller';
 import { BusinessSettingsModule } from '../business-settings/business-settings.module';
 
 @Module({
@@ -29,6 +30,7 @@ import { BusinessSettingsModule } from '../business-settings/business-settings.m
     ConduitToolsController,
     ConduitBookingToolsController,
     ConduitSupportToolsController,
+    ConduitAdminController,
   ],
   providers: [
     ConduitApiClient,
