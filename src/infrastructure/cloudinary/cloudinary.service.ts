@@ -26,6 +26,22 @@ export class CloudinaryService {
         },
         (error, result) => {
           if (error || !result) {
+            console.error('\n========== CLOUDINARY UPLOAD ERROR ==========');
+
+            if (error instanceof Error) {
+              console.error({
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+              });
+            } else {
+              console.dir(error, {
+                depth: null,
+              });
+            }
+
+            console.error('============================================\n');
+
             return reject(
               error instanceof Error
                 ? error
