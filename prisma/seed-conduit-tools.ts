@@ -1,3 +1,4 @@
+import { conduitSeedRequest } from './conduit-seed-request';
 import {
   CONDUIT_TOOL_CATALOG,
   ConduitToolDefinition,
@@ -34,26 +35,7 @@ export async function seedConduitTools(
   const publicUrl = env.CONDUIT_TOOLS_PUBLIC_URL!.replace(/\/+$/, '');
   const overwrite = env.CONDUIT_TOOLS_OVERWRITE === 'true';
 
-  const request = async <T>(
-    method: 'GET' | 'POST' | 'PATCH',
-    path: string,
-    body?: unknown,
-  ): Promise<T> => {
-    const res = await fetch(new URL(`/api/v1/${path}`, baseUrl), {
-      method,
-      headers: {
-        'X-API-Key': apiKey,
-        ...(body !== undefined && { 'Content-Type': 'application/json' }),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(10_000),
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      throw new Error(`${method} ${path} → HTTP ${res.status}: ${text}`);
-    }
-    return (text ? JSON.parse(text) : null) as T;
-  };
+  const request = conduitSeedRequest(baseUrl, apiKey);
 
   const listed = await request<RemoteTool[] | { data: RemoteTool[] }>(
     'GET',
