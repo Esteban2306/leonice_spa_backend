@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConduitApiClient } from './client/conduit-api.client';
+import { ConduitTemplateResolver } from './templates/conduit-template-resolver';
 import { HmacSignatureGuard } from './guards/hmac-signature.guard';
 import { ConduitWebhooksController } from './conduit.controller';
 import { ConduitMessageDeliveryLogRepository } from './repositories/conduit-message-delivery-log.repository';
@@ -34,6 +35,7 @@ import { BusinessSettingsModule } from '../business-settings/business-settings.m
   ],
   providers: [
     ConduitApiClient,
+    ConduitTemplateResolver,
     HmacSignatureGuard,
     ConduitMessageDeliveryLogRepository,
     ConduitMessageEventsService,
@@ -43,6 +45,6 @@ import { BusinessSettingsModule } from '../business-settings/business-settings.m
     ConduitOutboxListener,
     ConduitOutboxProcessor,
   ],
-  exports: [ConduitApiClient, HmacSignatureGuard],
+  exports: [ConduitApiClient, ConduitTemplateResolver, HmacSignatureGuard],
 })
 export class ConduitModule {}

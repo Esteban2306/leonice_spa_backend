@@ -1,5 +1,4 @@
 import { OPERATIONAL_TEMPLATE_ENV_KEYS } from '../../automation/domain/operational-notifications.constants';
-import { CONDUIT_TEMPLATE_IDS } from '../../automation/domain/conduit-template-ids.constants';
 import {
   CONDUIT_TEMPLATE_CATALOG,
   templatePlaceholders,
@@ -31,7 +30,6 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
         'REACTIVATION_PROMO',
       ]),
     );
-    expect(Object.keys(CONDUIT_TEMPLATE_IDS)).toHaveLength(3);
   });
 
   it('no repite nombres, códigos ni variables de entorno', () => {

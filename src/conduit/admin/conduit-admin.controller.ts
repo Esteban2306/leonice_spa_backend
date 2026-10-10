@@ -25,15 +25,9 @@ import {
   ConduitPromptTypeParam,
   FindOutboxQueryDto,
 } from './conduit-admin.dto';
-import { OPERATIONAL_TEMPLATE_ENV_KEYS } from '../../automation/domain/operational-notifications.constants';
+import { ConduitTemplateResolver } from '../templates/conduit-template-resolver';
 
 type Body = Record<string, unknown>;
-
-const CLIENT_TEMPLATE_ENV_KEYS = {
-  RESERVATION_REMINDER: 'CONDUIT_TEMPLATE_RESERVATION_REMINDER',
-  REACTIVATION: 'CONDUIT_TEMPLATE_REACTIVATION',
-  REACTIVATION_PROMO: 'CONDUIT_TEMPLATE_REACTIVATION_PROMO',
-} as const;
 
 /**
  * Backend del panel administrativo para Conduit (BFF).
@@ -53,6 +47,7 @@ export class ConduitAdminController {
   constructor(
     private readonly conduit: ConduitApiClient,
     private readonly config: ConfigService,
+    private readonly templateResolver: ConduitTemplateResolver,
     private readonly outboxRepository: ConduitOutboxRepository,
     private readonly outbox: ConduitOutboxService,
   ) {}
@@ -62,7 +57,7 @@ export class ConduitAdminController {
   /** Estado general para la portada del módulo WhatsApp. Tolera fallos parciales. */
   @Get('overview')
   async overview() {
-    const [health, connection, connectionHealth, bot] =
+    const [health, connection, connectionHealth, bot, templates] =
       await Promise.allSettled([
         this.conduit.admin('GET', 'health'),
         this.conduit.admin(
@@ -74,6 +69,7 @@ export class ConduitAdminController {
           `whatsapp/connections/${this.connectionId()}/health`,
         ),
         this.conduit.admin('GET', `bot/config/${this.botId()}`),
+        this.templateResolver.describe(),
       ]);
 
     const value = (r: PromiseSettledResult<unknown>) =>
@@ -92,7 +88,7 @@ export class ConduitAdminController {
         connection: error(connection),
         bot: error(bot),
       },
-      templates: this.templateConfiguration(),
+      templates: value(templates),
     };
   }
 
@@ -354,7 +350,7 @@ export class ConduitAdminController {
   /** Qué plantillas usa Leonice (variables CONDUIT_TEMPLATE_*) y si están configuradas. */
   @Get('templates/usage')
   templateUsage() {
-    return this.templateConfiguration();
+    return this.templateResolver.describe();
   }
 
   @Get('templates/:id')
@@ -363,18 +359,27 @@ export class ConduitAdminController {
   }
 
   @Post('templates')
-  createTemplate(@Body() body: Body) {
-    return this.call('POST', 'templates', { body });
+  async createTemplate(@Body() body: Body) {
+    const created = await this.call('POST', 'templates', { body });
+    this.templateResolver.invalidate();
+    return created;
   }
 
   @Put('templates/:id')
-  updateTemplate(@Param('id', ParseUUIDPipe) id: string, @Body() body: Body) {
-    return this.call('PUT', `templates/${id}`, { body });
+  async updateTemplate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Body,
+  ) {
+    const updated = await this.call('PUT', `templates/${id}`, { body });
+    this.templateResolver.invalidate();
+    return updated;
   }
 
   @Delete('templates/:id')
-  removeTemplate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.call('DELETE', `templates/${id}`);
+  async removeTemplate(@Param('id', ParseUUIDPipe) id: string) {
+    const removed = await this.call('DELETE', `templates/${id}`);
+    this.templateResolver.invalidate();
+    return removed;
   }
 
   @HttpCode(HttpStatus.OK)
@@ -522,16 +527,5 @@ export class ConduitAdminController {
       ...rest
     } = connection as Record<string, unknown>;
     return rest;
-  }
-
-  private templateConfiguration() {
-    const entries = {
-      ...CLIENT_TEMPLATE_ENV_KEYS,
-      ...OPERATIONAL_TEMPLATE_ENV_KEYS,
-    };
-    return Object.entries(entries).map(([name, envKey]) => {
-      const templateId = this.config.get<string>(envKey) || null;
-      return { name, envKey, templateId, configured: Boolean(templateId) };
-    });
   }
 }

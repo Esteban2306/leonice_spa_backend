@@ -16,6 +16,7 @@ import { ReservationsRepository } from 'src/reservations/repositories/reservatio
 import { ReservationStateMachine } from 'src/reservations/domain/reservation-state-machine';
 import { AdminNotificationRecipientsRepository } from 'src/admin-notifications/repository/admin-notification-recipients.repository';
 import { AutomationExecutionRepository } from './repositories/automation-execution.repository';
+import { ConduitTemplateResolver } from '../conduit/templates/conduit-template-resolver';
 import { assertMessageDelivered } from './utils/assert-message-delivered';
 import { formatNotificationDateTime } from './utils/format-notification-date';
 import {
@@ -68,6 +69,7 @@ export class OperationalNotificationsService {
     private readonly reservations: ReservationsRepository,
     private readonly recipients: AdminNotificationRecipientsRepository,
     private readonly executions: AutomationExecutionRepository,
+    private readonly templates: ConduitTemplateResolver,
   ) {}
 
   async notifyAdminDepositTimeout(
@@ -379,10 +381,10 @@ export class OperationalNotificationsService {
     variables: Record<string, string>,
   ): Promise<void> {
     const envKey = OPERATIONAL_TEMPLATE_ENV_KEYS[template];
-    const templateId = this.config.get<string>(envKey);
+    const templateId = await this.templates.resolve(envKey);
     if (!templateId) {
       throw new UnrecoverableError(
-        `Falta configurar la variable de entorno ${envKey}`,
+        `No hay plantilla de Conduit para ${envKey}: créala con pnpm seed o define la variable`,
       );
     }
 

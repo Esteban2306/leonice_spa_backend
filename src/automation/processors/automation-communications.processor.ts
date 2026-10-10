@@ -22,7 +22,7 @@ import { assertMessageDelivered } from '../utils/assert-message-delivered';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { ReactivationJobData } from '../listeners/schedule-reactivation.listener';
 import { ConsentService } from 'src/clients/consent/consent.service';
-import { CONDUIT_TEMPLATE_IDS } from '../domain/conduit-template-ids.constants';
+import { ConduitTemplateResolver } from '../../conduit/templates/conduit-template-resolver';
 import {
   AdminDepositTimeoutNoticeJobData,
   AdminClientCancellationNoticeJobData,
@@ -62,6 +62,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly consentService: ConsentService,
     private readonly notifications: OperationalNotificationsService,
+    private readonly templates: ConduitTemplateResolver,
   ) {
     super();
   }
@@ -279,9 +280,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     const result = await this.conduitApiClient.sendWhatsappMessage({
       ...ctx,
       phone: client.phone,
-      templateId: hasValidPromo
-        ? CONDUIT_TEMPLATE_IDS.REACTIVATION_WITH_PROMO
-        : CONDUIT_TEMPLATE_IDS.REACTIVATION,
+      templateId: await this.requireTemplate(
+        hasValidPromo
+          ? 'CONDUIT_TEMPLATE_REACTIVATION_PROMO'
+          : 'CONDUIT_TEMPLATE_REACTIVATION',
+      ),
       variables: hasValidPromo
         ? {
             nombre: client.name,
@@ -368,7 +371,9 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     const result = await this.conduitApiClient.sendWhatsappMessage({
       ...ctx,
       phone: reservation.client.phone,
-      templateId: CONDUIT_TEMPLATE_IDS.RESERVATION_REMINDER,
+      templateId: await this.requireTemplate(
+        'CONDUIT_TEMPLATE_RESERVATION_REMINDER',
+      ),
       variables: {
         nombre: reservation.client.name,
         fecha: formatNotificationDateTime(reservation.scheduledStart),
@@ -392,5 +397,15 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       result: AutomationExecutionResult.EXECUTED,
       reservationId,
     });
+  }
+
+  private async requireTemplate(envKey: string): Promise<string> {
+    const templateId = await this.templates.resolve(envKey);
+    if (!templateId) {
+      throw new UnrecoverableError(
+        `No hay plantilla de Conduit para ${envKey}: créala con pnpm seed o define la variable`,
+      );
+    }
+    return templateId;
   }
 }
