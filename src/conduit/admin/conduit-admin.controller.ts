@@ -27,7 +27,7 @@ import {
 } from './conduit-admin.dto';
 import { ConduitTemplateResolver } from '../templates/conduit-template-resolver';
 
-type Body = Record<string, unknown>;
+type ConduitPayload = Record<string, unknown>;
 
 /**
  * Backend del panel administrativo para Conduit (BFF).
@@ -128,7 +128,7 @@ export class ConduitAdminController {
   }
 
   @Put('connection/warmup-level')
-  warmupLevel(@Body() body: Body) {
+  warmupLevel(@Body() body: ConduitPayload) {
     return this.call(
       'POST',
       `whatsapp/connections/${this.connectionId()}/warmup-level`,
@@ -137,7 +137,7 @@ export class ConduitAdminController {
   }
 
   @Put('connection/campaign-policy')
-  campaignPolicy(@Body() body: Body) {
+  campaignPolicy(@Body() body: ConduitPayload) {
     return this.call(
       'PATCH',
       `whatsapp/connections/${this.connectionId()}/campaign-policy`,
@@ -167,7 +167,7 @@ export class ConduitAdminController {
 
   /** Ajustes generales del bot (retrasos, historial, takeover, imágenes…). */
   @Put('bot')
-  updateBot(@Body() body: Body) {
+  updateBot(@Body() body: ConduitPayload) {
     return this.call('PUT', `bot/config/${this.botId()}`, { body });
   }
 
@@ -183,7 +183,7 @@ export class ConduitAdminController {
   }
 
   @Put('bot/prompts/settings')
-  updatePromptSettings(@Body() body: Body) {
+  updatePromptSettings(@Body() body: ConduitPayload) {
     return this.call('PUT', `bots/${this.botId()}/prompts/settings`, { body });
   }
 
@@ -198,7 +198,10 @@ export class ConduitAdminController {
   }
 
   @Put('bot/prompts/:type')
-  updatePrompt(@Param() params: ConduitPromptTypeParam, @Body() body: Body) {
+  updatePrompt(
+    @Param() params: ConduitPromptTypeParam,
+    @Body() body: ConduitPayload,
+  ) {
     return this.call('PUT', `bots/${this.botId()}/prompts/${params.type}`, {
       body,
     });
@@ -206,7 +209,7 @@ export class ConduitAdminController {
 
   @HttpCode(HttpStatus.OK)
   @Post('bot/prompts/preview')
-  previewPrompt(@Body() body: Body) {
+  previewPrompt(@Body() body: ConduitPayload) {
     return this.call('POST', `bots/${this.botId()}/prompts/preview`, { body });
   }
 
@@ -217,7 +220,7 @@ export class ConduitAdminController {
 
   /** Agregar un modelo de IA (la API key se guarda cifrada en Conduit). */
   @Post('bot/models')
-  addModel(@Body() body: Body) {
+  addModel(@Body() body: ConduitPayload) {
     return this.call('POST', `bot/config/${this.botId()}/models`, { body });
   }
 
@@ -241,14 +244,14 @@ export class ConduitAdminController {
   }
 
   @Post('bot/tools')
-  createTool(@Body() body: Body) {
+  createTool(@Body() body: ConduitPayload) {
     return this.call('POST', `bots/${this.botId()}/tools`, { body });
   }
 
   @Patch('bot/tools/:toolId')
   updateTool(
     @Param('toolId', ParseUUIDPipe) toolId: string,
-    @Body() body: Body,
+    @Body() body: ConduitPayload,
   ) {
     return this.call('PATCH', `bots/${this.botId()}/tools/${toolId}`, {
       body,
@@ -266,7 +269,7 @@ export class ConduitAdminController {
   }
 
   @Post('bot/escalation-contacts')
-  addEscalationContact(@Body() body: Body) {
+  addEscalationContact(@Body() body: ConduitPayload) {
     return this.call('POST', `bots/${this.botId()}/escalation-contacts`, {
       body: { connectionId: this.connectionId(), ...body },
     });
@@ -311,7 +314,7 @@ export class ConduitAdminController {
 
   @HttpCode(HttpStatus.OK)
   @Post('conversations/:id/pause')
-  pause(@Param('id', ParseUUIDPipe) id: string, @Body() body: Body) {
+  pause(@Param('id', ParseUUIDPipe) id: string, @Body() body: ConduitPayload) {
     return this.call('POST', `bots/${this.botId()}/conversations/${id}/pause`, {
       body,
     });
@@ -326,7 +329,7 @@ export class ConduitAdminController {
   /** Responder como persona: el bot queda en pausa por takeover humano. */
   @HttpCode(HttpStatus.OK)
   @Post('conversations/:id/messages')
-  reply(@Param('id', ParseUUIDPipe) id: string, @Body() body: Body) {
+  reply(@Param('id', ParseUUIDPipe) id: string, @Body() body: ConduitPayload) {
     return this.call(
       'POST',
       `bots/${this.botId()}/conversations/${id}/messages`,
@@ -359,7 +362,7 @@ export class ConduitAdminController {
   }
 
   @Post('templates')
-  async createTemplate(@Body() body: Body) {
+  async createTemplate(@Body() body: ConduitPayload) {
     const created = await this.call('POST', 'templates', { body });
     this.templateResolver.invalidate();
     return created;
@@ -368,7 +371,7 @@ export class ConduitAdminController {
   @Put('templates/:id')
   async updateTemplate(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: Body,
+    @Body() body: ConduitPayload,
   ) {
     const updated = await this.call('PUT', `templates/${id}`, { body });
     this.templateResolver.invalidate();
@@ -384,7 +387,10 @@ export class ConduitAdminController {
 
   @HttpCode(HttpStatus.OK)
   @Post('templates/:id/preview')
-  previewTemplate(@Param('id', ParseUUIDPipe) id: string, @Body() body: Body) {
+  previewTemplate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ConduitPayload,
+  ) {
     return this.call('POST', `templates/${id}/preview`, { body });
   }
 
