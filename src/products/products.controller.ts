@@ -23,6 +23,7 @@ import { AssignProductTagsDto } from './dto/assign-product-tags.dto';
 import { LogProductViewDto } from './dto/log-product-view.dto';
 import { SkipCsrf } from 'src/auth/decorators/skip-csrf.decorator';
 import { CreateProductTagDto } from './dto/create-product-tag.dto';
+import { FindRecommendedForClientQueryDto } from './dto/find-recommended-for-client-query.dto';
 
 @Controller({ path: 'products', version: '1' })
 export class ProductsController {
@@ -88,8 +89,8 @@ export class ProductsController {
 
   @Public()
   @Get('recommended-for-client')
-  findRecommendedForClient(@Query('phone') phone: string) {
-    return this.service.findRecommendedForClient(phone);
+  findRecommendedForClient(@Query() query: FindRecommendedForClientQueryDto) {
+    return this.service.findRecommendedForClient(query.phone);
   }
 
   @Public()
