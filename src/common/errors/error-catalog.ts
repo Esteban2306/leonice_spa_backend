@@ -284,6 +284,63 @@ const CONDUIT = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const PRODUCT = {
+  PRODUCT_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Producto no encontrado.',
+  },
+  PRODUCT_HAS_HISTORY: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Este producto tiene historial (vistas de clientas o recomendaciones). Desactívalo en lugar de borrarlo.',
+  },
+  PRODUCT_VARIANT_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Variante no encontrada.',
+  },
+  PRODUCT_VARIANT_ALREADY_EXISTS: {
+    status: HttpStatus.CONFLICT,
+    message: 'Ya existe una variante con esa marca y presentación.',
+  },
+  PRODUCT_CATEGORY_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Categoría de producto no encontrada.',
+  },
+  PRODUCT_CATEGORY_ALREADY_EXISTS: {
+    status: HttpStatus.CONFLICT,
+    message: 'Ya existe una categoría de producto con ese nombre.',
+  },
+  PRODUCT_CATEGORY_IN_USE: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'La categoría tiene productos. Muévelos a otra categoría o desactívala.',
+  },
+  PRODUCT_TAG_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Etiqueta no encontrada.',
+  },
+  PRODUCT_TAG_ALREADY_EXISTS: {
+    status: HttpStatus.CONFLICT,
+    message: 'Ya existe una etiqueta con ese nombre.',
+  },
+  PRODUCT_RECOMMENDATION_ALREADY_EXISTS: {
+    status: HttpStatus.CONFLICT,
+    message: 'Este producto ya está recomendado para ese servicio.',
+  },
+  PRODUCT_RECOMMENDATION_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Recomendación no encontrada.',
+  },
+  PRODUCT_TREATMENT_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'El servicio indicado no existe.',
+  },
+  PRODUCT_IMAGE_UPLOAD_FAILED: {
+    status: HttpStatus.BAD_GATEWAY,
+    message: 'No pudimos subir la imagen. Intenta de nuevo en unos minutos.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 const AUTH = {
   AUTH_CURRENT_PASSWORD_INVALID: {
     status: HttpStatus.BAD_REQUEST,
@@ -323,6 +380,7 @@ export const ERROR_CATALOG = {
   ...SCHEDULE,
   ...DEPOSIT,
   ...CONDUIT,
+  ...PRODUCT,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

@@ -282,15 +282,16 @@ model Product {
 }
 
 model ProductVariant {
-  id           String   @id @default(uuid())
-  productId    String   @map("product_id")
-  brand        String
-  presentation String
-  price        Decimal  @db.Decimal(10, 2)
-  imageUrl     String?  @map("image_url")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  product      Product  @relation(fields: [productId], references: [id])
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  brand         String
+  presentation  String
+  price         Decimal  @db.Decimal(10, 2)
+  imageUrl      String?  @map("image_url")
+  imagePublicId String?  @map("image_public_id")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  product       Product  @relation(fields: [productId], references: [id])
 
   @@unique([productId, brand, presentation])
   @@map("product_variants")
@@ -428,17 +429,17 @@ model AuditLog {
 /// Información del negocio que el bot comunica a las clientas y que el
 /// panel edita. Registro único (id = "default").
 model BusinessSettings {
-  id                     String   @id @default("default")
+  id                  String   @id @default("default")
   /// Valor del anticipo en miles de COP (35 = $35.000). Null = no se informa monto fijo.
-  depositAmount          Int?     @map("deposit_amount")
+  depositAmount       Int?     @map("deposit_amount")
   /// Cómo pagar el anticipo (cuentas, Nequi, llaves). Texto que el bot comparte tal cual.
-  depositInstructions    String?  @map("deposit_instructions") @db.Text
-  depositPolicy          String?  @map("deposit_policy") @db.Text
-  cancellationPolicy     String?  @map("cancellation_policy") @db.Text
-  address                String?
-  additionalInfo         String?  @map("additional_info") @db.Text
-  updatedByUserId        String?  @map("updated_by_user_id")
-  updatedAt              DateTime @updatedAt @map("updated_at")
+  depositInstructions String?  @map("deposit_instructions") @db.Text
+  depositPolicy       String?  @map("deposit_policy") @db.Text
+  cancellationPolicy  String?  @map("cancellation_policy") @db.Text
+  address             String?
+  additionalInfo      String?  @map("additional_info") @db.Text
+  updatedByUserId     String?  @map("updated_by_user_id")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("business_settings")
 }

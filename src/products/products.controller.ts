@@ -2,13 +2,22 @@ import {
   Body,
   Controller,
   Delete,
+  FileTypeValidator,
   Get,
+  HttpCode,
+  HttpStatus,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ProductsService } from './products.service';
 import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductCategoryDto } from './dto/update-product-category.dto';
@@ -18,23 +27,44 @@ import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { CreateRecommendationDto } from './dto/create-recommendation.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
+import { FindAdminProductsQueryDto } from './dto/find-admin-products-query.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { AssignProductTagsDto } from './dto/assign-product-tags.dto';
 import { LogProductViewDto } from './dto/log-product-view.dto';
 import { SkipCsrf } from 'src/auth/decorators/skip-csrf.decorator';
 import { CreateProductTagDto } from './dto/create-product-tag.dto';
+import { UpdateProductTagDto } from './dto/update-product-tag.dto';
 import { FindRecommendedForClientQueryDto } from './dto/find-recommended-for-client-query.dto';
+
+const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+const PRODUCT_IMAGE_UPLOAD_OPTIONS = {
+  storage: memoryStorage(),
+  limits: { fileSize: PRODUCT_IMAGE_MAX_BYTES, files: 1 },
+};
+
+function productImageValidationPipe() {
+  return new ParseFilePipe({
+    validators: [
+      new MaxFileSizeValidator({ maxSize: PRODUCT_IMAGE_MAX_BYTES }),
+      new FileTypeValidator({ fileType: /(jpg|jpeg|png|webp)$/ }),
+    ],
+  });
+}
 
 @Controller({ path: 'products', version: '1' })
 export class ProductsController {
   constructor(private readonly service: ProductsService) {}
 
-  // ---- Categorías de producto  ----
-
   @Public()
   @Get('categories')
   findAllCategories() {
     return this.service.findAllCategories();
+  }
+
+  @Get('categories/admin')
+  findAllCategoriesForAdmin() {
+    return this.service.findAllCategoriesForAdmin();
   }
 
   @Post('categories')
@@ -50,7 +80,11 @@ export class ProductsController {
     return this.service.updateCategory(id, dto);
   }
 
-  // ---- Recomendaciones ----
+  @Delete('categories/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeCategory(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.removeCategory(id);
+  }
 
   @Public()
   @Get('recommendations/:treatmentId')
@@ -64,16 +98,25 @@ export class ProductsController {
   }
 
   @Delete('recommendations/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   removeRecommendation(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeRecommendation(id);
   }
-
-  // ---- Productos  ----
 
   @Public()
   @Get()
   findAll(@Query() query: FindProductsQueryDto) {
     return this.service.findAll(query);
+  }
+
+  @Get('admin')
+  findAllForAdmin(@Query() query: FindAdminProductsQueryDto) {
+    return this.service.findAllForAdmin(query);
+  }
+
+  @Get('admin/:id')
+  findOneForAdmin(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.findOneForAdmin(id);
   }
 
   @Public()
@@ -82,9 +125,28 @@ export class ProductsController {
     return this.service.findAllTags();
   }
 
+  @Get('tags/admin')
+  findAllTagsForAdmin() {
+    return this.service.findAllTagsForAdmin();
+  }
+
   @Post('tags')
   createTag(@Body() dto: CreateProductTagDto) {
     return this.service.createTag(dto);
+  }
+
+  @Patch('tags/:id')
+  updateTag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProductTagDto,
+  ) {
+    return this.service.updateTag(id, dto);
+  }
+
+  @Delete('tags/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeTag(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.removeTag(id);
   }
 
   @Public()
@@ -93,10 +155,38 @@ export class ProductsController {
     return this.service.findRecommendedForClient(query.phone);
   }
 
+  @Patch('variants/:variantId')
+  updateVariant(
+    @Param('variantId', ParseUUIDPipe) variantId: string,
+    @Body() dto: UpdateProductVariantDto,
+  ) {
+    return this.service.updateVariant(variantId, dto);
+  }
+
+  @Delete('variants/:variantId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeVariant(@Param('variantId', ParseUUIDPipe) variantId: string) {
+    return this.service.removeVariant(variantId);
+  }
+
+  @Post('variants/:variantId/image')
+  @UseInterceptors(FileInterceptor('image', PRODUCT_IMAGE_UPLOAD_OPTIONS))
+  uploadVariantImage(
+    @Param('variantId', ParseUUIDPipe) variantId: string,
+    @UploadedFile(productImageValidationPipe()) file: Express.Multer.File,
+  ) {
+    return this.service.uploadVariantImage(variantId, file.buffer);
+  }
+
+  @Delete('variants/:variantId/image')
+  removeVariantImage(@Param('variantId', ParseUUIDPipe) variantId: string) {
+    return this.service.removeVariantImage(variantId);
+  }
+
   @Public()
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findOne(id);
+    return this.service.findOnePublic(id);
   }
 
   @Post()
@@ -112,7 +202,11 @@ export class ProductsController {
     return this.service.update(id, dto);
   }
 
-  // ---- Variantes ----
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.remove(id);
+  }
 
   @Post(':id/variants')
   addVariant(
@@ -120,14 +214,6 @@ export class ProductsController {
     @Body() dto: CreateProductVariantDto,
   ) {
     return this.service.addVariant(id, dto);
-  }
-
-  @Patch('variants/:variantId')
-  updateVariant(
-    @Param('variantId', ParseUUIDPipe) variantId: string,
-    @Body() dto: UpdateProductVariantDto,
-  ) {
-    return this.service.updateVariant(variantId, dto);
   }
 
   @Patch(':id/toggle')

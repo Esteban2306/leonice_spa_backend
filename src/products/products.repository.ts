@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../infrastructure/database/prisma.service';
+import {
+  CatalogStatusFilter,
+  isActiveWhere,
+} from '../catalog/common/catalog-filters';
 import { CreateProductCategoryDto } from './dto/create-product-category.dto';
 import { UpdateProductCategoryDto } from './dto/update-product-category.dto';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -7,7 +12,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { CreateProductTagDto } from './dto/create-product-tag.dto';
-import { Prisma } from '@prisma/client';
+import { UpdateProductTagDto } from './dto/update-product-tag.dto';
 
 const productWithRelationsArgs = {
   include: {
@@ -21,11 +26,41 @@ export type ProductWithRelations = Prisma.ProductGetPayload<
   typeof productWithRelationsArgs
 >;
 
+const adminProductArgs = {
+  include: {
+    variants: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+    category: { select: { id: true, name: true, isActive: true } },
+    tagAssignments: {
+      include: { tag: { select: { id: true, name: true, isActive: true } } },
+      orderBy: { tag: { name: 'asc' } },
+    },
+    _count: { select: { viewLogs: true, recommendations: true } },
+  },
+} satisfies Prisma.ProductDefaultArgs;
+
+const adminProductDetailArgs = {
+  include: {
+    ...adminProductArgs.include,
+    recommendations: {
+      select: {
+        id: true,
+        createdAt: true,
+        treatment: { select: { id: true, name: true, isActive: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    },
+  },
+} satisfies Prisma.ProductDefaultArgs;
+
+export interface AdminProductsFilter {
+  q?: string;
+  productCategoryId?: string;
+  status: CatalogStatusFilter;
+}
+
 @Injectable()
 export class ProductsRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  // ---- Categorías de producto ----
 
   findAllCategories() {
     return this.prisma.client.productCategory.findMany({
@@ -34,8 +69,17 @@ export class ProductsRepository {
     });
   }
 
+  findAllCategoriesForAdmin() {
+    return this.prisma.client.productCategory.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { products: true } } },
+    });
+  }
+
   findCategoryByName(name: string) {
-    return this.prisma.client.productCategory.findUnique({ where: { name } });
+    return this.prisma.client.productCategory.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } },
+    });
   }
 
   findCategoryById(id: string) {
@@ -53,13 +97,64 @@ export class ProductsRepository {
     });
   }
 
-  // ---- Productos ----
+  countProductsInCategory(productCategoryId: string) {
+    return this.prisma.client.product.count({ where: { productCategoryId } });
+  }
+
+  deleteCategory(id: string) {
+    return this.prisma.client.productCategory.delete({ where: { id } });
+  }
 
   findAllActiveProducts() {
     return this.prisma.client.product.findMany({
       where: { isActive: true },
       ...productWithRelationsArgs,
       orderBy: { name: 'asc' },
+    });
+  }
+
+  findAdminProducts(filter: AdminProductsFilter) {
+    const where: Prisma.ProductWhereInput = {
+      ...isActiveWhere(filter.status),
+      ...(filter.productCategoryId
+        ? { productCategoryId: filter.productCategoryId }
+        : {}),
+      ...(filter.q
+        ? {
+            OR: [
+              { name: { contains: filter.q, mode: 'insensitive' } },
+              { description: { contains: filter.q, mode: 'insensitive' } },
+              {
+                variants: {
+                  some: {
+                    OR: [
+                      { brand: { contains: filter.q, mode: 'insensitive' } },
+                      {
+                        presentation: {
+                          contains: filter.q,
+                          mode: 'insensitive',
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    return this.prisma.client.product.findMany({
+      where,
+      ...adminProductArgs,
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  findAdminProductById(id: string) {
+    return this.prisma.client.product.findUnique({
+      where: { id },
+      ...adminProductDetailArgs,
     });
   }
 
@@ -73,15 +168,61 @@ export class ProductsRepository {
     });
   }
 
+  findProductBasic(id: string) {
+    return this.prisma.client.product.findUnique({ where: { id } });
+  }
+
   createProduct(dto: CreateProductDto) {
-    return this.prisma.client.product.create({ data: dto });
+    const { tagIds, variants, ...product } = dto;
+    return this.prisma.client.product.create({
+      data: {
+        ...product,
+        variants: variants?.length ? { create: variants } : undefined,
+        tagAssignments: tagIds?.length
+          ? { create: tagIds.map((tagId) => ({ tagId })) }
+          : undefined,
+      },
+      ...adminProductArgs,
+    });
   }
 
   updateProduct(id: string, dto: UpdateProductDto) {
-    return this.prisma.client.product.update({ where: { id }, data: dto });
+    return this.prisma.client.product.update({
+      where: { id },
+      data: dto,
+      ...adminProductArgs,
+    });
   }
 
-  // ---- Variantes ----
+  toggleActive(id: string, isActive: boolean) {
+    return this.prisma.client.product.update({
+      where: { id },
+      data: { isActive },
+      ...adminProductArgs,
+    });
+  }
+
+  countProductHistory(productId: string) {
+    return this.prisma.client.product.findUnique({
+      where: { id: productId },
+      select: { _count: { select: { viewLogs: true, recommendations: true } } },
+    });
+  }
+
+  async deleteProduct(productId: string): Promise<string[]> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const variants = await tx.productVariant.findMany({
+        where: { productId, imagePublicId: { not: null } },
+        select: { imagePublicId: true },
+      });
+      await tx.productTagAssignment.deleteMany({ where: { productId } });
+      await tx.productVariant.deleteMany({ where: { productId } });
+      await tx.product.delete({ where: { id: productId } });
+      return variants.flatMap((v) =>
+        v.imagePublicId ? [v.imagePublicId] : [],
+      );
+    });
+  }
 
   findVariantById(id: string) {
     return this.prisma.client.productVariant.findUnique({ where: { id } });
@@ -92,9 +233,11 @@ export class ProductsRepository {
     brand: string,
     presentation: string,
   ) {
-    return this.prisma.client.productVariant.findUnique({
+    return this.prisma.client.productVariant.findFirst({
       where: {
-        productId_brand_presentation: { productId, brand, presentation },
+        productId,
+        brand: { equals: brand, mode: 'insensitive' },
+        presentation: { equals: presentation, mode: 'insensitive' },
       },
     });
   }
@@ -105,22 +248,49 @@ export class ProductsRepository {
     });
   }
 
-  updateVariant(id: string, dto: UpdateProductVariantDto) {
+  updateVariant(
+    id: string,
+    data: UpdateProductVariantDto & { imagePublicId?: string | null },
+  ) {
+    return this.prisma.client.productVariant.update({ where: { id }, data });
+  }
+
+  setVariantImage(
+    id: string,
+    imageUrl: string | null,
+    imagePublicId: string | null,
+  ) {
     return this.prisma.client.productVariant.update({
       where: { id },
-      data: dto,
+      data: { imageUrl, imagePublicId },
     });
   }
 
-  // ---- Recomendaciones ----
+  deleteVariant(id: string) {
+    return this.prisma.client.productVariant.delete({ where: { id } });
+  }
 
   findRecommendationsForTreatment(treatmentId: string) {
     return this.prisma.client.treatmentProductRecommendation.findMany({
-      where: { treatmentId },
+      where: { treatmentId, product: { isActive: true } },
       include: {
         product: { include: { variants: { where: { isActive: true } } } },
       },
     });
+  }
+
+  findTreatmentIdsRecommending(productId: string) {
+    return this.prisma.client.treatmentProductRecommendation
+      .findMany({ where: { productId }, select: { treatmentId: true } })
+      .then((rows) => rows.map((row) => row.treatmentId));
+  }
+
+  async treatmentExists(treatmentId: string) {
+    const treatment = await this.prisma.client.treatment.findUnique({
+      where: { id: treatmentId },
+      select: { id: true },
+    });
+    return treatment !== null;
   }
 
   findRecommendationById(id: string) {
@@ -147,27 +317,51 @@ export class ProductsRepository {
     });
   }
 
-  // ---- Toggle ----
-  toggleActive(id: string, isActive: boolean) {
-    return this.prisma.client.product.update({
-      where: { id },
-      data: { isActive },
-    });
-  }
-
-  // ---- Tags ----
   findAllTags() {
     return this.prisma.client.productTag.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
     });
   }
-  findTagByName(name: string) {
-    return this.prisma.client.productTag.findUnique({ where: { name } });
+
+  findAllTagsForAdmin() {
+    return this.prisma.client.productTag.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { assignments: true } } },
+    });
   }
+
+  findTagById(id: string) {
+    return this.prisma.client.productTag.findUnique({ where: { id } });
+  }
+
+  findTagByName(name: string) {
+    return this.prisma.client.productTag.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } },
+    });
+  }
+
+  countTagsByIds(ids: string[]) {
+    return this.prisma.client.productTag.count({ where: { id: { in: ids } } });
+  }
+
   createTag(dto: CreateProductTagDto) {
     return this.prisma.client.productTag.create({ data: dto });
   }
+
+  updateTag(id: string, dto: UpdateProductTagDto) {
+    return this.prisma.client.productTag.update({ where: { id }, data: dto });
+  }
+
+  deleteTag(id: string) {
+    return this.prisma.client.$transaction([
+      this.prisma.client.productTagAssignment.deleteMany({
+        where: { tagId: id },
+      }),
+      this.prisma.client.productTag.delete({ where: { id } }),
+    ]);
+  }
+
   replaceProductTags(productId: string, tagIds: string[]) {
     return this.prisma.client.$transaction([
       this.prisma.client.productTagAssignment.deleteMany({

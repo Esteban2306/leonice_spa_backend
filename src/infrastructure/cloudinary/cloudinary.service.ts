@@ -66,6 +66,46 @@ export class CloudinaryService {
     };
   }
 
+  productImagePublicId(variantId: string): string {
+    return `leonice-spa/products/variant-${variantId}-${Date.now()}`;
+  }
+
+  async uploadProductImage(
+    fileBuffer: Buffer,
+    publicId: string,
+  ): Promise<UploadedImage> {
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const uploadStream = this.cloudinary.uploader.upload_stream(
+        {
+          public_id: publicId,
+          resource_type: 'image',
+        },
+        (error, uploaded) => {
+          if (error || !uploaded) {
+            return reject(
+              error instanceof Error
+                ? error
+                : new Error(
+                    error?.message ?? 'Cloudinary no devolvió resultado',
+                  ),
+            );
+          }
+          resolve(uploaded);
+        },
+      );
+      uploadStream.end(fileBuffer);
+    });
+
+    return { url: result.secure_url, publicId: result.public_id };
+  }
+
+  async destroyImage(publicId: string): Promise<void> {
+    await this.cloudinary.uploader.destroy(publicId, {
+      resource_type: 'image',
+      invalidate: true,
+    });
+  }
+
   async uploadDepositProofFromBase64(
     dataUri: string,
     reservationId: string,
