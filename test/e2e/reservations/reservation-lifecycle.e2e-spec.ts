@@ -32,6 +32,20 @@ describe('Reservation lifecycle (e2e)', () => {
   let treatmentSecondaryId: string;
   let treatmentLowCapId: string;
 
+  const runId = String(Date.now()).slice(-7);
+  const phones = new Map<string, string>();
+  const phoneFor = (key: string) => {
+    if (!phones.has(key)) {
+      phones.set(key, `+999${runId}${String(phones.size).padStart(2, '0')}`);
+    }
+    return phones.get(key)!;
+  };
+  const clientFor = (key: string) => ({
+    phone: phoneFor(key),
+    name: `E2E ${key}`,
+    birthDate: '1990-01-01',
+  });
+
   const futureDate = (daysFromNow: number, hour = 8, minute = 0) => {
     const d = new Date();
     d.setDate(d.getDate() + daysFromNow);
@@ -158,18 +172,14 @@ describe('Reservation lifecycle (e2e)', () => {
       where: { id: { in: categoryIds } },
     });
     await prisma.client.client.deleteMany({
-      where: { phone: { contains: 'TEST' } },
+      where: { phone: { in: [...phones.values()] } },
     });
     if (app) await app.close();
   });
 
-  it('recorre el ciclo completo: crear -> valoración -> depósito -> check-in -> completar', async () => {
+  it('recorre el ciclo completo: crear -> depósito -> check-in -> completar', async () => {
     const result = await createO.execute({
-      client: {
-        phone: '+57TESTLIFECYCLE1',
-        name: 'Cliente Ciclo',
-        birthDate: '1990-01-01',
-      },
+      client: clientFor('LIFECYCLE1'),
       treatments: [treatmentPrincipalId],
       scheduledStart: futureDate(5).toISOString(),
     });
@@ -178,15 +188,15 @@ describe('Reservation lifecycle (e2e)', () => {
     expect(result.summary).toContain('quedó para las');
 
     const reservation = result.reservations[0];
-    expect(reservation.status).toBe(ReservationStatus.PENDIENTE_VALORACION);
-
-    const afterValoracion = await valoracionO.execute(reservation.id, 180, 90);
-    expect(afterValoracion.status).toBe(ReservationStatus.PENDIENTE_DEPOSITO);
+    expect(reservation.status).toBe(ReservationStatus.PENDIENTE_DEPOSITO);
 
     const afterDeposit = await depositoO.execute(reservation.id);
     expect(afterDeposit.status).toBe(ReservationStatus.CONFIRMADA);
 
-    const afterCheckIn = await checkInO.execute(reservation.id);
+    const afterCheckIn = await checkInO.execute(
+      reservation.id,
+      reservation.scheduledStart,
+    );
     expect(afterCheckIn.status).toBe(ReservationStatus.CITA_EN_CURSO);
 
     const afterComplete = await completeO.execute(reservation.id);
@@ -196,45 +206,49 @@ describe('Reservation lifecycle (e2e)', () => {
 
   it('rechaza confirmar valoración con duración mayor a la máxima del tratamiento', async () => {
     const result = await createO.execute({
-      client: { phone: '+57TESTLIFECYCLE2' },
+      client: clientFor('LIFECYCLE2'),
       treatments: [treatmentPrincipalId],
       scheduledStart: futureDate(6).toISOString(),
     });
+    await prisma.client.reservation.update({
+      where: { id: result.reservations[0].id },
+      data: { status: ReservationStatus.PENDIENTE_VALORACION },
+    });
     await expect(
       valoracionO.execute(result.reservations[0].id, 180, 500),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/no puede superar el máximo/);
   });
 
   it('cancelar libera el cupo de inmediato', async () => {
     const slot = futureDate(10, 9);
 
     const first = await createO.execute({
-      client: { phone: '+57TESTLIFECYCLE3' },
+      client: clientFor('LIFECYCLE3'),
       treatments: [treatmentLowCapId],
       scheduledStart: slot.toISOString(),
     });
 
-    await expect(
-      createO.execute({
-        client: { phone: '+57TESTLIFECYCLE4' },
-        treatments: [treatmentLowCapId],
-        scheduledStart: slot.toISOString(),
-      }),
-    ).rejects.toThrow();
+    const relocated = await createO.execute({
+      client: clientFor('LIFECYCLE4'),
+      treatments: [treatmentLowCapId],
+      scheduledStart: slot.toISOString(),
+    });
+    expect(relocated.reservations[0].scheduledStart).not.toEqual(slot);
 
     await cancelO.executeVerifiedByPhone({
       reservationId: first.reservations[0].id,
-      phone: '+57TESTLIFECYCLE3',
+      phone: phoneFor('LIFECYCLE3'),
       scope: 'SINGLE',
       channel: 'WEB',
       reason: 'Prueba',
     });
 
     const third = await createO.execute({
-      client: { phone: '+57TESTLIFECYCLE4' },
+      client: clientFor('LIFECYCLE6'),
       treatments: [treatmentLowCapId],
       scheduledStart: slot.toISOString(),
     });
+    expect(third.reservations[0].scheduledStart).toEqual(slot);
     expect(third.reservations[0].status).toBe(
       ReservationStatus.PENDIENTE_DEPOSITO,
     );
@@ -246,26 +260,26 @@ describe('Reservation lifecycle (e2e)', () => {
     const day2 = futureDate(21, 8);
 
     await createO.execute({
-      client: { phone: '+57TESTLIFECYCLE5' },
+      client: clientFor('LIFECYCLE5'),
       treatments: [treatmentSimpleId],
       scheduledStart: day1.toISOString(),
     });
 
     await expect(
       createO.execute({
-        client: { phone: '+57TESTLIFECYCLE5' },
+        client: clientFor('LIFECYCLE5'),
         treatments: [treatmentPrincipalId],
         scheduledStart: day1Tarde.toISOString(),
       }),
     ).rejects.toThrow();
 
     const nextDay = await createO.execute({
-      client: { phone: '+57TESTLIFECYCLE5' },
+      client: clientFor('LIFECYCLE5'),
       treatments: [treatmentPrincipalId],
       scheduledStart: day2.toISOString(),
     });
     expect(nextDay.reservations[0].status).toBe(
-      ReservationStatus.PENDIENTE_VALORACION,
+      ReservationStatus.PENDIENTE_DEPOSITO,
     );
   });
 
@@ -273,11 +287,7 @@ describe('Reservation lifecycle (e2e)', () => {
     const start = futureDate(50, 8);
 
     const result = await createO.execute({
-      client: {
-        phone: '+57TESTCOMBO1',
-        name: 'Combo',
-        birthDate: '1990-01-01',
-      },
+      client: clientFor('COMBO1'),
       treatments: [treatmentSecondaryId, treatmentPrincipalId],
       scheduledStart: start.toISOString(),
     });
@@ -301,7 +311,7 @@ describe('Reservation lifecycle (e2e)', () => {
   it('rechaza un combo con dos tratamientos de la misma categoría', async () => {
     await expect(
       createO.execute({
-        client: { phone: '+57TESTCOMBO2' },
+        client: clientFor('COMBO2'),
         treatments: [treatmentSimpleId, treatmentPrincipalId],
         scheduledStart: futureDate(51, 8).toISOString(),
       }),
@@ -312,14 +322,14 @@ describe('Reservation lifecycle (e2e)', () => {
     const day = futureDate(55, 8);
 
     const first = await createO.execute({
-      client: { phone: '+57TESTSMART1' },
+      client: clientFor('SMART1'),
       treatments: [treatmentSimpleId],
       scheduledStart: day.toISOString(),
     });
 
     const clashingRequest = new Date(day.getTime() + 30 * 60_000);
     const second = await createO.execute({
-      client: { phone: '+57TESTSMART1' },
+      client: clientFor('SMART1'),
       treatments: [treatmentSecondaryId],
       scheduledStart: clashingRequest.toISOString(),
     });
@@ -333,13 +343,13 @@ describe('Reservation lifecycle (e2e)', () => {
 
   it('si el horario justo después del conflicto tampoco tiene cupo, busca el más cercano ese mismo día', async () => {
     await createO.execute({
-      client: { phone: '+57TESTNEAREST_A' },
+      client: clientFor('NEAREST_A'),
       treatments: [treatmentLowCapId],
       scheduledStart: futureDate(60, 10).toISOString(),
     });
 
     const result = await createO.execute({
-      client: { phone: '+57TESTNEAREST_B' },
+      client: clientFor('NEAREST_B'),
       treatments: [treatmentLowCapId],
       scheduledStart: futureDate(60, 10).toISOString(),
     });
@@ -353,12 +363,12 @@ describe('Reservation lifecycle (e2e)', () => {
 
     const results = await Promise.allSettled([
       createO.execute({
-        client: { phone: '+57TESTDEADLOCK1' },
+        client: clientFor('DEADLOCK1'),
         treatments: [treatmentSimpleId, treatmentSecondaryId],
         scheduledStart: start.toISOString(),
       }),
       createO.execute({
-        client: { phone: '+57TESTDEADLOCK2' },
+        client: clientFor('DEADLOCK2'),
         treatments: [treatmentSecondaryId, treatmentSimpleId],
         scheduledStart: start.toISOString(),
       }),
@@ -369,28 +379,33 @@ describe('Reservation lifecycle (e2e)', () => {
     ).toBe(true);
   }, 15_000);
 
-  it('concurrencia real: solo una prospera con capacidad 1', async () => {
+  it('concurrencia real: con capacidad 1 solo una se queda con el horario pedido', async () => {
     const slot = futureDate(70, 8);
 
     const [a, b] = await Promise.allSettled([
       createO.execute({
-        client: { phone: '+57TESTRACE1' },
+        client: clientFor('RACE1'),
         treatments: [treatmentLowCapId],
         scheduledStart: slot.toISOString(),
       }),
       createO.execute({
-        client: { phone: '+57TESTRACE2' },
+        client: clientFor('RACE2'),
         treatments: [treatmentLowCapId],
         scheduledStart: slot.toISOString(),
       }),
     ]);
 
-    expect([a, b].filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const atRequestedSlot = [a, b].filter(
+      (r) =>
+        r.status === 'fulfilled' &&
+        r.value.reservations[0].scheduledStart.getTime() === slot.getTime(),
+    );
+    expect(atRequestedSlot).toHaveLength(1);
   });
 
-  it('reprogramar: libera el cupo original de inmediato y crea una fila nueva enlazada', async () => {
+  it('reprogramar: mueve la misma reserva a la nueva hora conservando su id y estado', async () => {
     const result = await createO.execute({
-      client: { phone: '+57TESTRESCHED1' },
+      client: clientFor('RESCHED1'),
       treatments: [treatmentSimpleId],
       scheduledStart: futureDate(80, 8).toISOString(),
     });
@@ -398,20 +413,21 @@ describe('Reservation lifecycle (e2e)', () => {
 
     const rescheduled = await rescheduleO.execute(
       original.id,
-      '+57TESTRESCHED1',
+      phoneFor('RESCHED1'),
       futureDate(81, 9),
     );
 
     const originalAfter = await prisma.client.reservation.findUniqueOrThrow({
       where: { id: original.id },
     });
-    expect(originalAfter.status).toBe(ReservationStatus.REPROGRAMADA);
-    expect(rescheduled.rescheduledFromId).toBe(original.id);
+    expect(rescheduled.id).toBe(original.id);
+    expect(originalAfter.status).toBe(ReservationStatus.PENDIENTE_DEPOSITO);
+    expect(originalAfter.scheduledStart).toEqual(futureDate(81, 9));
   });
 
   it('el admin puede revivir un NO_SHOW haciendo check-in tarde', async () => {
     const result = await createO.execute({
-      client: { phone: '+57TESTNOSHOW1' },
+      client: clientFor('NOSHOW1'),
       treatments: [treatmentSimpleId],
       scheduledStart: futureDate(90, 8).toISOString(),
     });
@@ -422,41 +438,50 @@ describe('Reservation lifecycle (e2e)', () => {
       data: { status: ReservationStatus.NO_SHOW },
     });
 
-    const revived = await checkInO.execute(reservation.id);
+    const revived = await checkInO.execute(
+      reservation.id,
+      reservation.scheduledStart,
+    );
     expect(revived.status).toBe(ReservationStatus.CITA_EN_CURSO);
   });
 
-  it('el admin puede reprogramar sin pasar por capacidad, y controla si se notifica al cliente', async () => {
-    const fullSlot = futureDate(95, 10);
+  it('el admin no puede reprogramar a un horario sin cupo, pero sí a uno libre', async () => {
+    const fullSlot = futureDate(84, 8);
     await createO.execute({
-      client: { phone: '+57TESTADMIN_FILL' },
+      client: clientFor('ADMIN_FILL'),
       treatments: [treatmentLowCapId],
       scheduledStart: fullSlot.toISOString(),
     });
 
     const other = await createO.execute({
-      client: { phone: '+57TESTADMIN_MOVE' },
+      client: clientFor('ADMIN_MOVE'),
       treatments: [treatmentLowCapId],
-      scheduledStart: futureDate(96, 8).toISOString(),
+      scheduledStart: futureDate(85, 8).toISOString(),
     });
 
+    await expect(
+      adminRescheduleO.execute(other.reservations[0].id, fullSlot, false),
+    ).rejects.toThrow('Ya no hay cupo disponible para ese horario.');
+
+    const freeSlot = futureDate(84, 14);
     const moved = await adminRescheduleO.execute(
       other.reservations[0].id,
-      fullSlot,
+      freeSlot,
       false,
     );
-    expect(moved.scheduledStart).toEqual(fullSlot);
+    expect(moved.id).toBe(other.reservations[0].id);
+    expect(moved.scheduledStart).toEqual(freeSlot);
   });
 
   it('el admin no puede reprogramar una reserva en estado terminal', async () => {
     const result = await createO.execute({
-      client: { phone: '+57TESTADMIN_TERMINAL' },
+      client: clientFor('ADMIN_TERMINAL'),
       treatments: [treatmentSimpleId],
-      scheduledStart: futureDate(97, 8).toISOString(),
+      scheduledStart: futureDate(86, 8).toISOString(),
     });
     await cancelO.executeVerifiedByPhone({
       reservationId: result.reservations[0].id,
-      phone: '+57TESTADMIN_TERMINAL',
+      phone: phoneFor('ADMIN_TERMINAL'),
       scope: 'SINGLE',
       channel: 'WEB',
       reason: 'Prueba',
@@ -465,7 +490,7 @@ describe('Reservation lifecycle (e2e)', () => {
     await expect(
       adminRescheduleO.execute(
         result.reservations[0].id,
-        futureDate(98, 8),
+        futureDate(87, 8),
         false,
       ),
     ).rejects.toThrow();

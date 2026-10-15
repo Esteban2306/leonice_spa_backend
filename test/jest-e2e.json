@@ -7,5 +7,8 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "transformIgnorePatterns": ["node_modules/\\.pnpm/(?!(cockatiel)@)"]
+  "transformIgnorePatterns": ["node_modules/\\.pnpm/(?!(cockatiel)@)"],
+  "moduleNameMapper": {
+    "^src/(.*)$": "<rootDir>/../src/$1"
+  }
 }
