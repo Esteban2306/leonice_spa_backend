@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../infrastructure/database/prisma.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
   CatalogStatusFilter,
   isActiveWhere,
-} from '../catalog/common/catalog-filters';
-import { CreateProductCategoryDto } from './dto/create-product-category.dto';
-import { UpdateProductCategoryDto } from './dto/update-product-category.dto';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { CreateProductVariantDto } from './dto/create-product-variant.dto';
-import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
-import { CreateProductTagDto } from './dto/create-product-tag.dto';
-import { UpdateProductTagDto } from './dto/update-product-tag.dto';
+} from '../../catalog/common/catalog-filters';
+import { CreateProductCategoryDto } from '../dto/create-product-category.dto';
+import { UpdateProductCategoryDto } from '../dto/update-product-category.dto';
+import { CreateProductDto } from '../dto/create-product.dto';
+import { UpdateProductDto } from '../dto/update-product.dto';
+import { CreateProductVariantDto } from '../dto/create-product-variant.dto';
+import { UpdateProductVariantDto } from '../dto/update-product-variant.dto';
+import { CreateProductTagDto } from '../dto/create-product-tag.dto';
+import { UpdateProductTagDto } from '../dto/update-product-tag.dto';
 
 const productWithRelationsArgs = {
   include: {

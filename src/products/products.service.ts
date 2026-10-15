@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   ProductsRepository,
   ProductWithRelations,
-} from './products.repository';
+} from './repository/products.repository';
 import { SafeCacheService } from '../infrastructure/redis/safe-cache.service';
 import { CloudinaryService } from '../infrastructure/cloudinary/cloudinary.service';
 import {

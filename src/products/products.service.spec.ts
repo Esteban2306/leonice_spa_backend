@@ -2,7 +2,7 @@ import { AppException } from '../common/errors/app.exception';
 import { CloudinaryService } from '../infrastructure/cloudinary/cloudinary.service';
 import { SafeCacheService } from '../infrastructure/redis/safe-cache.service';
 import { ClientsRepository } from '../clients/repositories/clients.repository';
-import { ProductsRepository } from './products.repository';
+import { ProductsRepository } from './repository/products.repository';
 import { ProductsService } from './products.service';
 
 interface VariantRow {
