@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -25,6 +26,9 @@ import { HairColor, HairLength, Promotion } from '@prisma/client';
 import { combineHairPricing } from 'src/clients/domain/compute-treatment-pricing';
 import { PromotionsService } from 'src/promotions/promotions.service';
 import { resolveApplicablePromotion } from 'src/promotions/domain/resolve-applicable-promotion';
+import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
+import { AppException } from 'src/common/errors/app.exception';
+import { uniqueSlug } from '../common/slugify';
 
 interface RangeCheck {
   basePriceMin?: number | Decimal | null;
@@ -35,11 +39,14 @@ interface RangeCheck {
 
 @Injectable()
 export class TreatmentsService {
+  private readonly logger = new Logger(TreatmentsService.name);
+
   constructor(
     private readonly repository: TreatmentsRepository,
     private readonly categoriesService: CategoriesService,
     private readonly cache: SafeCacheService,
     private readonly promotionsService: PromotionsService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   async findAll(categoryId?: string) {
@@ -90,7 +97,10 @@ export class TreatmentsService {
     if (existing)
       throw new ConflictException(`Ya existe "${dto.name}" en esta categoría`);
 
-    const treatment = await this.repository.create(dto);
+    const slug = await uniqueSlug(dto.name, (candidate) =>
+      this.repository.isSlugTaken(dto.categoryId, candidate),
+    );
+    const treatment = await this.repository.create({ ...dto, slug });
     await this.invalidateCache();
     return treatment;
   }
@@ -117,6 +127,52 @@ export class TreatmentsService {
 
     const treatment = await this.repository.update(id, dto);
     await this.invalidateCache();
+    return treatment;
+  }
+
+  async uploadVideo(id: string, fileBuffer: Buffer) {
+    const current = await this.findOne(id);
+
+    const publicId = this.cloudinary.treatmentVideoPublicId(id);
+    let uploaded: { url: string; posterUrl: string; publicId: string };
+    try {
+      uploaded = await this.cloudinary.uploadTreatmentVideo(
+        fileBuffer,
+        publicId,
+      );
+    } catch (error) {
+      await this.destroyVideoQuietly(publicId);
+      this.logger.error(
+        `Fallo subiendo el video del servicio ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new AppException('TREATMENT_VIDEO_UPLOAD_FAILED', { cause: error });
+    }
+
+    try {
+      const treatment = await this.repository.setVideo(id, {
+        videoUrl: uploaded.url,
+        posterUrl: uploaded.posterUrl,
+        videoPublicId: uploaded.publicId,
+      });
+      await this.invalidateCache();
+      if (current.videoPublicId)
+        await this.destroyVideoQuietly(current.videoPublicId);
+      return treatment;
+    } catch (error) {
+      await this.destroyVideoQuietly(uploaded.publicId);
+      throw error;
+    }
+  }
+
+  async removeVideo(id: string) {
+    const current = await this.findOne(id);
+    if (!current.videoUrl) throw new AppException('TREATMENT_VIDEO_NOT_FOUND');
+
+    const treatment = await this.repository.clearVideo(id);
+    await this.invalidateCache();
+    if (current.videoPublicId)
+      await this.destroyVideoQuietly(current.videoPublicId);
     return treatment;
   }
 
@@ -285,7 +341,22 @@ export class TreatmentsService {
     };
   }
 
+  private async destroyVideoQuietly(publicId: string) {
+    try {
+      await this.cloudinary.destroyVideo(publicId);
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo borrar el video ${publicId} de Cloudinary: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
   private async invalidateCache() {
-    await this.cache.delete(CATALOG_CACHE_KEYS.treatments);
+    await Promise.all([
+      this.cache.delete(CATALOG_CACHE_KEYS.treatments),
+      this.cache.delete(CATALOG_CACHE_KEYS.showcase),
+    ]);
   }
 }

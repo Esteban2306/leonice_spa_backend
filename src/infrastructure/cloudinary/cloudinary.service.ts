@@ -7,6 +7,12 @@ export interface UploadedImage {
   publicId: string;
 }
 
+export interface UploadedVideo {
+  url: string;
+  posterUrl: string;
+  publicId: string;
+}
+
 @Injectable()
 export class CloudinaryService {
   constructor(
@@ -102,6 +108,63 @@ export class CloudinaryService {
   async destroyImage(publicId: string): Promise<void> {
     await this.cloudinary.uploader.destroy(publicId, {
       resource_type: 'image',
+      invalidate: true,
+    });
+  }
+
+  treatmentVideoPublicId(treatmentId: string): string {
+    return `leonice-spa/treatments/video-${treatmentId}-${Date.now()}`;
+  }
+
+  async uploadTreatmentVideo(
+    fileBuffer: Buffer,
+    publicId: string,
+  ): Promise<UploadedVideo> {
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const uploadStream = this.cloudinary.uploader.upload_stream(
+        {
+          public_id: publicId,
+          resource_type: 'video',
+        },
+        (error, uploaded) => {
+          if (error || !uploaded) {
+            return reject(
+              error instanceof Error
+                ? error
+                : new Error(
+                    error?.message ?? 'Cloudinary no devolvió resultado',
+                  ),
+            );
+          }
+          resolve(uploaded);
+        },
+      );
+      uploadStream.end(fileBuffer);
+    });
+
+    return {
+      url: this.cloudinary.url(result.public_id, {
+        resource_type: 'video',
+        secure: true,
+        format: 'mp4',
+        transformation: [{ quality: 'auto', width: 1280, crop: 'limit' }],
+      }),
+      posterUrl: this.cloudinary.url(result.public_id, {
+        resource_type: 'video',
+        secure: true,
+        format: 'jpg',
+        transformation: [
+          { start_offset: 'auto' },
+          { quality: 'auto', width: 1280, crop: 'limit' },
+        ],
+      }),
+      publicId: result.public_id,
+    };
+  }
+
+  async destroyVideo(publicId: string): Promise<void> {
+    await this.cloudinary.uploader.destroy(publicId, {
+      resource_type: 'video',
       invalidate: true,
     });
   }

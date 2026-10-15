@@ -4,6 +4,7 @@ import { ARGON2_OPTIONS } from '../src/auth/constants/auth.constants';
 import { DEFAULT_WEEKLY_WINDOWS } from '../src/reservations/domain/operating-hours';
 import { seedConduitTemplates } from './seed-conduit-templates';
 import { seedConduitTools } from './seed-conduit-tools';
+import { slugify } from '../src/catalog/common/slugify';
 
 const prisma = new PrismaClient();
 
@@ -39,19 +40,24 @@ async function main() {
   const spaCapilar = await prisma.category.upsert({
     where: { name: 'Spa Capilar' },
     update: { tracksHairProfile: true },
-    create: { name: 'Spa Capilar', isPrincipal: true, tracksHairProfile: true },
+    create: {
+      name: 'Spa Capilar',
+      slug: slugify('Spa Capilar'),
+      isPrincipal: true,
+      tracksHairProfile: true,
+    },
   });
 
   const spaCoreano = await prisma.category.upsert({
     where: { name: 'Spa Coreano' },
     update: {},
-    create: { name: 'Spa Coreano' },
+    create: { name: 'Spa Coreano', slug: slugify('Spa Coreano') },
   });
 
   const unas = await prisma.category.upsert({
     where: { name: 'Uñas' },
     update: {},
-    create: { name: 'Uñas' },
+    create: { name: 'Uñas', slug: slugify('Uñas') },
   });
 
   await prisma.capacityPool.upsert({
@@ -184,7 +190,7 @@ async function main() {
     await prisma.treatment.upsert({
       where: { categoryId_name: { categoryId: spaCapilar.id, name: t.name } },
       update: {},
-      create: { categoryId: spaCapilar.id, ...t },
+      create: { categoryId: spaCapilar.id, slug: slugify(t.name), ...t },
     });
   }
 
@@ -196,6 +202,7 @@ async function main() {
     create: {
       categoryId: spaCoreano.id,
       name: 'Spa coreano',
+      slug: slugify('Spa coreano'),
       requiresPriorAssessment: false,
       basePriceMin: 280,
       basePriceMax: 280,
@@ -222,6 +229,7 @@ async function main() {
       create: {
         categoryId: unas.id,
         name: t.name,
+        slug: slugify(t.name),
         requiresPriorAssessment: false,
         basePriceMin: t.price,
         basePriceMax: t.price,

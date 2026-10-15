@@ -44,7 +44,15 @@ export class CategoriesRepository {
     return this.prisma.client.category.findUnique({ where: { name } });
   }
 
-  create(dto: CreateCategoryDto) {
+  async isSlugTaken(slug: string) {
+    const found = await this.prisma.client.category.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    return found !== null;
+  }
+
+  create(dto: CreateCategoryDto & { slug: string }) {
     return this.prisma.client.category.create({ data: dto });
   }
 

@@ -25,7 +25,10 @@ describe('Availability concurrency (e2e)', () => {
     availabilityRepository = app.get(AvailabilityRepository);
 
     const category = await prisma.client.category.create({
-      data: { name: `Test Concurrency ${Date.now()}` },
+      data: {
+        name: `Test Concurrency ${Date.now()}`,
+        slug: `test-concurrency-${Date.now()}`,
+      },
     });
     categoryId = category.id;
 
@@ -37,6 +40,7 @@ describe('Availability concurrency (e2e)', () => {
       data: {
         categoryId,
         name: 'Test treatment',
+        slug: 'test-treatment',
         basePriceMin: 100,
         basePriceMax: 100,
         baseDurationMinMinutes: 60,

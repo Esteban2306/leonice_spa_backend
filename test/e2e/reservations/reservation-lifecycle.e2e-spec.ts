@@ -73,7 +73,11 @@ describe('Reservation lifecycle (e2e)', () => {
     const suffix = Date.now();
 
     const catPrincipal = await prisma.client.category.create({
-      data: { name: `Test Principal ${suffix}`, isPrincipal: true },
+      data: {
+        name: `Test Principal ${suffix}`,
+        slug: `test-principal-${suffix}`,
+        isPrincipal: true,
+      },
     });
     categoryPrincipalId = catPrincipal.id;
     await prisma.client.capacityPool.create({
@@ -81,7 +85,11 @@ describe('Reservation lifecycle (e2e)', () => {
     });
 
     const catSecondary = await prisma.client.category.create({
-      data: { name: `Test Secundaria ${suffix}`, isPrincipal: false },
+      data: {
+        name: `Test Secundaria ${suffix}`,
+        slug: `test-secundaria-${suffix}`,
+        isPrincipal: false,
+      },
     });
     categorySecondaryId = catSecondary.id;
     await prisma.client.capacityPool.create({
@@ -89,7 +97,11 @@ describe('Reservation lifecycle (e2e)', () => {
     });
 
     const catLowCap = await prisma.client.category.create({
-      data: { name: `Test BajaCapacidad ${suffix}`, isPrincipal: false },
+      data: {
+        name: `Test BajaCapacidad ${suffix}`,
+        slug: `test-bajacapacidad-${suffix}`,
+        isPrincipal: false,
+      },
     });
     categoryLowCapId = catLowCap.id;
     await prisma.client.capacityPool.create({
@@ -101,6 +113,7 @@ describe('Reservation lifecycle (e2e)', () => {
         data: {
           categoryId: categoryPrincipalId,
           name: 'Con valoración',
+          slug: 'con-valoracion',
           requiresPriorAssessment: true,
           basePriceMin: 100,
           basePriceMax: 200,
@@ -115,6 +128,7 @@ describe('Reservation lifecycle (e2e)', () => {
         data: {
           categoryId: categoryPrincipalId,
           name: 'Sin valoración',
+          slug: 'sin-valoracion',
           requiresPriorAssessment: false,
           basePriceMin: 100,
           basePriceMax: 100,
@@ -129,6 +143,7 @@ describe('Reservation lifecycle (e2e)', () => {
         data: {
           categoryId: categorySecondaryId,
           name: 'Secundario',
+          slug: 'secundario',
           requiresPriorAssessment: false,
           basePriceMin: 50,
           basePriceMax: 50,
@@ -143,6 +158,7 @@ describe('Reservation lifecycle (e2e)', () => {
         data: {
           categoryId: categoryLowCapId,
           name: 'BajaCapacidad',
+          slug: 'bajacapacidad',
           requiresPriorAssessment: false,
           basePriceMin: 80,
           basePriceMax: 80,

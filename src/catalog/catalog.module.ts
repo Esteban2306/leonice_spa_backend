@@ -9,6 +9,9 @@ import { CapacityPoolsController } from './capacity-pools/capacity-pools.control
 import { CapacityPoolsService } from './capacity-pools/capacity-pools.service';
 import { CapacityPoolsRepository } from './capacity-pools/capacity-pools.repository';
 import { PromotionsModule } from 'src/promotions/promotions.module';
+import { ShowcaseController } from './showcase/showcase.controller';
+import { ShowcaseService } from './showcase/showcase.service';
+import { ShowcaseRepository } from './showcase/showcase.repository';
 
 @Module({
   imports: [PromotionsModule],
@@ -16,6 +19,7 @@ import { PromotionsModule } from 'src/promotions/promotions.module';
     CategoriesController,
     TreatmentsController,
     CapacityPoolsController,
+    ShowcaseController,
   ],
   providers: [
     CategoriesService,
@@ -24,6 +28,8 @@ import { PromotionsModule } from 'src/promotions/promotions.module';
     TreatmentsRepository,
     CapacityPoolsService,
     CapacityPoolsRepository,
+    ShowcaseService,
+    ShowcaseRepository,
   ],
   exports: [CategoriesService, TreatmentsService],
 })

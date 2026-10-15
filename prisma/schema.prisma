@@ -71,6 +71,12 @@ model Category {
   updatedAt          DateTime            @updatedAt @map("updated_at")
   isPrincipal        Boolean             @default(false) @map("is_principal")
   tracksHairProfile  Boolean             @default(false) @map("tracks_hair_profile")
+  slug               String              @unique
+  tagline            String?
+  description        String?
+  iconKey            String?             @map("icon_key")
+  showOnWebsite      Boolean             @default(true) @map("show_on_website")
+  displayOrder       Int                 @default(0) @map("display_order")
   automationRules    AutomationRule[]
   capacityPools      CapacityPool[]
   promotions         Promotion[]
@@ -109,6 +115,21 @@ model Treatment {
   createdAt               DateTime                         @default(now()) @map("created_at")
   updatedAt               DateTime                         @updatedAt @map("updated_at")
   hasHairVariablePricing  Boolean                          @default(false) @map("has_hair_variable_pricing")
+  slug                    String
+  tagline                 String?
+  summary                 String?
+  idealFor                String[]                         @default([]) @map("ideal_for")
+  benefits                String[]                         @default([])
+  results                 String?
+  aftercare               String[]                         @default([])
+  considerations          String[]                         @default([])
+  recommendedFrequency    String?                          @map("recommended_frequency")
+  videoUrl                String?                          @map("video_url")
+  videoPublicId           String?                          @map("video_public_id")
+  posterUrl               String?                          @map("poster_url")
+  contentNeedsReview      Boolean                          @default(false) @map("content_needs_review")
+  displayOrder            Int                              @default(0) @map("display_order")
+  steps                   TreatmentStep[]
   automationRules         AutomationRule[]
   promotions              Promotion[]
   reservations            Reservation[]
@@ -118,7 +139,23 @@ model Treatment {
   category                Category                         @relation(fields: [categoryId], references: [id])
 
   @@unique([categoryId, name])
+  @@unique([categoryId, slug])
   @@map("treatments")
+}
+
+model TreatmentStep {
+  id              String    @id @default(uuid())
+  treatmentId     String    @map("treatment_id")
+  position        Int
+  title           String
+  description     String
+  durationMinutes Int?      @map("duration_minutes")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  treatment       Treatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+
+  @@unique([treatmentId, position])
+  @@map("treatment_steps")
 }
 
 model TreatmentHairLengthPricing {

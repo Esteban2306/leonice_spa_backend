@@ -13,6 +13,7 @@ import {
   CATALOG_CACHE_TTL_SECONDS,
 } from '../constants/catalog-cache.constants';
 import { Category } from '@prisma/client';
+import { uniqueSlug } from '../common/slugify';
 
 @Injectable()
 export class CategoriesService {
@@ -66,7 +67,10 @@ export class CategoriesService {
         `Ya existe una categoría llamada "${dto.name}"`,
       );
 
-    const category = await this.repository.create(dto);
+    const slug = await uniqueSlug(dto.name, (candidate) =>
+      this.repository.isSlugTaken(candidate),
+    );
+    const category = await this.repository.create({ ...dto, slug });
     await this.invalidateCache();
     return category;
   }
@@ -88,6 +92,9 @@ export class CategoriesService {
   }
 
   private async invalidateCache(): Promise<void> {
-    await this.cache.delete(CATALOG_CACHE_KEYS.categories);
+    await Promise.all([
+      this.cache.delete(CATALOG_CACHE_KEYS.categories),
+      this.cache.delete(CATALOG_CACHE_KEYS.showcase),
+    ]);
   }
 }

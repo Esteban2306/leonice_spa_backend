@@ -341,6 +341,25 @@ const PRODUCT = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const SHOWCASE = {
+  SHOWCASE_CATEGORY_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Esta categoría no está disponible.',
+  },
+  SHOWCASE_TREATMENT_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Este servicio no está disponible.',
+  },
+  TREATMENT_VIDEO_UPLOAD_FAILED: {
+    status: HttpStatus.BAD_GATEWAY,
+    message: 'No pudimos subir el video. Intenta de nuevo en unos minutos.',
+  },
+  TREATMENT_VIDEO_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Este servicio no tiene video.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 const AUTH = {
   AUTH_CURRENT_PASSWORD_INVALID: {
     status: HttpStatus.BAD_REQUEST,
@@ -381,6 +400,7 @@ export const ERROR_CATALOG = {
   ...DEPOSIT,
   ...CONDUIT,
   ...PRODUCT,
+  ...SHOWCASE,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

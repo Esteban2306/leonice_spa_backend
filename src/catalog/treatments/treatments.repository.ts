@@ -149,8 +149,33 @@ export class TreatmentsRepository {
     });
   }
 
-  create(dto: CreateTreatmentDto) {
+  async isSlugTaken(categoryId: string, slug: string) {
+    const found = await this.prisma.client.treatment.findUnique({
+      where: { categoryId_slug: { categoryId, slug } },
+      select: { id: true },
+    });
+    return found !== null;
+  }
+
+  create(dto: CreateTreatmentDto & { slug: string }) {
     return this.prisma.client.treatment.create({ data: dto });
+  }
+
+  setVideo(
+    id: string,
+    video: { videoUrl: string; posterUrl: string; videoPublicId: string },
+  ) {
+    return this.prisma.client.treatment.update({
+      where: { id },
+      data: video,
+    });
+  }
+
+  clearVideo(id: string) {
+    return this.prisma.client.treatment.update({
+      where: { id },
+      data: { videoUrl: null, posterUrl: null, videoPublicId: null },
+    });
   }
 
   update(id: string, dto: UpdateTreatmentDto) {
