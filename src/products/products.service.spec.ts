@@ -263,6 +263,8 @@ describe('ProductsService', () => {
 
       expect(deletedCacheKeys).toEqual([
         'catalog:products:list',
+        'catalog:products:catalog',
+        'catalog:showcase:tree',
         'catalog:recommendations:t1',
       ]);
     });

@@ -22,6 +22,7 @@ import { ClientsRepository } from 'src/clients/repositories/clients.repository';
 import { CreateProductTagDto } from './dto/create-product-tag.dto';
 import { UpdateProductTagDto } from './dto/update-product-tag.dto';
 import { normalizePhone } from 'src/clients/utils/normalize-phone.util';
+import { uniqueSlug } from '../catalog/common/slugify';
 
 function variantKey(brand: string, presentation: string) {
   return `${brand.toLowerCase()}\u0000${presentation.toLowerCase()}`;
@@ -48,7 +49,12 @@ export class ProductsService {
 
   async createCategory(dto: CreateProductCategoryDto) {
     await this.assertCategoryNameAvailable(dto.name);
-    return this.repository.createCategory(dto);
+    const slug = await uniqueSlug(dto.name, (candidate) =>
+      this.repository.isCategorySlugTaken(candidate),
+    );
+    const category = await this.repository.createCategory({ ...dto, slug });
+    await this.invalidateProductsCache();
+    return category;
   }
 
   async updateCategory(id: string, dto: UpdateProductCategoryDto) {
@@ -152,7 +158,10 @@ export class ProductsService {
       if (new Set(keys).size !== keys.length)
         throw new AppException('PRODUCT_VARIANT_ALREADY_EXISTS');
     }
-    const product = await this.repository.createProduct(dto);
+    const slug = await uniqueSlug(dto.name, (candidate) =>
+      this.repository.isProductSlugTaken(candidate),
+    );
+    const product = await this.repository.createProduct({ ...dto, slug });
     await this.invalidateProductsCache();
     return product;
   }
@@ -326,7 +335,11 @@ export class ProductsService {
       treatmentId,
       productId,
     );
-    await this.cache.delete(CATALOG_CACHE_KEYS.recommendation(treatmentId));
+    await Promise.all([
+      this.cache.delete(CATALOG_CACHE_KEYS.recommendation(treatmentId)),
+      this.cache.delete(CATALOG_CACHE_KEYS.productCatalog),
+      this.cache.delete(CATALOG_CACHE_KEYS.showcase),
+    ]);
     return recommendation;
   }
 
@@ -336,9 +349,13 @@ export class ProductsService {
       throw new AppException('PRODUCT_RECOMMENDATION_NOT_FOUND');
 
     await this.repository.deleteRecommendation(id);
-    await this.cache.delete(
-      CATALOG_CACHE_KEYS.recommendation(recommendation.treatmentId),
-    );
+    await Promise.all([
+      this.cache.delete(
+        CATALOG_CACHE_KEYS.recommendation(recommendation.treatmentId),
+      ),
+      this.cache.delete(CATALOG_CACHE_KEYS.productCatalog),
+      this.cache.delete(CATALOG_CACHE_KEYS.showcase),
+    ]);
   }
 
   findAllTags() {
@@ -351,7 +368,10 @@ export class ProductsService {
 
   async createTag(dto: CreateProductTagDto) {
     await this.assertTagNameAvailable(dto.name);
-    return this.repository.createTag(dto);
+    const slug = await uniqueSlug(dto.name, (candidate) =>
+      this.repository.isTagSlugTaken(candidate),
+    );
+    return this.repository.createTag({ ...dto, slug });
   }
 
   async updateTag(id: string, dto: UpdateProductTagDto) {
@@ -450,7 +470,11 @@ export class ProductsService {
   }
 
   private async invalidateProductsCache(productId?: string) {
-    await this.cache.delete(CATALOG_CACHE_KEYS.products);
+    await Promise.all([
+      this.cache.delete(CATALOG_CACHE_KEYS.products),
+      this.cache.delete(CATALOG_CACHE_KEYS.productCatalog),
+      this.cache.delete(CATALOG_CACHE_KEYS.showcase),
+    ]);
     if (!productId) return;
     const treatmentIds =
       await this.repository.findTreatmentIdsRecommending(productId);

@@ -5,6 +5,7 @@ export const CATALOG_CACHE_KEYS = {
   treatments: 'catalog:treatments:list',
   products: 'catalog:products:list',
   showcase: 'catalog:showcase:tree',
+  productCatalog: 'catalog:products:catalog',
   recommendation: (treatmentId: string) =>
     `catalog:recommendations:${treatmentId}`,
 };

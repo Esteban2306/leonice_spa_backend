@@ -86,8 +86,32 @@ export class ProductsRepository {
     return this.prisma.client.productCategory.findUnique({ where: { id } });
   }
 
-  createCategory(dto: CreateProductCategoryDto) {
+  createCategory(dto: CreateProductCategoryDto & { slug: string }) {
     return this.prisma.client.productCategory.create({ data: dto });
+  }
+
+  async isCategorySlugTaken(slug: string) {
+    const found = await this.prisma.client.productCategory.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    return found !== null;
+  }
+
+  async isProductSlugTaken(slug: string) {
+    const found = await this.prisma.client.product.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    return found !== null;
+  }
+
+  async isTagSlugTaken(slug: string) {
+    const found = await this.prisma.client.productTag.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    return found !== null;
   }
 
   updateCategory(id: string, dto: UpdateProductCategoryDto) {
@@ -172,7 +196,7 @@ export class ProductsRepository {
     return this.prisma.client.product.findUnique({ where: { id } });
   }
 
-  createProduct(dto: CreateProductDto) {
+  createProduct(dto: CreateProductDto & { slug: string }) {
     const { tagIds, variants, ...product } = dto;
     return this.prisma.client.product.create({
       data: {
@@ -345,7 +369,7 @@ export class ProductsRepository {
     return this.prisma.client.productTag.count({ where: { id: { in: ids } } });
   }
 
-  createTag(dto: CreateProductTagDto) {
+  createTag(dto: CreateProductTagDto & { slug: string }) {
     return this.prisma.client.productTag.create({ data: dto });
   }
 

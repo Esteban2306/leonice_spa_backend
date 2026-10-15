@@ -42,6 +42,14 @@ export interface ShowcaseStep {
   durationMinutes: number | null;
 }
 
+export interface ShowcaseRecommendedProduct {
+  slug: string;
+  name: string;
+  tagline: string | null;
+  priceFromPesos: number | null;
+  imageUrl: string | null;
+}
+
 export interface ShowcaseTreatmentDetail extends ShowcaseTreatmentCard {
   idealFor: string[];
   results: string | null;
@@ -51,6 +59,7 @@ export interface ShowcaseTreatmentDetail extends ShowcaseTreatmentCard {
   steps: ShowcaseStep[];
   category: ShowcaseCategorySummary;
   related: ShowcaseTreatmentCard[];
+  recommendedProducts: ShowcaseRecommendedProduct[];
 }
 
 export interface ShowcaseCategorySummary {
@@ -210,6 +219,16 @@ export function toTreatmentDetail(
       .filter((other) => other.id !== treatment.id)
       .slice(0, RELATED_LIMIT)
       .map((other) => toTreatmentCard(category, other, promotions)),
+    recommendedProducts: treatment.recommendations.map(({ product }) => ({
+      slug: product.slug,
+      name: product.name,
+      tagline: product.tagline,
+      priceFromPesos: product.variants[0]
+        ? Number(product.variants[0].price)
+        : null,
+      imageUrl:
+        product.variants.find((variant) => variant.imageUrl)?.imageUrl ?? null,
+    })),
   };
 }
 

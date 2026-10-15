@@ -11,7 +11,7 @@ import { isActiveWhere } from '../common/catalog-filters';
 
 const treatmentWithRelationsArgs = {
   include: {
-    category: { select: { id: true, name: true } },
+    category: { select: { id: true, name: true, slug: true } },
     hairLengthPricing: true,
     hairColorSurcharges: true,
   },

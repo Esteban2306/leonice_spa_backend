@@ -45,6 +45,7 @@ function treatment(
     contentNeedsReview: false,
     displayOrder: 0,
     steps: [],
+    recommendations: [],
     ...overrides,
   };
 }

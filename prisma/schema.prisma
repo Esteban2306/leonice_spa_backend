@@ -292,27 +292,41 @@ model Promotion {
 }
 
 model ProductCategory {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  isActive Boolean   @default(true) @map("is_active")
-  products Product[]
+  id           String    @id @default(uuid())
+  name         String    @unique
+  isActive     Boolean   @default(true) @map("is_active")
+  slug         String    @unique
+  description  String?
+  iconKey      String?   @map("icon_key")
+  displayOrder Int       @default(0) @map("display_order")
+  products     Product[]
 
   @@map("product_categories")
 }
 
 model Product {
-  id                String                           @id @default(uuid())
-  productCategoryId String                           @map("product_category_id")
-  name              String
-  description       String?
-  isActive          Boolean                          @default(true) @map("is_active")
-  createdAt         DateTime                         @default(now()) @map("created_at")
-  updatedAt         DateTime                         @updatedAt @map("updated_at")
-  tagAssignments    ProductTagAssignment[]
-  variants          ProductVariant[]
-  viewLogs          ProductViewLog[]
-  category          ProductCategory                  @relation(fields: [productCategoryId], references: [id])
-  recommendations   TreatmentProductRecommendation[]
+  id                 String                           @id @default(uuid())
+  productCategoryId  String                           @map("product_category_id")
+  name               String
+  description        String?
+  isActive           Boolean                          @default(true) @map("is_active")
+  createdAt          DateTime                         @default(now()) @map("created_at")
+  updatedAt          DateTime                         @updatedAt @map("updated_at")
+  slug               String                           @unique
+  tagline            String?
+  purpose            String?
+  benefits           String[]                         @default([])
+  howToUse           String[]                         @default([]) @map("how_to_use")
+  idealFor           String[]                         @default([]) @map("ideal_for")
+  usageFrequency     String?                          @map("usage_frequency")
+  precautions        String[]                         @default([])
+  contentNeedsReview Boolean                          @default(false) @map("content_needs_review")
+  displayOrder       Int                              @default(0) @map("display_order")
+  tagAssignments     ProductTagAssignment[]
+  variants           ProductVariant[]
+  viewLogs           ProductViewLog[]
+  category           ProductCategory                  @relation(fields: [productCategoryId], references: [id])
+  recommendations    TreatmentProductRecommendation[]
 
   @@index([productCategoryId])
   @@map("products")
@@ -368,6 +382,7 @@ model AutomationExecution {
 model ProductTag {
   id          String                 @id @default(uuid())
   name        String                 @unique
+  slug        String                 @unique
   isActive    Boolean                @default(true) @map("is_active")
   createdAt   DateTime               @default(now()) @map("created_at")
   assignments ProductTagAssignment[]
