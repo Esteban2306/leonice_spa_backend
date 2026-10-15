@@ -32,6 +32,7 @@ export interface ShowcaseTreatmentCard {
   posterUrl: string | null;
   benefits: string[];
   stepCount: number;
+  contentNeedsReview: boolean;
 }
 
 export interface ShowcaseStep {
@@ -142,6 +143,7 @@ export function toTreatmentCard(
     posterUrl: treatment.posterUrl,
     benefits: treatment.benefits,
     stepCount: treatment.steps.length,
+    contentNeedsReview: treatment.contentNeedsReview,
   };
 }
 

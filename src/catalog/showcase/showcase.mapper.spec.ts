@@ -166,6 +166,7 @@ describe('showcase mapper', () => {
     const detail = toTreatmentDetail(tree, tree.treatments[0], []);
 
     expect(detail.stepCount).toBe(1);
+    expect(detail.contentNeedsReview).toBe(false);
     expect(detail.steps).toEqual([
       {
         position: 1,
