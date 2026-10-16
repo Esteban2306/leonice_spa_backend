@@ -562,8 +562,9 @@ export class ReservationsRepository {
     return client.reservation.update({ where: { id }, data });
   }
 
-  updateValoracion(
+  async updateValoracionIfCurrent(
     id: string,
+    expectedStatus: ReservationStatus,
     data: {
       finalPrice: number;
       finalDurationMinutes: number;
@@ -573,11 +574,12 @@ export class ReservationsRepository {
       depositExpiresAt: Date;
     },
     client: PrismaClientOrTx = this.prisma.client,
-  ): Promise<Reservation> {
-    return client.reservation.update({
-      where: { id },
+  ): Promise<boolean> {
+    const result = await client.reservation.updateMany({
+      where: { id, status: expectedStatus },
       data: { ...data, valoracionRespondedAt: new Date() },
     });
+    return result.count === 1;
   }
 
   private buildWhere(

@@ -8,6 +8,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { ReservationStateMachine } from '../domain/reservation-state-machine';
 import { DepositDeadlineService } from '../service/deposit-deadline.service';
+import { AppException } from '../../common/errors/app.exception';
 import { assertTreatmentRequiresAssessment } from '../validators/assert-requires-assessment';
 
 @Injectable()
@@ -57,14 +58,24 @@ export class ConfirmValoracionOrchestrator {
       reservation.scheduledStart,
     );
 
-    const updated = await this.repository.updateValoracion(reservationId, {
-      finalPrice,
-      finalDurationMinutes,
-      scheduledEnd,
-      status: ReservationStatus.PENDIENTE_DEPOSITO,
-      depositClockStartedAt,
-      depositExpiresAt,
-    });
+    const applied = await this.repository.updateValoracionIfCurrent(
+      reservationId,
+      reservation.status,
+      {
+        finalPrice,
+        finalDurationMinutes,
+        scheduledEnd,
+        status: ReservationStatus.PENDIENTE_DEPOSITO,
+        depositClockStartedAt,
+        depositExpiresAt,
+      },
+    );
+    if (!applied) {
+      throw new AppException('RESERVATION_CONCURRENT_CHANGE');
+    }
+
+    const updated = await this.repository.findById(reservationId);
+    if (!updated) throw new NotFoundException('Reserva no encontrada');
 
     await this.depositDeadline.scheduleTimeout(reservationId, depositExpiresAt);
 
