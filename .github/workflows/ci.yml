@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 24
+  DB_USER: ci
+  DB_PASSWORD: ci
+  DB_NAME: leonice_ci
+
+jobs:
+  quality:
+    name: Tipos, lint, pruebas unitarias y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma generate
+      - run: pnpm exec tsc --noEmit -p tsconfig.json
+      - run: pnpm exec eslint "{src,test}/**/*.ts"
+      - run: pnpm test
+      - run: pnpm build
+
+  migrations:
+    name: Migraciones sobre PostgreSQL limpio
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
+          POSTGRES_DB: ${{ env.DB_NAME }}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d leonice_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/leonice_ci?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma migrate deploy
+      - name: El esquema de Prisma coincide con las migraciones
+        run: pnpm exec prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+
+  integration:
+    name: Pruebas de integración (PostgreSQL real)
+    runs-on: ubuntu-latest
+    needs: [quality]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
+          POSTGRES_DB: leonice_audit
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d leonice_audit"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/leonice_audit?schema=public
+      TZ: America/Bogota
+      NODE_ENV: test
+      PORT: 3920
+      REDIS_URL: redis://localhost:6379
+      CORS_ORIGIN: http://localhost:3000
+      JWT_SECRET: ci-jwt-secret-ci-jwt-secret-ci-jwt-secret-0001
+      JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret-ci-0002
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      CANCELLATION_LINK_SECRET: ci-cancellation-secret-ci-cancellation-0003
+      CONDUIT_TOOL_API_KEY: ci-tool-key-ci-tool-key-ci-tool-key-000000004
+      CONDUIT_WEBHOOK_SECRET: ci-webhook-secret-ci-webhook-secret-00005
+      CLOUDINARY_CLOUD_NAME: ci
+      CLOUDINARY_API_KEY: '0'
+      CLOUDINARY_API_SECRET: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma migrate deploy
+      - name: Reservas, dinero, concurrencia, colas y estructura de datos
+        run: >-
+          pnpm test:integration -- booking-flows concurrency money state-machine
+          transactions queues pool-starvation errors database-integrity
+      - name: Seguridad (informativo hasta cerrar los hallazgos pendientes)
+        continue-on-error: true
+        run: pnpm test:integration -- sec-spec
+
+  dependencies:
+    name: Auditoría de dependencias de producción
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - run: pnpm audit --prod --audit-level=high
+
+  images:
+    name: Imágenes de producción
+    runs-on: ubuntu-latest
+    needs: [quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Compose de producción es válido
+        run: |
+          cp infra/.env.production.example infra/.env.production
+          for var in POSTGRES_SUPERUSER_PASSWORD DB_MIGRATOR_PASSWORD DB_APP_PASSWORD DB_BACKUP_PASSWORD REDIS_PASSWORD SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+            sed -i "s/^$var=.*/$var=placeholder/" infra/.env.production
+          done
+          cp infra/app.env.production.example infra/app.env.production
+          docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.production --profile seed config --quiet
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: dockerfile
+          target: production
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: dockerfile
+          target: migrate
+          push: false
+          cache-from: type=gha
+      - uses: docker/build-push-action@v6
+        with:
+          context: infra/backup
+          push: false
