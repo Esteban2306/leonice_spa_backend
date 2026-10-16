@@ -263,6 +263,12 @@ async function invalidateCache() {
 }
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Este script carga contenido de los productos de prueba y no puede ejecutarse en producción',
+    );
+  }
+
   const prisma = new PrismaClient();
   try {
     await applyContent(prisma);

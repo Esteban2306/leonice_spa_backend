@@ -8,17 +8,42 @@ import { slugify } from '../src/catalog/common/slugify';
 
 const prisma = new PrismaClient();
 
+const DEFAULT_ADMIN_EMAIL = 'spacapilarleonicearenas@gmail.com';
+const MIN_PRODUCTION_PASSWORD_LENGTH = 14;
+
+function resolveAdminCredentials() {
+  const email = process.env.SEED_ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error(
+      'SEED_ADMIN_PASSWORD es obligatoria para crear el administrador',
+    );
+  }
+  if (process.env.NODE_ENV === 'production') {
+    const strong =
+      password.length >= MIN_PRODUCTION_PASSWORD_LENGTH &&
+      /[a-z]/.test(password) &&
+      /[A-Z]/.test(password) &&
+      /\d/.test(password) &&
+      /[^A-Za-z0-9]/.test(password);
+    if (!strong) {
+      throw new Error(
+        `En producción SEED_ADMIN_PASSWORD debe tener al menos ${MIN_PRODUCTION_PASSWORD_LENGTH} caracteres con mayúscula, minúscula, número y símbolo`,
+      );
+    }
+  }
+  return { email, password };
+}
+
 async function main() {
-  const adminPasswordHash = await argon2.hash(
-    process.env.SEED_ADMIN_PASSWORD!,
-    ARGON2_OPTIONS,
-  );
+  const admin = resolveAdminCredentials();
+  const adminPasswordHash = await argon2.hash(admin.password, ARGON2_OPTIONS);
 
   await prisma.user.upsert({
-    where: { email: 'spacapilarleonicearenas@gmail.com' },
+    where: { email: admin.email },
     update: {},
     create: {
-      email: 'spacapilarleonicearenas@gmail.com',
+      email: admin.email,
       passwordHash: adminPasswordHash,
       role: 'ADMIN',
     },

@@ -172,6 +172,12 @@ async function deactivate(prisma: PrismaClient) {
 }
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Este script carga productos de prueba de la landing y no puede ejecutarse en producción',
+    );
+  }
+
   const prisma = new PrismaClient();
   try {
     if (process.argv.includes('--deactivate')) await deactivate(prisma);
