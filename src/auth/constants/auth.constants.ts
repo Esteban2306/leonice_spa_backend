@@ -6,6 +6,7 @@ export const CSRF_TOKEN_COOKIE = 'csrf_token';
 
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const REFRESH_REUSE_GRACE_SECONDS = 30;
 
 export const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 export const LOCKOUT_DURATION_MINUTES = 15;

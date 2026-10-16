@@ -11,6 +11,7 @@ interface JwtPayload {
   sub: string;
   email: string;
   role: string;
+  sv?: number;
 }
 
 @Injectable()
@@ -30,10 +31,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     const user = await this.prisma.client.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, role: true, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        sessionVersion: true,
+      },
     });
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || payload.sv !== user.sessionVersion) {
       throw new UnauthorizedException();
     }
 

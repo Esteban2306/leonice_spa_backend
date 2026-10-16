@@ -8,20 +8,23 @@ datasource db {
 }
 
 model User {
-  id                  String              @id @default(uuid())
-  email               String              @unique
-  passwordHash        String              @map("password_hash")
-  role                Role                @default(ADMIN)
-  isActive            Boolean             @default(true) @map("is_active")
-  failedLoginAttempts Int                 @default(0) @map("failed_login_attempts")
-  lastLoginAt         DateTime?           @map("last_login_at")
-  refreshTokenHash    String?             @map("refresh_token_hash")
-  createdAt           DateTime            @default(now()) @map("created_at")
-  updatedAt           DateTime            @updatedAt @map("updated_at")
-  lockedUntil         DateTime?           @map("locked_until")
-  auditLog            AuditLog[]
-  verifiedDeposits    DepositRecord[]
-  scheduleExceptions  ScheduleException[]
+  id                       String              @id @default(uuid())
+  email                    String              @unique
+  passwordHash             String              @map("password_hash")
+  role                     Role                @default(ADMIN)
+  isActive                 Boolean             @default(true) @map("is_active")
+  failedLoginAttempts      Int                 @default(0) @map("failed_login_attempts")
+  lastLoginAt              DateTime?           @map("last_login_at")
+  refreshTokenHash         String?             @map("refresh_token_hash")
+  previousRefreshTokenHash String?             @map("previous_refresh_token_hash")
+  refreshRotatedAt         DateTime?           @map("refresh_rotated_at")
+  sessionVersion           Int                 @default(0) @map("session_version")
+  createdAt                DateTime            @default(now()) @map("created_at")
+  updatedAt                DateTime            @updatedAt @map("updated_at")
+  lockedUntil              DateTime?           @map("locked_until")
+  auditLog                 AuditLog[]
+  verifiedDeposits         DepositRecord[]
+  scheduleExceptions       ScheduleException[]
 
   @@map("users")
 }

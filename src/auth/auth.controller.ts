@@ -104,18 +104,21 @@ export class AuthController {
   async changePassword(
     @CurrentUser() user: { id: string },
     @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.changePassword(
+    const updated = await this.authService.changePassword(
       user.id,
       dto.currentPassword,
       dto.newPassword,
     );
+    const tokens = await this.authService.issueTokens(updated);
+    this.setAuthCookies(res, tokens);
     return { ok: true };
   }
 
   private setAuthCookies(
     res: Response,
-    tokens: { accessToken: string; refreshToken: string; csrfToken: string },
+    tokens: { accessToken: string; refreshToken?: string; csrfToken: string },
   ) {
     const isProd = process.env.NODE_ENV === 'production';
     const common = {
@@ -129,11 +132,13 @@ export class AuthController {
       ...common,
       maxAge: ACCESS_TOKEN_TTL_SECONDS * 1000,
     });
-    res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
-      ...common,
-      maxAge: REFRESH_TOKEN_TTL_SECONDS * 1000,
-      path: '/api/v1/auth/refresh',
-    });
+    if (tokens.refreshToken) {
+      res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
+        ...common,
+        maxAge: REFRESH_TOKEN_TTL_SECONDS * 1000,
+        path: '/api/v1/auth/refresh',
+      });
+    }
     res.cookie(CSRF_TOKEN_COOKIE, tokens.csrfToken, {
       httpOnly: false,
       secure: isProd,
