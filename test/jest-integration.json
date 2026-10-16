@@ -2,7 +2,7 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": ".",
   "testEnvironment": "node",
-  "testRegex": ".int-spec.ts$",
+  "testRegex": "\\.(int|sec)-spec\\.ts$",
   "globalSetup": "<rootDir>/integration/global-setup.ts",
   "setupFiles": ["<rootDir>/integration/env-setup.ts"],
   "testTimeout": 60000,
@@ -12,6 +12,7 @@
   },
   "transformIgnorePatterns": ["node_modules/\\.pnpm/(?!(cockatiel)@)"],
   "moduleNameMapper": {
-    "^src/(.*)$": "<rootDir>/../src/$1"
+    "^src/(.*)$": "<rootDir>/../src/$1",
+    "^load-esm$": "<rootDir>/integration/load-esm-stub.ts"
   }
 }
