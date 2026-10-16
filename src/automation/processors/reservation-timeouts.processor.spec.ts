@@ -5,6 +5,7 @@ import {
 } from '@prisma/client';
 import { ForbiddenException } from '@nestjs/common';
 import { Job, UnrecoverableError } from 'bullmq';
+import { AppException } from '../../common/errors/app.exception';
 import { JOB_NAMES } from '../../infrastructure/queue/queue.constants';
 import { ReservationsRepository } from '../../reservations/repositories/reservations.repository';
 import { AdminCancelReservationOrchestrator } from '../../reservations/orchestrators/admin-cancel-reservation.orchestrator';
@@ -166,6 +167,39 @@ describe('ReservationTimeoutsProcessor', () => {
 
     expect(cancelCalls).toHaveLength(0);
     expect(logged[0]?.result).toBe(AutomationExecutionResult.SKIPPED);
+  });
+
+  it.each([
+    'RESERVATION_CONCURRENT_CHANGE',
+    'RESERVATION_INVALID_TRANSITION',
+  ] as const)(
+    'si otra copia del job ganó la carrera (%s) registra SKIPPED y no falla',
+    async (code) => {
+      const { processor, logged } = buildFixture(
+        ReservationStatus.PENDIENTE_DEPOSITO,
+        { cancelError: new AppException(code) },
+      );
+
+      await expect(
+        processor.process(buildJob(JOB_NAMES.DEPOSITO_TIMEOUT)),
+      ).resolves.toBeUndefined();
+      expect(logged).toEqual([
+        expect.objectContaining({
+          result: AutomationExecutionResult.SKIPPED,
+          reason: 'La reserva cambió de estado durante la cancelación',
+        }),
+      ]);
+    },
+  );
+
+  it('otros AppException 4xx siguen siendo irrecuperables', async () => {
+    const { processor } = buildFixture(ReservationStatus.PENDIENTE_DEPOSITO, {
+      cancelError: new AppException('RESERVATION_NOT_OWNED'),
+    });
+
+    await expect(
+      processor.process(buildJob(JOB_NAMES.DEPOSITO_TIMEOUT)),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
   });
 
   it('convierte un 4xx en UnrecoverableError (sin reintentos)', async () => {

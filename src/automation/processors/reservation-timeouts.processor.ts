@@ -15,6 +15,8 @@ import { ReservationsRepository } from '../../reservations/repositories/reservat
 import { AdminCancelReservationOrchestrator } from '../../reservations/orchestrators/admin-cancel-reservation.orchestrator';
 import { MarkNoShowOrchestrator } from '../../reservations/orchestrators/mark-no-show.orchestrator';
 import { AutomationExecutionRepository } from '../repositories/automation-execution.repository';
+import { AppException } from '../../common/errors/app.exception';
+import type { ErrorCode } from '../../common/errors/error-catalog';
 import {
   DEPOSIT_SWEEP_BATCH_SIZE,
   NO_SHOW_GRACE_MS,
@@ -27,6 +29,11 @@ interface TimeoutJobData {
 }
 
 const NOTIFY_CLIENT_ON_TIMEOUT = false;
+
+const LOST_RACE_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
+  'RESERVATION_CONCURRENT_CHANGE',
+  'RESERVATION_INVALID_TRANSITION',
+]);
 
 const DEPOSIT_TIMEOUT_REASON = 'Depósito no confirmado a tiempo';
 
@@ -148,6 +155,13 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
         );
       }
     }
+  }
+
+  private isLostRace(error: unknown): boolean {
+    if (error instanceof AppException) {
+      return LOST_RACE_CODES.has(error.code);
+    }
+    return error instanceof ConflictException;
   }
 
   private isDeterministicError(error: unknown): error is HttpException {
@@ -276,7 +290,7 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
         CancellationSource.TIMEOUT,
       );
     } catch (error: unknown) {
-      if (error instanceof ConflictException) {
+      if (this.isLostRace(error)) {
         await this.skip(
           type,
           reservationId,
