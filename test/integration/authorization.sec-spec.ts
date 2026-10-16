@@ -6,6 +6,7 @@ import { CreateReservationOrchestrator } from 'src/reservations/orchestrators/cr
 import { signCancellationLink } from 'src/reservations/domain/cancellation-link-token';
 import {
   ADMIN_EMAIL,
+  bodyOf,
   ADMIN_PASSWORD,
   createSecurityApp,
   HttpServer,
@@ -28,16 +29,13 @@ const PUBLIC_ALLOW_LIST = [
   'GET /api/v1/catalog/products/:slug',
   'GET /api/v1/categories',
   'GET /api/v1/categories/:id',
-  'POST /api/v1/clients/resolve',
   'GET /api/v1/health',
   'POST /api/v1/integrations/conduit/message-events',
   'GET /api/v1/products',
   'GET /api/v1/products/:id',
   'GET /api/v1/products/:id/related',
-  'POST /api/v1/products/:id/view',
   'GET /api/v1/products/categories',
   'GET /api/v1/products/recommendations/:treatmentId',
-  'GET /api/v1/products/recommended-for-client',
   'GET /api/v1/products/tags',
   'GET /api/v1/promotions',
   'GET /api/v1/promotions/:id',
@@ -417,26 +415,88 @@ describe('S2. Autorización por rol y por recurso', () => {
       return client;
     };
 
-    it('POST /clients/resolve no revela el nombre de una persona registrada a quien solo conoce su teléfono', async () => {
+    const adminSession = async () => {
+      const login = await request(server)
+        .post('/api/v1/auth/login')
+        .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
+      return toSession(login.headers['set-cookie']);
+    };
+
+    it('POST /clients/resolve exige sesión de administrador y no revela el nombre a un anónimo', async () => {
       const victim = await registered('victima', 18);
       const res = await anonPost('/api/v1/clients/resolve', {
         phone: victim.phone,
       });
-      expect(res.status).toBeLessThan(300);
+      expect(res.status).toBe(401);
       expect(JSON.stringify(res.body)).not.toContain(victim.name);
     });
 
-    it('POST /clients/resolve no permite a un anónimo asociar su whatsappJid a la ficha de otra persona', async () => {
+    it('el administrador sigue pudiendo resolver clientes por teléfono', async () => {
+      const victim = await registered('admin-resolve', 23);
+      const s = await adminSession();
+      const res = await request(server)
+        .post('/api/v1/clients/resolve')
+        .set('Cookie', s.cookie)
+        .set('X-CSRF-Token', s.csrf)
+        .send({ phone: victim.phone });
+      expect(res.status).toBe(201);
+      expect(bodyOf(res).name).toBe(victim.name);
+    });
+
+    it('un anónimo no puede asociar su whatsappJid ni datos de salud a la ficha de otra persona (ni por /clients/resolve ni reservando)', async () => {
       const victim = await registered('victima-jid', 19);
-      const res = await anonPost('/api/v1/clients/resolve', {
+      await anonPost('/api/v1/clients/resolve', {
         phone: victim.phone,
         whatsappJid: 'atacante@s.whatsapp.net',
       });
-      expect(res.status).toBeLessThan(500);
+      const booking = await request(server)
+        .post('/api/v1/reservations')
+        .send({
+          client: {
+            phone: victim.phone,
+            whatsappJid: 'atacante@s.whatsapp.net',
+            allergies: 'inventada',
+            isPregnant: true,
+            consent: { healthDataConsent: true, policyVersion: 'v1' },
+          },
+          treatments: [world.tertiary.treatmentId],
+          scheduledStart: futureSlot(24, 10).toISOString(),
+        });
+      expect(booking.status).toBeLessThan(500);
       const row = await prisma.client.client.findUniqueOrThrow({
         where: { phone: victim.phone },
       });
       expect(row.whatsappJid).toBeNull();
+      expect(row.allergies).toBeNull();
+      expect(row.isPregnant).toBe(false);
+    });
+
+    it('un whatsappJid enviado por un anónimo no sirve para suplantar a otra clienta al reservar', async () => {
+      const victim = await registered('victima-jid-lookup', 26);
+      await prisma.client.client.update({
+        where: { phone: victim.phone },
+        data: { whatsappJid: 'victima@s.whatsapp.net' },
+      });
+      const attacker = newClientDto('atacante');
+      const res = await request(server)
+        .post('/api/v1/reservations')
+        .send({
+          client: { ...attacker, whatsappJid: 'victima@s.whatsapp.net' },
+          treatments: [world.tertiary.treatmentId],
+          scheduledStart: futureSlot(27, 10).toISOString(),
+        });
+      expect(res.status).toBe(201);
+      const victimRow = await prisma.client.client.findUniqueOrThrow({
+        where: { phone: victim.phone },
+      });
+      const reservations = await prisma.client.reservation.findMany({
+        where: { clientId: victimRow.id },
+      });
+      expect(
+        reservations.every(
+          (r) => r.scheduledStart.getTime() !== futureSlot(27, 10).getTime(),
+        ),
+      ).toBe(true);
     });
 
     it('un anónimo no puede saber si un teléfono es cliente: /clients/resolve responde igual para registrados y desconocidos', async () => {
@@ -459,6 +519,7 @@ describe('S2. Autorización por rol y por recurso', () => {
         .get('/api/v1/products/recommended-for-client')
         .query({ phone: newClientDto('desconocida-rec').phone });
       expect(knownRes.status).toBe(unknownRes.status);
+      expect(knownRes.status).toBe(401);
     });
 
     it('POST /products/:id/view no permite a un anónimo escribir historial en nombre de otra persona', async () => {
@@ -475,7 +536,7 @@ describe('S2. Autorización por rol y por recurso', () => {
       const res = await request(server)
         .post(`/api/v1/products/${product.id}/view`)
         .send({ phone: victim.phone });
-      expect(res.status).toBeLessThan(300);
+      expect(res.status).toBe(401);
       const client = await prisma.client.client.findUniqueOrThrow({
         where: { phone: victim.phone },
       });

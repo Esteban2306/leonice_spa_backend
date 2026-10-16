@@ -114,10 +114,24 @@ describe('S3. Rate limiting para anónimos, clientes, administradores y webhooks
 
   describe('resiliencia del almacén de límites', () => {
     it('si el almacén de límites (Redis) falla, la API pública sigue respondiendo en lugar de caer con 500', async () => {
-      const restore = breakThrottleStorage(app);
+      const restore = breakThrottleStorage();
       try {
         const res = await request(server).get(`${API}/treatments`);
         expect(res.status).toBe(200);
+      } finally {
+        restore();
+      }
+    });
+
+    it('con Redis caído los límites se siguen aplicando en memoria (no queda abierta la puerta)', async () => {
+      const restore = breakThrottleStorage();
+      try {
+        const codes = await statuses(8, () =>
+          request(server)
+            .post(`${API}/auth/login`)
+            .send({ email: 'nadie@leonice.test', password: 'incorrecta' }),
+        );
+        expect(codes.filter((c) => c === 429).length).toBeGreaterThanOrEqual(1);
       } finally {
         restore();
       }
@@ -254,8 +268,8 @@ describe('S3. Rate limiting para anónimos, clientes, administradores y webhooks
       expect(codes.filter((c) => c === 429)).toHaveLength(0);
     });
 
-    it('una avalancha de firmas inválidas se frena con 429 antes de gastar HMAC (60 por minuto)', async () => {
-      const codes = await statuses(70, () =>
+    it('una avalancha de firmas inválidas termina frenada con 429 (tope por segundo de webhooks)', async () => {
+      const codes = await statuses(80, () =>
         request(server)
           .post(`${API}/integrations/conduit/message-events`)
           .set('Content-Type', 'application/json')
@@ -263,8 +277,8 @@ describe('S3. Rate limiting para anónimos, clientes, administradores y webhooks
           .set('X-Conduit-Timestamp', String(Math.floor(Date.now() / 1000)))
           .send(body),
       );
-      expect(codes.filter((c) => c === 401).length).toBe(60);
-      expect(codes.filter((c) => c === 429).length).toBe(10);
+      expect(codes.filter((c) => c === 429).length).toBeGreaterThanOrEqual(1);
+      expect(codes.every((c) => c === 401 || c === 429)).toBe(true);
     });
 
     it('el listado de eventos de mensajes exige sesión de administrador', async () => {

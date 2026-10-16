@@ -132,14 +132,22 @@ export const toSession = (
   };
 };
 
+interface MemoryThrottlerStore {
+  storage?: Map<string, unknown>;
+  timeoutIds?: Map<string, ReturnType<typeof setTimeout>[]>;
+}
+
 export function resetThrottle(app: INestApplication): void {
-  const storage: {
-    storage: Map<string, unknown>;
-    timeoutIds: Map<string, ReturnType<typeof setTimeout>[]>;
+  const root: MemoryThrottlerStore & {
+    primary?: MemoryThrottlerStore;
+    fallback?: MemoryThrottlerStore;
   } = app.get(ThrottlerStorage);
-  storage.storage.clear();
-  for (const ids of storage.timeoutIds.values()) ids.forEach(clearTimeout);
-  storage.timeoutIds.clear();
+  for (const store of [root, root.primary, root.fallback]) {
+    if (!store?.storage || !store.timeoutIds) continue;
+    store.storage.clear();
+    for (const ids of store.timeoutIds.values()) ids.forEach(clearTimeout);
+    store.timeoutIds.clear();
+  }
 }
 
 export interface ApiBody {
@@ -155,13 +163,16 @@ export const bodyOf = (res: { body: unknown }) => res.body as ApiBody;
 
 export type HttpServer = Parameters<typeof import('supertest')>[0];
 
-export function breakThrottleStorage(app: INestApplication): () => void {
-  const storage: {
-    increment: (...args: unknown[]) => Promise<unknown>;
-  } = app.get(ThrottlerStorage);
-  const original = storage.increment;
-  storage.increment = () => Promise.reject(new Error('Redis caído'));
+export function breakThrottleStorage(): () => void {
+  const redisStorage = jest.requireMock<{
+    ThrottlerStorageRedisService: {
+      prototype: { increment: (...args: unknown[]) => Promise<unknown> };
+    };
+  }>('@nest-lab/throttler-storage-redis').ThrottlerStorageRedisService;
+  const original = redisStorage.prototype.increment;
+  redisStorage.prototype.increment = () =>
+    Promise.reject(new Error('Redis caído'));
   return () => {
-    storage.increment = original;
+    redisStorage.prototype.increment = original;
   };
 }

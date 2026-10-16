@@ -36,7 +36,17 @@ jest.mock('ioredis', () => {
 jest.mock('@nest-lab/throttler-storage-redis', () => {
   const actual =
     jest.requireActual<typeof import('@nestjs/throttler')>('@nestjs/throttler');
-  class ThrottlerStorageRedisService extends actual.ThrottlerStorageService {}
+  class ThrottlerStorageRedisService extends actual.ThrottlerStorageService {
+    increment(
+      key: string,
+      ttl: number,
+      limit: number,
+      blockDuration: number,
+      throttlerName: string,
+    ) {
+      return super.increment(key, ttl, limit, blockDuration, throttlerName);
+    }
+  }
   return { ThrottlerStorageRedisService };
 });
 

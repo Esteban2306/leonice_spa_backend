@@ -196,6 +196,27 @@ describe('S1. Autenticación, expiración, renovación y logout', () => {
       expect((await me(expired)).status).toBe(401);
     });
 
+    it('un token firmado correctamente pero sin la versión de sesión vigente responde 401', async () => {
+      const user = await prisma.client.user.findFirstOrThrow();
+      const stale = jwt.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          role: 'ADMIN',
+          sv: user.sessionVersion + 1,
+        },
+        process.env.JWT_SECRET as string,
+        { expiresIn: 600 },
+      );
+      const missing = jwt.sign(
+        { sub: user.id, email: user.email, role: 'ADMIN' },
+        process.env.JWT_SECRET as string,
+        { expiresIn: 600 },
+      );
+      expect((await me(stale)).status).toBe(401);
+      expect((await me(missing)).status).toBe(401);
+    });
+
     it('el token de refresh no sirve como token de acceso', async () => {
       const s = await loggedIn();
       expect((await me(s.refresh)).status).toBe(401);
@@ -204,7 +225,12 @@ describe('S1. Autenticación, expiración, renovación y logout', () => {
     it('el rol sale de la base de datos, no del token', async () => {
       const user = await prisma.client.user.findFirstOrThrow();
       const forged = jwt.sign(
-        { sub: user.id, email: 'otro@x.test', role: 'SUPERADMIN' },
+        {
+          sub: user.id,
+          email: 'otro@x.test',
+          role: 'SUPERADMIN',
+          sv: user.sessionVersion,
+        },
         process.env.JWT_SECRET as string,
         { expiresIn: 600 },
       );
@@ -223,43 +249,70 @@ describe('S1. Autenticación, expiración, renovación y logout', () => {
   });
 
   describe('renovación de sesión', () => {
-    it('rota el refresh token: el nuevo funciona y el anterior queda inválido', async () => {
+    const expireGrace = () =>
+      prisma.client.user.updateMany({
+        data: { refreshRotatedAt: new Date(Date.now() - 5 * 60_000) },
+      });
+
+    it('rota el refresh token: el nuevo funciona y, pasado el margen de gracia, el anterior queda inválido', async () => {
       const s = await loggedIn();
-      await new Promise((r) => setTimeout(r, 1100));
       const res = await refreshWith(s.refresh, s.csrf);
       expect(res.status).toBe(201);
       const renewed = toSession(res.headers['set-cookie']);
       expect(renewed.refresh).not.toBe(s.refresh);
       expect((await me(renewed.access)).status).toBe(200);
 
+      await expireGrace();
       const replay = await refreshWith(s.refresh, s.csrf);
       expect(replay.status).toBe(401);
     });
 
-    it('reutilizar un refresh ya rotado revoca toda la sesión (detección de robo)', async () => {
+    it('dentro del margen de gracia el refresh anterior solo obtiene un nuevo acceso, sin rotar ni emitir otro refresh', async () => {
       const s = await loggedIn();
-      await new Promise((r) => setTimeout(r, 1100));
+      const first = await refreshWith(s.refresh, s.csrf);
+      const renewed = toSession(first.headers['set-cookie']);
+      const late = await refreshWith(s.refresh, s.csrf);
+      expect(late.status).toBe(201);
+      const cookies = (late.headers['set-cookie'] as unknown as string[]).join(
+        '|',
+      );
+      expect(cookies).toMatch(/access_token=/);
+      expect(cookies).not.toMatch(/refresh_token=/);
+      expect((await refreshWith(renewed.refresh, renewed.csrf)).status).toBe(
+        201,
+      );
+    });
+
+    it('reutilizar un refresh ya rotado fuera del margen de gracia revoca toda la sesión (detección de robo), incluido el acceso vigente', async () => {
+      const s = await loggedIn();
       const renewed = toSession(
         (await refreshWith(s.refresh, s.csrf)).headers['set-cookie'],
       );
+      await expireGrace();
 
       expect((await refreshWith(s.refresh, s.csrf)).status).toBe(401);
       expect((await refreshWith(renewed.refresh, renewed.csrf)).status).toBe(
         401,
       );
+      expect((await me(renewed.access)).status).toBe(401);
     });
 
     it('dos pestañas que renuevan a la vez con el mismo refresh no deben cerrar la sesión legítima', async () => {
       const s = await loggedIn();
-      await new Promise((r) => setTimeout(r, 1100));
       const [a, b] = await Promise.all([
         refreshWith(s.refresh, s.csrf),
         refreshWith(s.refresh, s.csrf),
       ]);
       const winners = [a, b].filter((r) => r.status === 201);
-      expect(winners.length).toBeGreaterThanOrEqual(1);
+      expect(winners).toHaveLength(2);
       const user = await prisma.client.user.findFirstOrThrow();
       expect(user.refreshTokenHash).not.toBeNull();
+      const finalSession = toSession(
+        [a, b].flatMap(
+          (r) => (r.headers['set-cookie'] as unknown as string[]) ?? [],
+        ),
+      );
+      expect((await me(finalSession.access)).status).toBe(200);
     });
 
     it('exige el token CSRF y un refresh cookie válido', async () => {
@@ -382,6 +435,8 @@ describe('S1. Autenticación, expiración, renovación y logout', () => {
         newPassword: 'Nueva#Clave-456',
       });
       expect(ok.status).toBe(200);
+      const continued = toSession(ok.headers['set-cookie']);
+      expect((await me(continued.access)).status).toBe(200);
       expect((await refreshWith(s.refresh, s.csrf)).status).toBe(401);
       expect((await login(ADMIN_PASSWORD)).status).toBe(401);
       expect((await login('Nueva#Clave-456')).status).toBe(201);

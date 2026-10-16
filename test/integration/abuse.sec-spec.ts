@@ -22,7 +22,6 @@ const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
   'base64',
 );
-const anon = { cookie: 'csrf_token=anon', csrf: 'anon' };
 
 describe('S5. Validación de DTO, límites, archivos y abuso', () => {
   let app: INestApplication;
@@ -50,13 +49,6 @@ describe('S5. Validación de DTO, límites, archivos y abuso', () => {
   beforeEach(() => {
     resetThrottle(app);
   });
-
-  const anonPost = (path: string, body: object) =>
-    request(server)
-      .post(`${API}${path}`)
-      .set('Cookie', anon.cookie)
-      .set('X-CSRF-Token', anon.csrf)
-      .send(body);
 
   const adminReq = (
     method: 'get' | 'post' | 'patch' | 'put' | 'delete',
@@ -179,22 +171,34 @@ describe('S5. Validación de DTO, límites, archivos y abuso', () => {
 
   describe('límites de tamaño en endpoints anónimos', () => {
     it('un nombre de cliente descomunal se rechaza con validación (no se acepta ni se procesa)', async () => {
-      const res = await anonPost('/clients/resolve', {
-        phone: newClientDto('grande').phone,
-        name: 'A'.repeat(200_000),
-        birthDate: '1990-01-01',
-      });
+      const res = await request(server)
+        .post(`${API}/reservations`)
+        .send(
+          validBooking({
+            client: {
+              phone: newClientDto('grande').phone,
+              name: 'A'.repeat(200_000),
+              birthDate: '1990-01-01',
+            },
+          }),
+        );
       expect(res.status).toBe(400);
     });
 
     it('alergias descomunales se rechazan', async () => {
-      const res = await anonPost('/clients/resolve', {
-        phone: newClientDto('alergia').phone,
-        name: 'Cliente',
-        birthDate: '1990-01-01',
-        allergies: 'x'.repeat(200_000),
-        consent: { healthDataConsent: true, policyVersion: 'v1' },
-      });
+      const res = await request(server)
+        .post(`${API}/reservations`)
+        .send(
+          validBooking({
+            client: {
+              phone: newClientDto('alergia').phone,
+              name: 'Cliente',
+              birthDate: '1990-01-01',
+              allergies: 'x'.repeat(200_000),
+              consent: { healthDataConsent: true, policyVersion: 'v1' },
+            },
+          }),
+        );
       expect(res.status).toBe(400);
     });
 

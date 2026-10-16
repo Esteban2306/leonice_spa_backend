@@ -95,34 +95,41 @@ describe('S7. Datos personales y de salud: acceso, cifrado, consentimiento, traz
       expect(anonymous.status).toBe(401);
     });
 
+    const publicBooking = (client: Record<string, unknown>, day: number) =>
+      request(server)
+        .post(`${API}/reservations`)
+        .send({
+          client,
+          treatments: [world.secondary.treatmentId],
+          scheduledStart: futureSlot(day, 10).toISOString(),
+        });
+
     it('registrar alergias o embarazo por el canal público exige consentimiento explícito y lo deja registrado con versión de política', async () => {
       const dto = newClientDto('consent');
-      const withoutConsent = await request(server)
-        .post(`${API}/clients/resolve`)
-        .set('Cookie', 'csrf_token=a')
-        .set('X-CSRF-Token', 'a')
-        .send({
-          phone: dto.phone,
-          name: dto.name,
-          birthDate: dto.birthDate,
-          allergies: 'polen',
-        });
+      const withoutConsent = await publicBooking(
+        { ...dto, allergies: 'polen' },
+        30,
+      );
       expect(withoutConsent.status).toBe(400);
+      expect(
+        await prisma.client.client.count({ where: { phone: dto.phone } }),
+      ).toBe(0);
 
-      const withConsent = await request(server)
-        .post(`${API}/clients/resolve`)
-        .set('Cookie', 'csrf_token=a')
-        .set('X-CSRF-Token', 'a')
-        .send({
-          phone: dto.phone,
-          name: dto.name,
-          birthDate: dto.birthDate,
+      resetThrottle(app);
+      const withConsent = await publicBooking(
+        {
+          ...dto,
           allergies: 'polen',
           consent: { healthDataConsent: true, policyVersion: 'v1' },
-        });
-      expect(withConsent.status).toBeLessThan(300);
+        },
+        31,
+      );
+      expect(withConsent.status).toBe(201);
+      const created = await prisma.client.client.findUniqueOrThrow({
+        where: { phone: dto.phone },
+      });
       const records = await prisma.client.consentRecord.findMany({
-        where: { clientId: (withConsent.body as { id: string }).id },
+        where: { clientId: created.id },
       });
       expect(records).toHaveLength(1);
       expect(records[0].type).toBe('DATOS_SALUD');
@@ -131,17 +138,14 @@ describe('S7. Datos personales y de salud: acceso, cifrado, consentimiento, traz
 
     it('un consentimiento falso (healthDataConsent=false) se rechaza', async () => {
       const dto = newClientDto('consent-no');
-      const res = await request(server)
-        .post(`${API}/clients/resolve`)
-        .set('Cookie', 'csrf_token=a')
-        .set('X-CSRF-Token', 'a')
-        .send({
-          phone: dto.phone,
-          name: dto.name,
-          birthDate: dto.birthDate,
+      const res = await publicBooking(
+        {
+          ...dto,
           isPregnant: true,
           consent: { healthDataConsent: false, policyVersion: 'v1' },
-        });
+        },
+        32,
+      );
       expect(res.status).toBe(400);
     });
   });
