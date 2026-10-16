@@ -15,8 +15,23 @@ type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 export class DepositsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(data: CreateDepositData) {
-    return this.prisma.client.depositRecord.create({ data });
+  create(
+    data: CreateDepositData,
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.depositRecord.create({ data });
+  }
+
+  async supersedePendingProofs(
+    reservationId: string,
+    reason: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<number> {
+    const result = await client.depositRecord.updateMany({
+      where: { reservationId, status: DepositStatus.PENDIENTE },
+      data: { status: DepositStatus.RECHAZADO, rejectionReason: reason },
+    });
+    return result.count;
   }
 
   findLatestByReservationId(

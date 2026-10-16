@@ -1,5 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DepositStatus, DepositVerificationMethod } from '@prisma/client';
+import {
+  DepositStatus,
+  DepositVerificationMethod,
+  Prisma,
+} from '@prisma/client';
 import {
   DepositVerificationStrategy,
   SubmitProofInput,
@@ -12,21 +16,24 @@ export class AutomaticDepositVerificationStrategy implements DepositVerification
 
   constructor(private readonly repository: DepositsRepository) {}
 
-  async submitProof(input: SubmitProofInput) {
+  async submitProof(input: SubmitProofInput, tx?: Prisma.TransactionClient) {
     if (!input.coverage) {
       throw new BadRequestException(
         'El canal automático debe indicar si es anticipo o pago completo',
       );
     }
 
-    return this.repository.create({
-      reservationId: input.reservationId,
-      method: this.method,
-      status: DepositStatus.CONFIRMADO,
-      coverage: input.coverage,
-      imageUrl: input?.imageUrl,
-      imageCloudinaryId: input?.imageCloudinaryId,
-      verifiedAt: new Date(),
-    });
+    return this.repository.create(
+      {
+        reservationId: input.reservationId,
+        method: this.method,
+        status: DepositStatus.CONFIRMADO,
+        coverage: input.coverage,
+        imageUrl: input?.imageUrl,
+        imageCloudinaryId: input?.imageCloudinaryId,
+        verifiedAt: new Date(),
+      },
+      tx,
+    );
   }
 }

@@ -2,6 +2,7 @@ import {
   DepositCoverage,
   DepositRecord,
   DepositVerificationMethod,
+  Prisma,
 } from '@prisma/client';
 
 export interface SubmitProofInput {
@@ -13,5 +14,8 @@ export interface SubmitProofInput {
 
 export interface DepositVerificationStrategy {
   readonly method: DepositVerificationMethod;
-  submitProof(input: SubmitProofInput): Promise<DepositRecord>;
+  submitProof(
+    input: SubmitProofInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DepositRecord>;
 }
