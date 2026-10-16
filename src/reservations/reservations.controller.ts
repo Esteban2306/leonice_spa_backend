@@ -16,6 +16,8 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CancelReservationDto } from './dto/cancel-reservation.dto';
 import { RescheduleReservationDto } from './dto/reschedule-reservation.dto';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateReservationOrchestrator } from './orchestrators/create-reservation.orchestrator';
 import { CancelReservationOrchestrator } from './orchestrators/cancel-reservation.orchestrator';
 import { RescheduleReservationOrchestrator } from './orchestrators/reschedule-reservation.orchestrator';
@@ -88,8 +90,13 @@ export class ReservationsController {
     },
   })
   @Post()
-  create(@Body() dto: CreateReservationDto) {
-    return this.createOrchestrator.execute(dto);
+  create(
+    @Body() dto: CreateReservationDto,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.createOrchestrator.execute(dto, {
+      trustedIdentity: user !== undefined,
+    });
   }
 
   @Public()

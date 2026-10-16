@@ -6,10 +6,15 @@ import {
   HttpStatus,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ReservationChannel } from '@prisma/client';
 import { ConduitTool } from './decorators/conduit-tool.decorator';
-import { ConduitToolOptionsMeta } from './interceptors/conduit-contact.interceptor';
+import {
+  ConduitToolOptionsMeta,
+  hasVerifiedIdentity,
+  type RequestWithConduitContact,
+} from './interceptors/conduit-contact.interceptor';
 import { RescheduleReservationOrchestrator } from '../reservations/orchestrators/reschedule-reservation.orchestrator';
 import { GetAvailabilityCalendarDto } from '../reservations/dto/get-availability-calendar.dto';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
@@ -59,11 +64,14 @@ export class ConduitBookingToolsController {
   }
 
   @Post('reservations')
-  create(@Body() dto: CreateReservationDto) {
-    return this.createReservation.execute({
-      ...dto,
-      channel: ReservationChannel.WHATSAPP,
-    });
+  create(
+    @Body() dto: CreateReservationDto,
+    @Req() req: RequestWithConduitContact,
+  ) {
+    return this.createReservation.execute(
+      { ...dto, channel: ReservationChannel.WHATSAPP },
+      { trustedIdentity: hasVerifiedIdentity(req) },
+    );
   }
 
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })

@@ -41,6 +41,14 @@ export class ConduitToolsController {
       ? await this.clientsRepository.findByWhatsappJid(dto.whatsappJid)
       : null;
 
+    if (
+      client &&
+      req.conduitContact?.phone &&
+      client.phone !== req.conduitContact.phone
+    ) {
+      client = null;
+    }
+
     if (!client) {
       client = await this.clientsRepository.findByPhone(normalizedPhone);
     }

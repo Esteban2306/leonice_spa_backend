@@ -9,7 +9,10 @@ import {
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { AvailabilityRepository } from '../repositories/availability.repository';
 import { ReservationsRepository } from '../repositories/reservations.repository';
-import { ClientsService } from 'src/clients/clients.service';
+import {
+  ClientsService,
+  type ResolveClientOptions,
+} from 'src/clients/clients.service';
 import { PlacementCheckService } from '../service/placement-check.service';
 import { placementRejectionException } from '../domain/placement-rejection.exception';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
@@ -66,9 +69,13 @@ export class CreateReservationOrchestrator {
     private readonly depositDeadline: DepositDeadlineService,
   ) {}
 
-  async execute(dto: CreateReservationDto): Promise<CreateReservationResult> {
+  async execute(
+    dto: CreateReservationDto,
+    options: ResolveClientOptions = { trustedIdentity: false },
+  ): Promise<CreateReservationResult> {
     const client = await this.clientService.resolveOrCreateForBooking(
       dto.client,
+      options,
     );
 
     const treatmentIds = dto.treatments;

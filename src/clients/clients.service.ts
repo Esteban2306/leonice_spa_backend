@@ -27,6 +27,10 @@ import {
 const MIN_NAME_QUERY = 2;
 const MIN_PHONE_DIGITS = 4;
 
+export interface ResolveClientOptions {
+  trustedIdentity: boolean;
+}
+
 @Injectable()
 export class ClientsService {
   constructor(
@@ -35,11 +39,15 @@ export class ClientsService {
     private readonly consentService: ConsentService,
   ) {}
 
-  async resolveOrCreateForBooking(dto: ResolveClientDto) {
+  async resolveOrCreateForBooking(
+    dto: ResolveClientDto,
+    options: ResolveClientOptions = { trustedIdentity: false },
+  ) {
     const normalizedPhone = normalizePhone(dto.phone);
+    const whatsappJid = options.trustedIdentity ? dto.whatsappJid : undefined;
 
-    let client = dto.whatsappJid
-      ? await this.repository.findByWhatsappJid(dto.whatsappJid)
+    let client = whatsappJid
+      ? await this.repository.findByWhatsappJid(whatsappJid)
       : null;
 
     if (!client) {
@@ -69,7 +77,7 @@ export class ClientsService {
         phone: normalizedPhone,
         name: dto.name,
         birthDate: calendarDateToUtcMidnight(dto.birthDate),
-        whatsappJid: dto.whatsappJid,
+        whatsappJid,
         allergies: dto.allergies,
         isPregnant: dto.isPregnant || false,
       });
@@ -83,12 +91,16 @@ export class ClientsService {
       return created;
     }
 
+    if (!options.trustedIdentity) {
+      return client;
+    }
+
     if (hasSensitiveInput) {
       await this.consentService.ensureHealthDataConsent(client.id, dto.consent);
     }
 
     return this.repository.fillMissingFields(client, {
-      whatsappJid: dto.whatsappJid,
+      whatsappJid,
       allergies: dto.allergies,
       isPregnant: dto.isPregnant,
     });

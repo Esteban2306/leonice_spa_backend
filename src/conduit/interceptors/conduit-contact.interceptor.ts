@@ -33,6 +33,12 @@ export type RequestWithConduitContact = Request & {
   conduitContact?: ConduitContact;
 };
 
+export function hasVerifiedIdentity(req: RequestWithConduitContact): boolean {
+  const contact = req.conduitContact;
+  if (!contact) return false;
+  return contact.phone !== null || contact.lid === null;
+}
+
 function header(req: Request, name: string): string | undefined {
   const value = req.headers[name];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;

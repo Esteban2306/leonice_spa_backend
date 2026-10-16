@@ -11,11 +11,9 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { ClientsService } from './clients.service';
 import { ResolveClientDto } from './dto/resolve-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
-import { Public } from '../auth/decorators/public.decorator';
 import { FindClientsQueryDto } from './dto/find-clients-query.dto';
 import { SetHairProfileDto } from './dto/set-hair-profile.dto';
 import { CreateClientDto } from './dto/create-client.dto';
@@ -26,11 +24,11 @@ import { FindPendingHairProfilesQueryDto } from './dto/find-pending-hair-profile
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
-  @Public()
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post('resolve')
   async resolve(@Body() dto: ResolveClientDto) {
-    const client = await this.clientsService.resolveOrCreateForBooking(dto);
+    const client = await this.clientsService.resolveOrCreateForBooking(dto, {
+      trustedIdentity: true,
+    });
     return {
       id: client.id,
       name: client.name,

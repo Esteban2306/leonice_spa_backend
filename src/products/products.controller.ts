@@ -31,7 +31,6 @@ import { FindAdminProductsQueryDto } from './dto/find-admin-products-query.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { AssignProductTagsDto } from './dto/assign-product-tags.dto';
 import { LogProductViewDto } from './dto/log-product-view.dto';
-import { SkipCsrf } from 'src/auth/decorators/skip-csrf.decorator';
 import { CreateProductTagDto } from './dto/create-product-tag.dto';
 import { UpdateProductTagDto } from './dto/update-product-tag.dto';
 import { FindRecommendedForClientQueryDto } from './dto/find-recommended-for-client-query.dto';
@@ -149,7 +148,6 @@ export class ProductsController {
     return this.service.removeTag(id);
   }
 
-  @Public()
   @Get('recommended-for-client')
   findRecommendedForClient(@Query() query: FindRecommendedForClientQueryDto) {
     return this.service.findRecommendedForClient(query.phone);
@@ -235,8 +233,6 @@ export class ProductsController {
     return this.service.findRelated(id);
   }
 
-  @Public()
-  @SkipCsrf()
   @Post(':id/view')
   logView(
     @Param('id', ParseUUIDPipe) id: string,
