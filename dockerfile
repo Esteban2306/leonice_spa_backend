@@ -16,6 +16,14 @@ COPY . .
 EXPOSE 3000
 CMD ["pnpm", "start:dev"]
 
+FROM deps AS migrate
+COPY . .
+RUN pnpm exec prisma generate
+ENV NODE_ENV=production
+ENV PATH=/usr/src/app/node_modules/.bin:$PATH
+USER node
+CMD ["prisma", "migrate", "deploy"]
+
 FROM deps AS build
 COPY . .
 RUN pnpm exec prisma generate \

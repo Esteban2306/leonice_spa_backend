@@ -1,0 +1,219 @@
+name: ${COMPOSE_PROJECT_NAME:-leonice}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+x-database-name: &database-name ${POSTGRES_DB:-leonice_spa}
+
+services:
+  volume-permissions:
+    image: busybox:1.37
+    command:
+      - sh
+      - -c
+      - chown -R 70:70 /wal_archive /backups && chmod 700 /wal_archive /backups
+    volumes:
+      - wal_archive:/wal_archive
+      - backups:/backups
+    restart: 'no'
+    networks: [internal]
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    depends_on:
+      volume-permissions:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Define POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: *database-name
+      DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:?Define DB_MIGRATOR_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?Define DB_APP_PASSWORD}
+      DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:?Define DB_BACKUP_PASSWORD}
+      TZ: America/Bogota
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=test ! -f /wal_archive/%f && cp %p /wal_archive/%f.tmp && mv /wal_archive/%f.tmp /wal_archive/%f
+      - -c
+      - archive_timeout=300
+      - -c
+      - max_wal_senders=4
+      - -c
+      - max_connections=100
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - log_lock_waits=on
+      - -c
+      - password_encryption=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - wal_archive:/wal_archive
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 60s
+    logging: *logging
+    networks: [internal]
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Define REDIS_PASSWORD}
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --requirepass "$$REDIS_PASSWORD"
+        --appendonly yes
+        --appendfsync everysec
+        --auto-aof-rewrite-percentage 100
+        --auto-aof-rewrite-min-size 64mb
+        --maxmemory ${REDIS_MAXMEMORY:-256mb}
+        --maxmemory-policy noeviction
+        --save 900 1
+        --save 300 100
+        --save 60 10000
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    stop_grace_period: 30s
+    logging: *logging
+    networks: [internal]
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: dockerfile
+      target: migrate
+    image: leonice-spa-migrate:${APP_VERSION:-local}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://leonice_migrator:${DB_MIGRATOR_PASSWORD}@postgres:5432/${POSTGRES_DB:-leonice_spa}?schema=public
+    command: [prisma, migrate, deploy]
+    restart: 'no'
+    logging: *logging
+    networks: [internal]
+
+  seed:
+    profiles: [seed]
+    image: leonice-spa-migrate:${APP_VERSION:-local}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://leonice_migrator:${DB_MIGRATOR_PASSWORD}@postgres:5432/${POSTGRES_DB:-leonice_spa}?schema=public
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:?Define SEED_ADMIN_EMAIL}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Define SEED_ADMIN_PASSWORD}
+      CONDUIT_BASE_URL: ${CONDUIT_BASE_URL:-}
+      CONDUIT_API_KEY: ${CONDUIT_API_KEY:-}
+    command: [prisma, db, seed]
+    restart: 'no'
+    logging: *logging
+    networks: [internal, egress]
+
+  api:
+    build:
+      context: ..
+      dockerfile: dockerfile
+      target: production
+    image: leonice-spa-api:${APP_VERSION:-local}
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./app.env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://leonice_app:${DB_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-leonice_spa}?schema=public&connection_limit=${DB_POOL_SIZE:-10}&pool_timeout=20&connect_timeout=10
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    ports:
+      - '127.0.0.1:${API_PORT:-3000}:3000'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    logging: *logging
+    networks: [internal, egress]
+
+  backup:
+    build:
+      context: ./backup
+    image: leonice-spa-backup:${APP_VERSION:-local}
+    restart: unless-stopped
+    user: '70:70'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      volume-permissions:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: leonice_backup
+      PGPASSWORD: ${DB_BACKUP_PASSWORD}
+      PGDATABASE: *database-name
+      POSTGRES_SUPERUSER: ${POSTGRES_SUPERUSER:-postgres_admin}
+      BACKUP_REMOTE: ${BACKUP_REMOTE:-}
+      DUMP_INTERVAL_HOURS: ${DUMP_INTERVAL_HOURS:-6}
+      BASE_INTERVAL_HOURS: ${BASE_INTERVAL_HOURS:-24}
+      VERIFY_INTERVAL_HOURS: ${VERIFY_INTERVAL_HOURS:-168}
+      WAL_SYNC_INTERVAL_MINUTES: ${WAL_SYNC_INTERVAL_MINUTES:-5}
+      BASE_BACKUPS_KEEP: ${BASE_BACKUPS_KEEP:-7}
+      RCLONE_CONFIG: /etc/rclone/rclone.conf
+      TZ: America/Bogota
+    volumes:
+      - backups:/backups
+      - wal_archive:/wal_archive
+      - ${RCLONE_CONFIG_FILE:-./backup/rclone.conf.empty}:/etc/rclone/rclone.conf:ro
+    healthcheck:
+      test: ['CMD', '/opt/backup/healthcheck.sh']
+      interval: 5m
+      timeout: 30s
+      retries: 1
+      start_period: 40m
+    logging: *logging
+    networks: [internal, egress]
+
+networks:
+  internal:
+    internal: true
+  egress: {}
+
+volumes:
+  postgres_data:
+  wal_archive:
+  backups:
+  redis_data:

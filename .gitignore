@@ -12,3 +12,10 @@ scripts
 # Verificación en vivo (test/live): credenciales QA y capturas del sink
 test/live/.qa-admin.json
 test/live/sink.jsonl
+
+# Plantillas de despliegue
+!infra/.env.production.example
+!infra/app.env.production.example
+infra/.env.production
+infra/app.env.production
+infra/rclone.conf
