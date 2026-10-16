@@ -1,6 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
-import type { UploadApiResponse, v2 as CloudinaryType } from 'cloudinary';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type {
+  UploadApiOptions,
+  UploadApiResponse,
+  v2 as CloudinaryType,
+} from 'cloudinary';
 import { CLOUDINARY } from './cloudinary.constants';
+import { withUploadRetry } from './upload-retry';
 
 export interface UploadedImage {
   url: string;
@@ -15,55 +20,56 @@ export interface UploadedVideo {
 
 @Injectable()
 export class CloudinaryService {
+  private readonly logger = new Logger(CloudinaryService.name);
+
   constructor(
     @Inject(CLOUDINARY) private readonly cloudinary: typeof CloudinaryType,
   ) {}
+
+  private uploadBuffer(
+    fileBuffer: Buffer,
+    options: UploadApiOptions,
+  ): Promise<UploadApiResponse> {
+    return withUploadRetry(
+      () =>
+        new Promise<UploadApiResponse>((resolve, reject) => {
+          const uploadStream = this.cloudinary.uploader.upload_stream(
+            options,
+            (error, uploaded) => {
+              if (error || !uploaded) {
+                return reject(
+                  error instanceof Error
+                    ? error
+                    : Object.assign(
+                        new Error(
+                          error?.message ?? 'Cloudinary no devolvió resultado',
+                        ),
+                        error ?? {},
+                      ),
+                );
+              }
+              resolve(uploaded);
+            },
+          );
+          uploadStream.end(fileBuffer);
+        }),
+      {
+        onRetry: (error, attempt) =>
+          this.logger.warn(
+            `Reintentando subida a Cloudinary (${options.public_id ?? 'sin id'}) tras intento ${attempt}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+      },
+    );
+  }
 
   async uploadDepositProof(
     fileBuffer: Buffer,
     reservationId: string,
   ): Promise<UploadedImage> {
-    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
-      const uploadStream = this.cloudinary.uploader.upload_stream(
-        {
-          folder: 'leonice-spa/deposit-proofs',
-          public_id: `deposit-${reservationId}-${Date.now()}`,
-          resource_type: 'image',
-        },
-        (error, result) => {
-          if (error || !result) {
-            console.error('\n========== CLOUDINARY UPLOAD ERROR ==========');
-
-            if (error instanceof Error) {
-              console.error({
-                name: error.name,
-                message: error.message,
-                stack: error.stack,
-              });
-            } else {
-              console.dir(error, {
-                depth: null,
-              });
-            }
-
-            console.error('============================================\n');
-
-            return reject(
-              error instanceof Error
-                ? error
-                : new Error(
-                    error
-                      ? error.message || JSON.stringify(error)
-                      : 'Cloudinary no devolvió resultado',
-                  ),
-            );
-          }
-
-          resolve(result);
-        },
-      );
-
-      uploadStream.end(fileBuffer);
+    const result = await this.uploadBuffer(fileBuffer, {
+      folder: 'leonice-spa/deposit-proofs',
+      public_id: `deposit-${reservationId}-${Date.now()}`,
+      resource_type: 'image',
     });
 
     return {
@@ -80,26 +86,9 @@ export class CloudinaryService {
     fileBuffer: Buffer,
     publicId: string,
   ): Promise<UploadedImage> {
-    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
-      const uploadStream = this.cloudinary.uploader.upload_stream(
-        {
-          public_id: publicId,
-          resource_type: 'image',
-        },
-        (error, uploaded) => {
-          if (error || !uploaded) {
-            return reject(
-              error instanceof Error
-                ? error
-                : new Error(
-                    error?.message ?? 'Cloudinary no devolvió resultado',
-                  ),
-            );
-          }
-          resolve(uploaded);
-        },
-      );
-      uploadStream.end(fileBuffer);
+    const result = await this.uploadBuffer(fileBuffer, {
+      public_id: publicId,
+      resource_type: 'image',
     });
 
     return { url: result.secure_url, publicId: result.public_id };
@@ -120,26 +109,9 @@ export class CloudinaryService {
     fileBuffer: Buffer,
     publicId: string,
   ): Promise<UploadedVideo> {
-    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
-      const uploadStream = this.cloudinary.uploader.upload_stream(
-        {
-          public_id: publicId,
-          resource_type: 'video',
-        },
-        (error, uploaded) => {
-          if (error || !uploaded) {
-            return reject(
-              error instanceof Error
-                ? error
-                : new Error(
-                    error?.message ?? 'Cloudinary no devolvió resultado',
-                  ),
-            );
-          }
-          resolve(uploaded);
-        },
-      );
-      uploadStream.end(fileBuffer);
+    const result = await this.uploadBuffer(fileBuffer, {
+      public_id: publicId,
+      resource_type: 'video',
     });
 
     return {
@@ -173,11 +145,14 @@ export class CloudinaryService {
     dataUri: string,
     reservationId: string,
   ): Promise<UploadedImage> {
-    const result = await this.cloudinary.uploader.upload(dataUri, {
-      folder: 'leonice-spa/deposit-proofs',
-      public_id: `deposit-${reservationId}-${Date.now()}`,
-      resource_type: 'image',
-    });
+    const publicId = `deposit-${reservationId}-${Date.now()}`;
+    const result = await withUploadRetry(() =>
+      this.cloudinary.uploader.upload(dataUri, {
+        folder: 'leonice-spa/deposit-proofs',
+        public_id: publicId,
+        resource_type: 'image',
+      }),
+    );
     return { url: result.secure_url, publicId: result.public_id };
   }
 }
