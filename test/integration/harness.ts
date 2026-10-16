@@ -143,10 +143,20 @@ export async function createHarnessModuleWith(extra: {
   return moduleRef;
 }
 
+const TRUNCATE_ALL = `TRUNCATE TABLE "deposit_records", "reservations", "consent_records", "clients", "treatments", "capacity_pools", "categories", "operating_windows", "schedule_exceptions", "automation_executions", "users" RESTART IDENTITY CASCADE`;
+
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
-  await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "deposit_records", "reservations", "consent_records", "clients", "treatments", "capacity_pools", "categories", "operating_windows", "schedule_exceptions", "automation_executions", "users" RESTART IDENTITY CASCADE`,
-  );
+  const ownerUrl = process.env.AUDIT_OWNER_DATABASE_URL;
+  if (ownerUrl) {
+    const owner = new PrismaClient({ datasources: { db: { url: ownerUrl } } });
+    try {
+      await owner.$executeRawUnsafe(TRUNCATE_ALL);
+    } finally {
+      await owner.$disconnect();
+    }
+  } else {
+    await prisma.$executeRawUnsafe(TRUNCATE_ALL);
+  }
   for (const queue of Object.values(fakeQueues)) queue.jobs.length = 0;
 }
 
