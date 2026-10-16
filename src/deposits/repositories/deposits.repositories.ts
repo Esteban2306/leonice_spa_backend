@@ -174,25 +174,6 @@ export class DepositsRepository {
     });
   }
 
-  markConfirmed(
-    id: string,
-    adminUserId: string,
-    coverage: DepositCoverage,
-    amount: number,
-    client: PrismaClientOrTx = this.prisma.client,
-  ) {
-    return client.depositRecord.update({
-      where: { id },
-      data: {
-        status: DepositStatus.CONFIRMADO,
-        coverage,
-        amount,
-        verifiedByUserId: adminUserId,
-        verifiedAt: new Date(),
-      },
-    });
-  }
-
   async markConfirmedIfPending(
     id: string,
     adminUserId: string,
@@ -213,9 +194,18 @@ export class DepositsRepository {
     return result.count === 1;
   }
 
-  markRejected(id: string, adminUserId: string, reason: string) {
-    return this.prisma.client.depositRecord.update({
-      where: { id },
+  findById(id: string, client: PrismaClientOrTx = this.prisma.client) {
+    return client.depositRecord.findUnique({ where: { id } });
+  }
+
+  async markRejectedIfPending(
+    id: string,
+    adminUserId: string,
+    reason: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<boolean> {
+    const result = await client.depositRecord.updateMany({
+      where: { id, status: DepositStatus.PENDIENTE },
       data: {
         status: DepositStatus.RECHAZADO,
         rejectionReason: reason,
@@ -223,5 +213,6 @@ export class DepositsRepository {
         verifiedAt: new Date(),
       },
     });
+    return result.count === 1;
   }
 }

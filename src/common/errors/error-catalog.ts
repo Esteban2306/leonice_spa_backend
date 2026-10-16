@@ -253,7 +253,7 @@ const DEPOSIT = {
   DEPOSIT_CONCURRENT_CHANGE: {
     status: HttpStatus.CONFLICT,
     message:
-      'El comprobante cambió mientras se aprobaba. Revisa su estado actual.',
+      'El comprobante cambió mientras se procesaba. Revisa su estado actual.',
   },
 } as const satisfies Record<string, ErrorDefinition>;
 

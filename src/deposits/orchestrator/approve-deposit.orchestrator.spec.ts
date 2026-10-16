@@ -43,7 +43,6 @@ const buildFixture = (options: FixtureOptions) => {
   const calls = {
     confirmed: [] as string[],
     created: [] as Array<{ reservationId: string; amount: number }>,
-    markConfirmed: [] as Array<{ id: string; amount: number }>,
     markIfPending: [] as Array<{ id: string; amount: number }>,
     covered: [] as Array<{ ids: readonly string[]; depositId: string }>,
     afterConfirmed: [] as string[],
@@ -65,15 +64,7 @@ const buildFixture = (options: FixtureOptions) => {
       calls.created.push({ reservationId, amount });
       return Promise.resolve(deposit(`new-${reservationId}`, 'CONFIRMADO'));
     },
-    markConfirmed: (
-      id: string,
-      _admin: string,
-      _coverage: DepositCoverage,
-      amount: number,
-    ) => {
-      calls.markConfirmed.push({ id, amount });
-      return Promise.resolve(deposit(id, 'CONFIRMADO'));
-    },
+    findById: (id: string) => Promise.resolve(deposit(id, 'CONFIRMADO')),
     markConfirmedIfPending: (
       id: string,
       _admin: string,
@@ -150,8 +141,22 @@ describe('ApproveDepositOrchestrator', () => {
         approvedReservationIds: ['a'],
         depositId: 'd1',
       });
-      expect(calls.markConfirmed).toEqual([{ id: 'd1', amount: 15 }]);
+      expect(calls.markIfPending).toEqual([{ id: 'd1', amount: 15 }]);
       expect(calls.afterConfirmed).toEqual(['a']);
+    });
+
+    it('si otro proceso procesó el comprobante pendiente responde DEPOSIT_CONCURRENT_CHANGE y no completa la aprobación', async () => {
+      const { orchestrator, calls } = buildFixture({
+        anchor: reservation('a'),
+        latestByReservation: { a: deposit('d1', 'PENDIENTE') },
+        markIfPendingResult: false,
+      });
+
+      await expectCode(
+        orchestrator.execute(command({ amount: 15 })),
+        'DEPOSIT_CONCURRENT_CHANGE',
+      );
+      expect(calls.afterConfirmed).toEqual([]);
     });
 
     it('acepta un monto menor al adelanto mínimo (decide el admin)', async () => {
@@ -183,7 +188,7 @@ describe('ApproveDepositOrchestrator', () => {
       const result = await orchestrator.execute(command({ amount: 60 }));
 
       expect(result.approvedReservationIds).toEqual(['b', 'a', 'c']);
-      expect(calls.markConfirmed).toEqual([{ id: 'd1', amount: 60 }]);
+      expect(calls.markIfPending).toEqual([{ id: 'd1', amount: 60 }]);
       expect(calls.created).toEqual([]);
       expect(calls.covered).toEqual([{ ids: ['b', 'c'], depositId: 'd1' }]);
     });
@@ -226,7 +231,7 @@ describe('ApproveDepositOrchestrator', () => {
         depositId: null,
       });
       expect(calls.created).toEqual([]);
-      expect(calls.markConfirmed).toEqual([]);
+      expect(calls.markIfPending).toEqual([]);
     });
   });
 

@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DepositStatus, ReservationStatus } from '@prisma/client';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DepositsRepository } from '../repositories/deposits.repositories';
 import { ReservationsRepository } from '../../reservations/repositories/reservations.repository';
 import { DomainException } from '../../common/exceptions/domain.exception';
+import { AppException } from '../../common/errors/app.exception';
 import { DepositDeadlineService } from '../../reservations/service/deposit-deadline.service';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
@@ -10,6 +12,7 @@ import { EVENT_TYPES } from '../../common/events/constants/event.types';
 @Injectable()
 export class RejectDepositOrchestrator {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly repository: DepositsRepository,
     private readonly reservationsRepository: ReservationsRepository,
     private readonly depositDeadline: DepositDeadlineService,
@@ -34,24 +37,43 @@ export class RejectDepositOrchestrator {
     const isAwaitingDeposit =
       reservation?.status === ReservationStatus.PENDIENTE_DEPOSITO;
     const depositClockStartedAt = new Date();
-    const newExpiry = isAwaitingDeposit
+    const candidateExpiry = isAwaitingDeposit
       ? await this.depositDeadline.computeExpiry(
           depositClockStartedAt,
           reservation.scheduledStart,
         )
       : null;
 
-    if (newExpiry) {
-      await this.reservationsRepository.restartDepositDeadline(reservationId, {
-        depositClockStartedAt,
-        depositExpiresAt: newExpiry,
-      });
-    }
+    const { rejected, newExpiry } = await this.prisma.client.$transaction(
+      async (tx) => {
+        const applied = await this.repository.markRejectedIfPending(
+          deposit.id,
+          adminUserId,
+          reason,
+          tx,
+        );
+        const record = applied
+          ? await this.repository.findById(deposit.id, tx)
+          : null;
+        if (!record) {
+          throw new AppException('DEPOSIT_CONCURRENT_CHANGE', {
+            details: { depositId: deposit.id },
+          });
+        }
 
-    const rejected = await this.repository.markRejected(
-      deposit.id,
-      adminUserId,
-      reason,
+        const restarted = candidateExpiry
+          ? await this.reservationsRepository.restartDepositDeadlineIfAwaiting(
+              reservationId,
+              { depositClockStartedAt, depositExpiresAt: candidateExpiry },
+              tx,
+            )
+          : false;
+
+        return {
+          rejected: record,
+          newExpiry: restarted ? candidateExpiry : null,
+        };
+      },
     );
 
     if (newExpiry) {

@@ -344,15 +344,16 @@ export class ReservationsRepository {
     });
   }
 
-  restartDepositDeadline(
+  async restartDepositDeadlineIfAwaiting(
     id: string,
     deadline: { depositClockStartedAt: Date; depositExpiresAt: Date },
     client: PrismaClientOrTx = this.prisma.client,
-  ): Promise<Reservation> {
-    return client.reservation.update({
-      where: { id },
+  ): Promise<boolean> {
+    const result = await client.reservation.updateMany({
+      where: { id, status: ReservationStatus.PENDIENTE_DEPOSITO },
       data: deadline,
     });
+    return result.count === 1;
   }
 
   findDepositDeadlinesRunningDuring(

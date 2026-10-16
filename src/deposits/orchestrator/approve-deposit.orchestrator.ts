@@ -171,6 +171,30 @@ export class ApproveDepositOrchestrator {
     return amount;
   }
 
+  private async confirmPendingDeposit(
+    depositId: string,
+    command: ApproveDepositCommand,
+    amount: number,
+    tx: Prisma.TransactionClient,
+  ): Promise<DepositRecord> {
+    const applied = await this.repository.markConfirmedIfPending(
+      depositId,
+      command.adminUserId,
+      command.coverage,
+      amount,
+      tx,
+    );
+    const confirmed = applied
+      ? await this.repository.findById(depositId, tx)
+      : null;
+    if (!confirmed) {
+      throw new AppException('DEPOSIT_CONCURRENT_CHANGE', {
+        details: { depositId },
+      });
+    }
+    return confirmed;
+  }
+
   private resolveConfirmedDeposit(
     latest: DepositRecord | null,
     reservationId: string,
@@ -189,13 +213,7 @@ export class ApproveDepositOrchestrator {
     }
 
     if (latest.status === DepositStatus.PENDIENTE) {
-      return this.repository.markConfirmed(
-        latest.id,
-        command.adminUserId,
-        command.coverage,
-        amount,
-        tx,
-      );
+      return this.confirmPendingDeposit(latest.id, command, amount, tx);
     }
 
     if (latest.status === DepositStatus.CONFIRMADO) {
