@@ -229,6 +229,7 @@ model Reservation {
   @@index([comboGroupId])
   @@index([status, depositExpiresAt])
   @@index([clientId, categoryId, status])
+  @@index([treatmentId])
   @@index([coveredByDepositId])
   @@map("reservations")
 }
