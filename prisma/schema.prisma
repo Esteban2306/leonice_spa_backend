@@ -321,6 +321,7 @@ model Product {
   usageFrequency     String?                          @map("usage_frequency")
   precautions        String[]                         @default([])
   contentNeedsReview Boolean                          @default(false) @map("content_needs_review")
+  isFeatured         Boolean                          @default(false) @map("is_featured")
   displayOrder       Int                              @default(0) @map("display_order")
   tagAssignments     ProductTagAssignment[]
   variants           ProductVariant[]

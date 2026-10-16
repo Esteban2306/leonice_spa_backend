@@ -1,5 +1,13 @@
 import { Transform } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+import { TransformBooleanQuery } from '../../catalog/common/catalog-filters';
 
 export class FindProductsQueryDto {
   @IsOptional()
@@ -13,6 +21,11 @@ export class FindProductsQueryDto {
   @IsOptional()
   @IsUUID()
   tagId?: string;
+
+  @IsOptional()
+  @TransformBooleanQuery()
+  @IsBoolean()
+  isFeatured?: boolean;
 
   @IsOptional()
   @Transform(({ value }) => Number(value))

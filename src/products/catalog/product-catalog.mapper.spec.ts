@@ -47,6 +47,7 @@ function product(
     usageFrequency: null,
     precautions: [],
     contentNeedsReview: false,
+    isFeatured: false,
     displayOrder: 0,
     category: CATEGORIES[category],
     variants: priceList.map((price, index) => ({

@@ -270,6 +270,46 @@ describe('ProductsService', () => {
     });
   });
 
+  describe('findAll (público)', () => {
+    const product = (id: string, isFeatured: boolean) => ({
+      id,
+      name: id,
+      productCategoryId: 'cat1',
+      isFeatured,
+      tagAssignments: [],
+      variants: [],
+    });
+    const cachedProducts = [
+      product('a', true),
+      product('b', false),
+      product('c', false),
+    ];
+    const withCache = () => {
+      const { service } = buildFixture();
+      (
+        service as unknown as {
+          cache: { get: () => Promise<unknown[]>; delete: () => void };
+        }
+      ).cache.get = () => Promise.resolve(cachedProducts);
+      return service;
+    };
+
+    it('devuelve todos los productos si no se filtra por destacados', async () => {
+      const result = await withCache().findAll({});
+      expect(result.map((p) => p.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('isFeatured=true devuelve solo los destacados', async () => {
+      const result = await withCache().findAll({ isFeatured: true });
+      expect(result.map((p) => p.id)).toEqual(['a']);
+    });
+
+    it('isFeatured=false devuelve solo los que no lo son', async () => {
+      const result = await withCache().findAll({ isFeatured: false });
+      expect(result.map((p) => p.id)).toEqual(['b', 'c']);
+    });
+  });
+
   it('assignTags rechaza etiquetas inexistentes antes de reemplazar', async () => {
     const { service, calls } = buildFixture();
 

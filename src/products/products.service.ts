@@ -107,6 +107,8 @@ export class ProductsService {
         return false;
       if (query.tagId && !p.tagAssignments.some((a) => a.tagId === query.tagId))
         return false;
+      if (query.isFeatured !== undefined && p.isFeatured !== query.isFeatured)
+        return false;
       if (query.minPrice !== undefined || query.maxPrice !== undefined) {
         const inRange = p.variants.some((v) => {
           const price = Number(v.price);
