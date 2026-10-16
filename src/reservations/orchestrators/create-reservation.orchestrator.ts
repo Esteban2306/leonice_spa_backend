@@ -369,6 +369,7 @@ export class CreateReservationOrchestrator {
         categoryId,
         dayStart,
         dayEnd,
+        tx,
       );
     const windows = await this.operatingSchedule.getWindows(
       idealStart,

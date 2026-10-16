@@ -36,8 +36,9 @@ export class AvailabilityRepository {
     categoryId: string,
     rangeStart: Date,
     rangeEnd: Date,
+    client: PrismaClientOrTx = this.prisma.client,
   ) {
-    return this.prisma.client.reservation.findMany({
+    return client.reservation.findMany({
       where: {
         categoryId,
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
