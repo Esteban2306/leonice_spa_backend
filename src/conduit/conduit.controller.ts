@@ -16,6 +16,8 @@ import { ConduitMessageEventsService } from './service/conduit-message-events.se
 import { ConduitMessageDeliveryLogRepository } from './repositories/conduit-message-delivery-log.repository';
 import { FindMessageEventsQueryDto } from './dto/find-message-events-query.dto';
 
+const CONDUIT_WEBHOOK_LIMIT_PER_MINUTE = 600;
+
 @Controller({ path: 'integrations/conduit/message-events', version: '1' })
 export class ConduitWebhooksController {
   constructor(
@@ -31,7 +33,9 @@ export class ConduitWebhooksController {
   @Public()
   @SkipCsrf()
   @UseGuards(ConduitWebhookSignatureGuard)
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({
+    default: { limit: CONDUIT_WEBHOOK_LIMIT_PER_MINUTE, ttl: 60_000 },
+  })
   @HttpCode(200)
   @Post()
   async receive(@Body() dto: ConduitMessageEventDto) {

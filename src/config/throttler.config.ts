@@ -5,6 +5,8 @@ import type { Request } from 'express';
 import type { ThrottlerModuleOptions } from '@nestjs/throttler';
 import Redis from 'ioredis';
 import { RedisConnectionReporter } from '../infrastructure/redis/redis-connection-reporter.service';
+import { ResilientThrottlerStorage } from '../infrastructure/redis/resilient-throttler-storage';
+import { normalizePhone } from '../clients/utils/normalize-phone.util';
 
 import {
   CLIENT_BOOKING_RATE_LIMIT,
@@ -42,6 +44,31 @@ export function isSafeMethod(context: ExecutionContext): boolean {
   return SAFE_METHODS.has(
     context.switchToHttp().getRequest<Request>().method.toUpperCase(),
   );
+}
+
+const BOOKING_CREATION_PATH = /\/reservations\/?$/;
+
+export function isBookingCreation(context: ExecutionContext): boolean {
+  const request = context.switchToHttp().getRequest<Request>();
+  return (
+    request.method.toUpperCase() === 'POST' &&
+    BOOKING_CREATION_PATH.test(request.path)
+  );
+}
+
+export function clientIpTracker(request: Request): string {
+  return `ip:${request.ip ?? 'desconocida'}`;
+}
+
+export function bookingClientTracker(
+  request: Record<string, unknown>,
+): Promise<string> {
+  const body = request.body as { client?: { phone?: unknown } } | undefined;
+  const phone = body?.client?.phone;
+  if (typeof phone === 'string' && phone.trim().length > 0) {
+    return Promise.resolve(`phone:${normalizePhone(phone)}`);
+  }
+  return Promise.resolve(clientIpTracker(request as unknown as Request));
 }
 
 export function shouldSkipThrottle(
@@ -116,8 +143,9 @@ export function getThrottlerConfig(
         name: 'client-booking',
         ttl: CLIENT_BOOKING_RATE_LIMIT_TTL_MS,
         limit: CLIENT_BOOKING_RATE_LIMIT,
+        getTracker: bookingClientTracker,
         skipIf: (context: ExecutionContext): boolean =>
-          shouldSkipThrottle(context, config) || isSafeMethod(context),
+          shouldSkipThrottle(context, config) || !isBookingCreation(context),
       },
 
       {
@@ -135,7 +163,9 @@ export function getThrottlerConfig(
       },
     ],
 
-    storage: new ThrottlerStorageRedisService(redis),
+    storage: new ResilientThrottlerStorage(
+      new ThrottlerStorageRedisService(redis),
+    ),
 
     skipIf: (context: ExecutionContext): boolean => {
       return shouldSkipThrottle(context, config);
