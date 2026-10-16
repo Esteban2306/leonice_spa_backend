@@ -1,3 +1,5 @@
+import * as http from 'node:http';
+import * as https from 'node:https';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
@@ -11,3 +13,6 @@ url.searchParams.set('connection_limit', process.env.AUDIT_POOL ?? '30');
 
 process.env.DATABASE_URL = url.toString();
 process.env.TZ = 'America/Bogota';
+
+Reflect.set(http, 'globalAgent', new http.Agent({ keepAlive: false }));
+Reflect.set(https, 'globalAgent', new https.Agent({ keepAlive: false }));
