@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   AutomationExecutionResult,
@@ -20,6 +20,7 @@ import { ConduitTemplateResolver } from '../conduit/templates/conduit-template-r
 import { assertMessageDelivered } from './utils/assert-message-delivered';
 import { formatNotificationDateTime } from './utils/format-notification-date';
 import {
+  OPERATIONAL_EMAIL_TEMPLATE_ENV_KEYS,
   OPERATIONAL_TEMPLATE_ENV_KEYS,
   type AdminDepositTimeoutNoticeJobData,
   type AdminClientCancellationNoticeJobData,
@@ -61,8 +62,15 @@ function isCancelledByTimeout(
   );
 }
 
+interface NoticeRecipient {
+  phone: string;
+  email: string | null;
+}
+
 @Injectable()
 export class OperationalNotificationsService {
+  private readonly logger = new Logger(OperationalNotificationsService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly conduit: ConduitApiClient,
@@ -114,7 +122,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send(ctx, 'ADMIN_DEPOSIT_TIMEOUT', recipient.phone, {
+    await this.notifyRecipient(ctx, 'ADMIN_DEPOSIT_TIMEOUT', recipient, {
       cliente: first.client.name,
       telefono: first.client.phone,
       tratamientos: details.map((r) => r.treatment.name).join(', '),
@@ -225,7 +233,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send(ctx, 'ADMIN_RESCHEDULED', recipient.phone, {
+    await this.notifyRecipient(ctx, 'ADMIN_RESCHEDULED', recipient, {
       cliente: reservation.client.name,
       telefono: reservation.client.phone,
       tratamiento: reservation.treatment.name,
@@ -284,7 +292,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send(ctx, 'ADMIN_CLIENT_CANCELLED', recipient.phone, {
+    await this.notifyRecipient(ctx, 'ADMIN_CLIENT_CANCELLED', recipient, {
       cliente: first.client.name,
       telefono: first.client.phone,
       tratamientos: cancelled.map((r) => r.treatment.name).join(', '),
@@ -314,7 +322,7 @@ export class OperationalNotificationsService {
       return;
     }
 
-    await this.send(ctx, 'ADMIN_HANDOFF', recipient.phone, {
+    await this.notifyRecipient(ctx, 'ADMIN_HANDOFF', recipient, {
       cliente: data.clientName ?? 'Cliente sin registrar',
       telefono:
         data.phone ?? `(número oculto por WhatsApp, LID ${data.lid ?? '?'})`,
@@ -395,6 +403,50 @@ export class OperationalNotificationsService {
       idempotencyKey: `${ctx.idempotencyKey}:${template}`,
       companyEventId: ctx.companyEventId,
     });
+    assertMessageDelivered(result);
+  }
+
+  private async notifyRecipient(
+    ctx: ConduitSendContext,
+    template: OperationalTemplate,
+    recipient: NoticeRecipient,
+    variables: Record<string, string>,
+  ): Promise<void> {
+    await this.send(ctx, template, recipient.phone, variables);
+    if (recipient.email) {
+      await this.sendEmail(ctx, template, recipient.email, variables);
+    }
+  }
+
+  private async sendEmail(
+    ctx: ConduitSendContext,
+    template: OperationalTemplate,
+    email: string,
+    variables: Record<string, string>,
+  ): Promise<void> {
+    const envKey = OPERATIONAL_EMAIL_TEMPLATE_ENV_KEYS[template];
+    if (!envKey) return;
+    const templateId = await this.templates.resolve(envKey);
+    if (!templateId) {
+      this.logger.warn(
+        `No hay plantilla de correo en Conduit para ${envKey}: el aviso salió solo por WhatsApp`,
+      );
+      return;
+    }
+
+    const result = await this.conduit.sendEmailMessage({
+      email,
+      templateId,
+      variables,
+      idempotencyKey: `${ctx.idempotencyKey}:${template}:EMAIL`,
+      companyEventId: ctx.companyEventId,
+    });
+    if (result.permanent) {
+      this.logger.warn(
+        `Conduit rechazó el correo de ${template}: ${result.reason ?? 'sin detalle'}. El aviso salió por WhatsApp`,
+      );
+      return;
+    }
     assertMessageDelivered(result);
   }
 

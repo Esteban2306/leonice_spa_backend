@@ -1,14 +1,32 @@
 export type ConduitTemplateAudience = 'CLIENT' | 'ADMIN';
 
+export type ConduitTemplateChannel = 'WHATSAPP' | 'EMAIL';
+
 export interface ConduitTemplateDefinition {
   code: string;
   envKey: string;
   name: string;
   description: string;
   audience: ConduitTemplateAudience;
+  channel?: ConduitTemplateChannel;
+  subject?: string;
   variables: readonly string[];
   body: string;
 }
+
+export const templateChannel = (
+  template: Pick<ConduitTemplateDefinition, 'channel'>,
+): ConduitTemplateChannel => template.channel ?? 'WHATSAPP';
+
+const emailLayout = (title: string, rows: string[], footer: string) =>
+  [
+    '<div style="font-family:Arial,sans-serif;font-size:15px;color:#2b2b2b;line-height:1.5">',
+    `<h2 style="font-size:18px;margin:0 0 12px">${title}</h2>`,
+    ...rows.map((row) => `<p style="margin:0 0 6px">${row}</p>`),
+    `<p style="margin:16px 0 0;color:#666">${footer}</p>`,
+    '<p style="margin:16px 0 0;font-size:12px;color:#999">Aviso automático de Leonice Arenas Spa Capilar.</p>',
+    '</div>',
+  ].join('\n');
 
 export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
   {
@@ -208,6 +226,93 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       '',
       'El asistente quedó en pausa en ese chat. Respóndele desde WhatsApp o desde el panel.',
     ].join('\n'),
+  },
+  {
+    code: 'ADMIN_DEPOSIT_TIMEOUT_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_DEPOSIT_TIMEOUT_EMAIL',
+    name: 'leonice_correo_aviso_abono_vencido',
+    description:
+      'Correo interno: una reserva se canceló porque la clienta no envió el abono a tiempo.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Reserva cancelada por abono vencido: {{cliente}}',
+    variables: ['cliente', 'telefono', 'tratamientos', 'fecha'],
+    body: emailLayout(
+      'Reserva cancelada por abono vencido',
+      [
+        '<strong>Clienta:</strong> {{cliente}} ({{telefono}})',
+        '<strong>Servicios:</strong> {{tratamientos}}',
+        '<strong>Fecha:</strong> {{fecha}}',
+      ],
+      'Si la clienta ya pagó, puedes revivir la reserva desde el panel.',
+    ),
+  },
+  {
+    code: 'ADMIN_RESCHEDULED_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_RESCHEDULED_EMAIL',
+    name: 'leonice_correo_aviso_reprogramacion',
+    description: 'Correo interno: una cita cambió de fecha.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Cita reprogramada: {{cliente}}',
+    variables: [
+      'cliente',
+      'telefono',
+      'tratamiento',
+      'fecha_anterior',
+      'fecha_nueva',
+      'origen',
+    ],
+    body: emailLayout(
+      'Cita reprogramada por {{origen}}',
+      [
+        '<strong>Clienta:</strong> {{cliente}} ({{telefono}})',
+        '<strong>Servicio:</strong> {{tratamiento}}',
+        '<strong>Antes:</strong> {{fecha_anterior}}',
+        '<strong>Ahora:</strong> {{fecha_nueva}}',
+      ],
+      'La agenda ya refleja el cambio.',
+    ),
+  },
+  {
+    code: 'ADMIN_CLIENT_CANCELLED_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_CLIENT_CANCELLED_EMAIL',
+    name: 'leonice_correo_aviso_cancelacion_clienta',
+    description: 'Correo interno: una clienta canceló su cita.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Cita cancelada por la clienta: {{cliente}}',
+    variables: ['cliente', 'telefono', 'tratamientos', 'fecha', 'canal'],
+    body: emailLayout(
+      'Cita cancelada por la clienta (desde {{canal}})',
+      [
+        '<strong>Clienta:</strong> {{cliente}} ({{telefono}})',
+        '<strong>Servicios:</strong> {{tratamientos}}',
+        '<strong>Fecha:</strong> {{fecha}}',
+      ],
+      'El espacio quedó libre en la agenda.',
+    ),
+  },
+  {
+    code: 'ADMIN_HANDOFF_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF_EMAIL',
+    name: 'leonice_correo_aviso_atencion_humana',
+    description:
+      'Correo interno: una clienta pidió hablar con una persona y el bot quedó en pausa en su chat.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Una clienta necesita atención personal: {{cliente}}',
+    variables: ['cliente', 'telefono', 'motivo', 'resumen'],
+    body: emailLayout(
+      'Una clienta necesita atención personal',
+      [
+        '<strong>Clienta:</strong> {{cliente}}',
+        '<strong>Teléfono:</strong> {{telefono}}',
+        '<strong>Motivo:</strong> {{motivo}}',
+        '<strong>Resumen:</strong> {{resumen}}',
+      ],
+      'El asistente quedó en pausa en ese chat. Respóndele desde WhatsApp o desde el panel.',
+    ),
   },
 ];
 

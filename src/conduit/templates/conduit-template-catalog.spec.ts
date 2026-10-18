@@ -1,6 +1,7 @@
 import { OPERATIONAL_TEMPLATE_ENV_KEYS } from '../../automation/domain/operational-notifications.constants';
 import {
   CONDUIT_TEMPLATE_CATALOG,
+  templateChannel,
   templatePlaceholders,
 } from './conduit-template-catalog';
 
@@ -41,7 +42,27 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
 
   it('cabe en un mensaje de WhatsApp de Conduit', () => {
     for (const template of CONDUIT_TEMPLATE_CATALOG) {
+      if (templateChannel(template) !== 'WHATSAPP') continue;
       expect(template.body.length).toBeLessThan(700);
+    }
+  });
+
+  it('cada correo tiene asunto y sus variables coinciden con las del cuerpo', () => {
+    const emails = CONDUIT_TEMPLATE_CATALOG.filter(
+      (t) => templateChannel(t) === 'EMAIL',
+    );
+    expect(emails.map((t) => t.code).sort()).toEqual([
+      'ADMIN_CLIENT_CANCELLED_EMAIL',
+      'ADMIN_DEPOSIT_TIMEOUT_EMAIL',
+      'ADMIN_HANDOFF_EMAIL',
+      'ADMIN_RESCHEDULED_EMAIL',
+    ]);
+    for (const email of emails) {
+      expect(email.subject).toBeTruthy();
+      expect(email.audience).toBe('ADMIN');
+      for (const used of templatePlaceholders(email.subject ?? '')) {
+        expect(email.variables).toContain(used);
+      }
     }
   });
 });

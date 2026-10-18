@@ -21,6 +21,14 @@ export interface SendWhatsappMessageParams {
   companyEventId?: string;
 }
 
+export interface SendEmailMessageParams {
+  email: string;
+  templateId: string;
+  variables: Record<string, string>;
+  idempotencyKey: string;
+  companyEventId?: string;
+}
+
 /** Contexto del job que origina el envío; estable entre reintentos. */
 export interface ConduitSendContext {
   idempotencyKey: string;
@@ -74,39 +82,61 @@ export class ConduitApiClient {
     const connectionId = this.config.getOrThrow<string>(
       'CONDUIT_WHATSAPP_CONNECTION_ID',
     );
+    return this.dispatchMessage(
+      params.phone,
+      {
+        recipient: { channel: 'WHATSAPP', address: params.phone },
+        connectionId,
+        template: { id: params.templateId },
+        variables: params.variables,
+        ...(params.companyEventId
+          ? { meta: { companyEventId: params.companyEventId } }
+          : {}),
+      },
+      params.idempotencyKey,
+    );
+  }
 
+  async sendEmailMessage(params: SendEmailMessageParams): Promise<SendResult> {
+    return this.dispatchMessage(
+      params.email,
+      {
+        recipient: { channel: 'EMAIL', address: params.email },
+        template: { id: params.templateId },
+        variables: params.variables,
+        ...(params.companyEventId
+          ? { meta: { companyEventId: params.companyEventId } }
+          : {}),
+      },
+      params.idempotencyKey,
+    );
+  }
+
+  private async dispatchMessage(
+    recipient: string,
+    body: Record<string, unknown>,
+    idempotencyKey: string,
+  ): Promise<SendResult> {
     try {
       const response = await conduitSendPolicy.execute(() =>
-        this.post<{ messageId?: string }>(
-          '/api/v1/messages',
-          {
-            recipient: { channel: 'WHATSAPP', address: params.phone },
-            connectionId,
-            template: { id: params.templateId },
-            variables: params.variables,
-            ...(params.companyEventId
-              ? { meta: { companyEventId: params.companyEventId } }
-              : {}),
-          },
-          { 'Idempotency-Key': params.idempotencyKey },
-        ),
+        this.post<{ messageId?: string }>('/api/v1/messages', body, {
+          'Idempotency-Key': idempotencyKey,
+        }),
       );
       return { delivered: true, messageId: response.messageId };
     } catch (error) {
       if (error instanceof ConduitPermanentError) {
         this.logger.error(
-          `Conduit rechazó el mensaje a ${params.phone} (${error.status}): ${error.message}`,
+          `Conduit rechazó el mensaje a ${recipient} (${error.status}): ${error.message}`,
         );
         return { delivered: false, permanent: true, reason: error.message };
       }
       if (error instanceof BrokenCircuitError) {
-        this.logger.warn(
-          `Mensaje a ${params.phone} no enviado: circuito abierto`,
-        );
+        this.logger.warn(`Mensaje a ${recipient} no enviado: circuito abierto`);
         return { delivered: false, reason: 'circuito abierto' };
       }
       this.logger.warn(
-        `Mensaje a ${params.phone} no enviado: ${(error as Error).message}`,
+        `Mensaje a ${recipient} no enviado: ${(error as Error).message}`,
       );
       return { delivered: false, reason: (error as Error).message };
     }

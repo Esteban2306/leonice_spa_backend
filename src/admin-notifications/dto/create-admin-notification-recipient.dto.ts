@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateAdminNotificationRecipientDto {
   @IsString()
@@ -10,4 +16,9 @@ export class CreateAdminNotificationRecipientDto {
   @IsNotEmpty()
   @MaxLength(32)
   phone!: string;
+
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(254)
+  email?: string;
 }

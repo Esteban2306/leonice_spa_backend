@@ -2,14 +2,18 @@ import { conduitSeedRequest } from './conduit-seed-request';
 import {
   CONDUIT_TEMPLATE_CATALOG,
   ConduitTemplateDefinition,
+  templateChannel,
   templatePlaceholders,
 } from '../src/conduit/templates/conduit-template-catalog';
 
 interface RemoteTemplate {
   id: string;
   name: string;
+  channel: string;
   bodyHandlebars: string;
 }
+
+const templateKey = (channel: string, name: string) => `${channel}:${name}`;
 
 type Outcome = 'created' | 'updated' | 'kept';
 
@@ -30,8 +34,10 @@ export async function seedConduitTemplates(
 
   const request = conduitSeedRequest(baseUrl, apiKey);
 
-  const existing = await listWhatsappTemplates(request);
-  const byName = new Map(existing.map((t) => [t.name, t]));
+  const existing = await listTemplates(request);
+  const byName = new Map(
+    existing.map((t) => [templateKey(t.channel, t.name), t]),
+  );
 
   const results: Array<{
     template: ConduitTemplateDefinition;
@@ -44,13 +50,16 @@ export async function seedConduitTemplates(
     const payload = {
       name: template.name,
       description: template.description,
-      channel: 'WHATSAPP',
+      channel: templateChannel(template),
+      ...(template.subject ? { subject: template.subject } : {}),
       bodyHandlebars: template.body,
       variadblesSchema: Object.fromEntries(
         template.variables.map((variable) => [variable, 'string']),
       ),
     };
-    const current = byName.get(template.name);
+    const current = byName.get(
+      templateKey(templateChannel(template), template.name),
+    );
 
     if (!current) {
       const created = await request<RemoteTemplate>(
@@ -95,7 +104,8 @@ export async function seedConduitTemplates(
   for (const { template, outcome, missing } of results) {
     console.log(`[conduit] ${template.name}: ${label[outcome]}`);
     const unknown = templatePlaceholders(
-      byName.get(template.name)?.bodyHandlebars ?? template.body,
+      byName.get(templateKey(templateChannel(template), template.name))
+        ?.bodyHandlebars ?? template.body,
     ).filter((v) => !template.variables.includes(v));
     if (outcome === 'kept' && unknown.length > 0) {
       console.warn(
@@ -127,7 +137,7 @@ export async function seedConduitTemplates(
   console.log('');
 }
 
-async function listWhatsappTemplates(
+async function listTemplates(
   request: <T>(method: 'GET', path: string) => Promise<T>,
 ): Promise<RemoteTemplate[]> {
   const all: RemoteTemplate[] = [];
@@ -135,10 +145,7 @@ async function listWhatsappTemplates(
     const response = await request<{
       data: RemoteTemplate[];
       meta: { totalPages: number };
-    }>(
-      'GET',
-      `templates?channel=WHATSAPP&limit=${LIST_PAGE_SIZE}&page=${page}`,
-    );
+    }>('GET', `templates?limit=${LIST_PAGE_SIZE}&page=${page}`);
     all.push(...response.data);
     if (page >= response.meta.totalPages) return all;
   }

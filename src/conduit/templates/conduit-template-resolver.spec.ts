@@ -2,7 +2,7 @@ import { ConduitTemplateResolver } from './conduit-template-resolver';
 
 function setup(
   env: Record<string, string> = {},
-  remote: Array<{ id: string; name: string }> = [],
+  remote: Array<{ id: string; name: string; channel?: string }> = [],
 ) {
   const admin = jest
     .fn()
@@ -39,14 +39,14 @@ describe('ConduitTemplateResolver', () => {
     ).resolves.toBeNull();
   });
 
-  it('describe las 12 plantillas e indica de dónde salió cada ID', async () => {
+  it('describe las 16 plantillas e indica de dónde salió cada ID', async () => {
     const { resolver } = setup({ CONDUIT_TEMPLATE_REACTIVATION: 'env-id' }, [
       { id: 'tpl-1', name: 'leonice_recordatorio_cita' },
     ]);
 
     const usage = await resolver.describe();
 
-    expect(usage).toHaveLength(12);
+    expect(usage).toHaveLength(16);
     expect(usage.find((u) => u.name === 'RESERVATION_REMINDER')).toMatchObject({
       templateId: 'tpl-1',
       configured: true,
@@ -60,6 +60,33 @@ describe('ConduitTemplateResolver', () => {
       configured: false,
       source: null,
     });
+  });
+
+  it('distingue la plantilla de correo de la de WhatsApp aunque compartan nombre', async () => {
+    const { resolver } = setup({}, [
+      {
+        id: 'wa-1',
+        name: 'leonice_aviso_atencion_humana',
+        channel: 'WHATSAPP',
+      },
+      {
+        id: 'mail-1',
+        name: 'leonice_correo_aviso_atencion_humana',
+        channel: 'EMAIL',
+      },
+      {
+        id: 'mail-falso',
+        name: 'leonice_aviso_atencion_humana',
+        channel: 'EMAIL',
+      },
+    ]);
+
+    await expect(
+      resolver.resolve('CONDUIT_TEMPLATE_ADMIN_HANDOFF'),
+    ).resolves.toBe('wa-1');
+    await expect(
+      resolver.resolve('CONDUIT_TEMPLATE_ADMIN_HANDOFF_EMAIL'),
+    ).resolves.toBe('mail-1');
   });
 
   it('cachea la lista y la vuelve a pedir tras invalidar', async () => {

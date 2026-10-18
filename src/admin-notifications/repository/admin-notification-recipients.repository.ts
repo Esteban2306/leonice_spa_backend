@@ -24,11 +24,14 @@ export class AdminNotificationRecipientsRepository {
     });
   }
 
-  create(data: { name: string; phone: string }) {
+  create(data: { name: string; phone: string; email: string | null }) {
     return this.prisma.client.adminNotificationRecipient.create({ data });
   }
 
-  update(id: string, data: { name?: string; isActive?: boolean }) {
+  update(
+    id: string,
+    data: { name?: string; isActive?: boolean; email?: string | null },
+  ) {
     return this.prisma.client.adminNotificationRecipient.update({
       where: { id },
       data,

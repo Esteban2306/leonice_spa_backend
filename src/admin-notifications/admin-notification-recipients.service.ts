@@ -9,6 +9,11 @@ import { AdminNotificationRecipientsRepository } from './repository/admin-notifi
 import { CreateAdminNotificationRecipientDto } from './dto/create-admin-notification-recipient.dto';
 import { UpdateAdminNotificationRecipientDto } from './dto/update-admin-notification-recipient.dto';
 
+function normalizeEmail(email: string | null | undefined): string | null {
+  const trimmed = email?.trim().toLowerCase();
+  return trimmed ? trimmed : null;
+}
+
 @Injectable()
 export class AdminNotificationRecipientsService {
   constructor(
@@ -24,6 +29,7 @@ export class AdminNotificationRecipientsService {
       return await this.repository.create({
         name: dto.name.trim(),
         phone: normalizePhone(dto.phone),
+        email: normalizeEmail(dto.email),
       });
     } catch (error: unknown) {
       if (
@@ -43,6 +49,7 @@ export class AdminNotificationRecipientsService {
     return this.repository.update(id, {
       name: dto.name?.trim(),
       isActive: dto.isActive,
+      email: dto.email === undefined ? undefined : normalizeEmail(dto.email),
     });
   }
 }

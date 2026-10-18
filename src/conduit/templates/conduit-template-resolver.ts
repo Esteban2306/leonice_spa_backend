@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConduitApiClient } from '../client/conduit-api.client';
-import { CONDUIT_TEMPLATE_CATALOG } from './conduit-template-catalog';
+import {
+  CONDUIT_TEMPLATE_CATALOG,
+  templateChannel,
+  type ConduitTemplateChannel,
+} from './conduit-template-catalog';
 
 export type TemplateSource = 'env' | 'catalog';
 
@@ -12,6 +16,7 @@ export interface TemplateUsage {
   configured: boolean;
   source: TemplateSource | null;
   catalogName: string;
+  channel: ConduitTemplateChannel;
   description: string;
   suggestedBody: string;
 }
@@ -19,7 +24,10 @@ export interface TemplateUsage {
 interface RemoteTemplate {
   id: string;
   name: string;
+  channel?: string;
 }
+
+const templateKey = (channel: string, name: string) => `${channel}:${name}`;
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const PAGE_SIZE = 100;
@@ -40,14 +48,19 @@ export class ConduitTemplateResolver {
     if (fromEnv) return fromEnv;
     const entry = CONDUIT_TEMPLATE_CATALOG.find((t) => t.envKey === envKey);
     if (!entry) return null;
-    return (await this.templatesByName()).get(entry.name) ?? null;
+    return (
+      (await this.templatesByName()).get(
+        templateKey(templateChannel(entry), entry.name),
+      ) ?? null
+    );
   }
 
   async describe(): Promise<TemplateUsage[]> {
     const byName = await this.templatesByName();
     return CONDUIT_TEMPLATE_CATALOG.map((entry) => {
       const fromEnv = this.config.get<string>(entry.envKey) || null;
-      const fromCatalog = byName.get(entry.name) ?? null;
+      const fromCatalog =
+        byName.get(templateKey(templateChannel(entry), entry.name)) ?? null;
       const templateId = fromEnv ?? fromCatalog;
       return {
         name: entry.code,
@@ -56,6 +69,7 @@ export class ConduitTemplateResolver {
         configured: templateId !== null,
         source: fromEnv ? 'env' : fromCatalog ? 'catalog' : null,
         catalogName: entry.name,
+        channel: templateChannel(entry),
         description: entry.description,
         suggestedBody: entry.body,
       };
@@ -77,11 +91,14 @@ export class ConduitTemplateResolver {
           data: RemoteTemplate[];
           meta: { totalPages: number };
         }>('GET', 'templates', {
-          query: { channel: 'WHATSAPP', limit: PAGE_SIZE, page },
+          query: { limit: PAGE_SIZE, page },
         });
         for (const template of response.data) {
-          if (!byName.has(template.name))
-            byName.set(template.name, template.id);
+          const key = templateKey(
+            template.channel ?? 'WHATSAPP',
+            template.name,
+          );
+          if (!byName.has(key)) byName.set(key, template.id);
         }
         if (page >= response.meta.totalPages) break;
       }
