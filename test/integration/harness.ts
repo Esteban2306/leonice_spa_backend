@@ -26,6 +26,7 @@ export interface RecordedJob {
 export class FakeQueue {
   readonly jobs: RecordedJob[] = [];
   failNext = false;
+  hangNext = false;
 
   constructor(private readonly queueName: string) {}
 
@@ -33,6 +34,10 @@ export class FakeQueue {
     if (this.failNext) {
       this.failNext = false;
       return Promise.reject(new Error('redis caído'));
+    }
+    if (this.hangNext) {
+      this.hangNext = false;
+      return new Promise<never>(() => undefined);
     }
     this.jobs.push({ queue: this.queueName, name, data, opts });
     return Promise.resolve({ id: String(this.jobs.length) });

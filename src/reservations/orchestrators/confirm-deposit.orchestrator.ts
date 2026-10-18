@@ -12,6 +12,7 @@ import { NO_SHOW_GRACE_MS } from '../domain/reservation-timing.constants';
 import { EVENT_TYPES } from 'src/common/events/constants/event.types';
 import { EventBusService } from 'src/common/events/event.service';
 import { AppException } from '../../common/errors/app.exception';
+import { enqueueWithin } from '../../infrastructure/queue/enqueue-within';
 
 @Injectable()
 export class ConfirmDepositOrchestrator {
@@ -71,20 +72,32 @@ export class ConfirmDepositOrchestrator {
     reservationId: string,
     scheduledStart: Date,
   ): Promise<void> {
+    const lateFailure = (error: unknown) =>
+      this.logger.error(
+        `no-show-check de ${reservationId} no se encoló al volver Redis; lo cubrirá el barrido de no-show: ${error instanceof Error ? error.message : String(error)}`,
+      );
     try {
       const delay = Math.max(
         scheduledStart.getTime() + NO_SHOW_GRACE_MS - Date.now(),
         0,
       );
-      await this.timeoutsQueue.add(
-        JOB_NAMES.NO_SHOW_CHECK,
-        { reservationId },
-        { delay },
+      const outcome = await enqueueWithin(
+        this.timeoutsQueue.add(
+          JOB_NAMES.NO_SHOW_CHECK,
+          { reservationId },
+          { delay },
+        ),
+        lateFailure,
       );
+      if (outcome === 'DEFERRED') {
+        this.logger.warn(
+          `Redis no respondió a tiempo: no-show-check de ${reservationId} se encolará al reconectar y el barrido de no-show lo cubre si no`,
+        );
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `No se pudo encolar no-show-check de ${reservationId}; NO hay barrido que lo cubra: ${message}`,
+        `No se pudo encolar no-show-check de ${reservationId}; lo cubrirá el barrido de no-show: ${message}`,
       );
     }
   }

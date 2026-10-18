@@ -15,6 +15,7 @@ import {
 } from '../domain/operating-hours';
 import { DEPOSIT_OPERATING_WINDOW_MS } from '../domain/reservation-timing.constants';
 import { OperatingScheduleRepository } from '../repositories/operating-schedule.repository';
+import { enqueueWithin } from '../../infrastructure/queue/enqueue-within';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
@@ -124,12 +125,24 @@ export class DepositDeadlineService {
   }
 
   async scheduleTimeout(reservationId: string, expiresAt: Date): Promise<void> {
-    try {
-      await this.timeoutsQueue.add(
-        JOB_NAMES.DEPOSITO_TIMEOUT,
-        { reservationId },
-        { delay: Math.max(expiresAt.getTime() - Date.now(), 0) },
+    const lateFailure = (error: unknown) =>
+      this.logger.error(
+        `deposito-timeout de ${reservationId} no se encoló al volver Redis; lo cubrirá el barrido: ${error instanceof Error ? error.message : String(error)}`,
       );
+    try {
+      const outcome = await enqueueWithin(
+        this.timeoutsQueue.add(
+          JOB_NAMES.DEPOSITO_TIMEOUT,
+          { reservationId },
+          { delay: Math.max(expiresAt.getTime() - Date.now(), 0) },
+        ),
+        lateFailure,
+      );
+      if (outcome === 'DEFERRED') {
+        this.logger.warn(
+          `Redis no respondió a tiempo: deposito-timeout de ${reservationId} se encolará al reconectar y el barrido lo cubre si no`,
+        );
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(

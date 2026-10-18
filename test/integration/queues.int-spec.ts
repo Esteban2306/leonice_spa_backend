@@ -25,6 +25,7 @@ import {
   outboxJobId,
 } from 'src/conduit/service/conduit-outbox.service';
 import { ConduitOutboxListener } from 'src/conduit/listeners/conduit-outbox.listener';
+import { ENQUEUE_WAIT_MS } from 'src/infrastructure/queue/enqueue-within';
 import { ConduitApiClient } from 'src/conduit/client/conduit-api.client';
 import { ReservationsRepository } from 'src/reservations/repositories/reservations.repository';
 import { AdminCancelReservationOrchestrator } from 'src/reservations/orchestrators/admin-cancel-reservation.orchestrator';
@@ -736,6 +737,22 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
         ]);
       },
     );
+  });
+
+  describe('Redis sin responder', () => {
+    it('crear una reserva no se bloquea esperando a Redis: responde y deja la reserva guardada', async () => {
+      fakeQueues.timeouts.hangNext = true;
+      const startedAt = Date.now();
+      const { reservation } = await book();
+      const elapsed = Date.now() - startedAt;
+
+      expect(elapsed).toBeLessThan(ENQUEUE_WAIT_MS + 1_500);
+      const stored = await prisma.client.reservation.findUniqueOrThrow({
+        where: { id: reservation.id },
+      });
+      expect(stored.status).toBe(ReservationStatus.PENDIENTE_DEPOSITO);
+      expect(stored.depositExpiresAt).not.toBeNull();
+    });
   });
 
   describe('comunicaciones', () => {
