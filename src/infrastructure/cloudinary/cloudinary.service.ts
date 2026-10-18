@@ -7,6 +7,9 @@ import type {
 import { CLOUDINARY } from './cloudinary.constants';
 import { withUploadRetry } from './upload-retry';
 
+export const TESTIMONIAL_IMAGE_WIDTH = 800;
+export const TESTIMONIAL_IMAGE_HEIGHT = 1000;
+
 export interface UploadedImage {
   url: string;
   publicId: string;
@@ -89,6 +92,31 @@ export class CloudinaryService {
     const result = await this.uploadBuffer(fileBuffer, {
       public_id: publicId,
       resource_type: 'image',
+    });
+
+    return { url: result.secure_url, publicId: result.public_id };
+  }
+
+  testimonialImagePublicId(testimonialId: string, slot: string): string {
+    return `leonice-spa/testimonials/${testimonialId}-${slot}-${Date.now()}`;
+  }
+
+  async uploadTestimonialImage(
+    fileBuffer: Buffer,
+    publicId: string,
+  ): Promise<UploadedImage> {
+    const result = await this.uploadBuffer(fileBuffer, {
+      public_id: publicId,
+      resource_type: 'image',
+      transformation: [
+        {
+          width: TESTIMONIAL_IMAGE_WIDTH,
+          height: TESTIMONIAL_IMAGE_HEIGHT,
+          crop: 'fill',
+          gravity: 'auto',
+        },
+        { quality: 'auto:good' },
+      ],
     });
 
     return { url: result.secure_url, publicId: result.public_id };

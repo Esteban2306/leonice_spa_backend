@@ -27,6 +27,7 @@ const PUBLIC_ALLOW_LIST = [
   'POST /api/v1/cancellation-links/:token/cancel',
   'GET /api/v1/catalog/products',
   'GET /api/v1/catalog/products/:slug',
+  'GET /api/v1/business-hours',
   'GET /api/v1/categories',
   'GET /api/v1/categories/:id',
   'GET /api/v1/health',
@@ -47,6 +48,7 @@ const PUBLIC_ALLOW_LIST = [
   'GET /api/v1/showcase/categories',
   'GET /api/v1/showcase/categories/:categorySlug',
   'GET /api/v1/showcase/categories/:categorySlug/treatments/:treatmentSlug',
+  'GET /api/v1/testimonials',
   'GET /api/v1/treatments',
   'GET /api/v1/treatments/:id',
 ].sort();

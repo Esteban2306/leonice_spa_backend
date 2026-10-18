@@ -513,6 +513,25 @@ model AdminNotificationRecipient {
   @@map("admin_notification_recipients")
 }
 
+model Testimonial {
+  id                  String   @id @default(uuid())
+  authorName          String   @map("author_name")
+  quote               String
+  treatmentName       String   @map("treatment_name")
+  beforeImageUrl      String?  @map("before_image_url")
+  beforeImagePublicId String?  @map("before_image_public_id")
+  afterImageUrl       String?  @map("after_image_url")
+  afterImagePublicId  String?  @map("after_image_public_id")
+  isPublished         Boolean  @default(true) @map("is_published")
+  displayOrder        Int      @default(0) @map("display_order")
+  consentConfirmedAt  DateTime @default(now()) @map("consent_confirmed_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublished, displayOrder])
+  @@map("testimonials")
+}
+
 enum Role {
   ADMIN
 }

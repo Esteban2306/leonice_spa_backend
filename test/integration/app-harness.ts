@@ -72,6 +72,13 @@ export async function createSecurityApp(
       uploadDepositProofFromBase64: (_d: string, id: string) =>
         Promise.resolve({ url: `https://fake.test/${id}.webp`, publicId: id }),
       destroyImage: () => Promise.resolve(),
+      testimonialImagePublicId: (id: string, slot: string) =>
+        `testimonials/${id}-${slot}-${Math.random().toString(36).slice(2)}`,
+      uploadTestimonialImage: (_b: Buffer, publicId: string) =>
+        Promise.resolve({
+          url: `https://fake.test/${publicId}.webp`,
+          publicId,
+        }),
     })
     .compile();
 

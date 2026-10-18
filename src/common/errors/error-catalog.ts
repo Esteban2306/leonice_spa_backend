@@ -351,6 +351,26 @@ const PRODUCT = {
   },
 } as const satisfies Record<string, ErrorDefinition>;
 
+const TESTIMONIALS = {
+  TESTIMONIAL_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Testimonio no encontrado.',
+  },
+  TESTIMONIAL_IMAGE_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Este testimonio no tiene esa foto.',
+  },
+  TESTIMONIAL_IMAGE_UPLOAD_FAILED: {
+    status: HttpStatus.BAD_GATEWAY,
+    message: 'No pudimos subir la foto. Intenta de nuevo en unos minutos.',
+  },
+  TESTIMONIAL_REORDER_MISMATCH: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'La lista de testimonios cambió mientras la ordenabas. Recarga e inténtalo de nuevo.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
+
 const SHOWCASE = {
   SHOWCASE_CATEGORY_NOT_FOUND: {
     status: HttpStatus.NOT_FOUND,
@@ -411,6 +431,7 @@ export const ERROR_CATALOG = {
   ...CONDUIT,
   ...PRODUCT,
   ...SHOWCASE,
+  ...TESTIMONIALS,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

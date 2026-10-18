@@ -18,6 +18,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ConduitModule } from './conduit/conduit.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ProductsModule } from './products/products.module';
+import { TestimonialsModule } from './testimonials/testimonials.module';
 import { EventModule } from './common/events/event.module';
 import { QueueModule } from './infrastructure/queue/bullmq.module';
 import { AutomationModule } from './automation/automation.module';
@@ -59,6 +60,7 @@ import { AdminModule } from './admin/admin.module';
     ReservationsModule,
     ConduitModule,
     ProductsModule,
+    TestimonialsModule,
     CatalogModule,
     QueueModule,
     AutomationModule,
