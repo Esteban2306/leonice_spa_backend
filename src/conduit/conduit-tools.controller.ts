@@ -88,26 +88,12 @@ export class ConduitToolsController {
         isPregnant: dto.isPregnant || false,
       });
 
-      // Registrar consentimientos
-      for (const c of dto.consents ?? []) {
-        if (c.accepted) {
-          await this.consentService.recordConsent(
-            client.id,
-            c.type,
-            c.policyVersion,
-          );
-        }
-      }
+      await this.recordAcceptedConsents(client.id, dto.consents);
 
       return client;
     }
 
-    for (const c of dto.consents ?? []) {
-      await this.consentService.ensureConsent(client.id, c.type, {
-        accepted: c.accepted,
-        policyVersion: c.policyVersion,
-      });
-    }
+    await this.recordAcceptedConsents(client.id, dto.consents);
 
     if (dto.allergies !== undefined) {
       await this.consentService.ensureHealthDataConsent(client.id);
@@ -134,12 +120,7 @@ export class ConduitToolsController {
       );
     }
 
-    for (const c of dto.consents ?? []) {
-      await this.consentService.ensureConsent(client.id, c.type, {
-        accepted: c.accepted,
-        policyVersion: c.policyVersion,
-      });
-    }
+    await this.recordAcceptedConsents(client.id, dto.consents);
 
     if (dto.allergies !== undefined) {
       await this.consentService.ensureHealthDataConsent(client.id);
@@ -147,5 +128,18 @@ export class ConduitToolsController {
 
     const { phone: _phone, ...updates } = dto;
     return this.clientsService.update(client.id, updates);
+  }
+
+  private async recordAcceptedConsents(
+    clientId: string,
+    consents: ConduitUpdateClientDto['consents'],
+  ): Promise<void> {
+    for (const consent of consents ?? []) {
+      if (!consent.accepted) continue;
+      await this.consentService.ensureConsent(clientId, consent.type, {
+        accepted: true,
+        policyVersion: consent.policyVersion,
+      });
+    }
   }
 }
