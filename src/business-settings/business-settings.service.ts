@@ -13,6 +13,12 @@ const DAY_NAMES = [
   'sábado',
 ];
 
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 function minutesToClock(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -51,6 +57,25 @@ export class BusinessSettingsService {
       create: { id: SETTINGS_ID, ...data },
       update: data,
     });
+  }
+
+  async publicHours() {
+    const windows = await this.prisma.client.operatingWindow.findMany({
+      orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
+      select: { dayOfWeek: true, startMinute: true, endMinute: true },
+    });
+    return {
+      timeZone: 'America/Bogota',
+      days: DAY_NAMES.map((_, dayOfWeek) => ({
+        dayOfWeek,
+        windows: windows
+          .filter((w) => w.dayOfWeek === dayOfWeek)
+          .map((w) => ({
+            opens: minutesToTime(w.startMinute),
+            closes: minutesToTime(w.endMinute),
+          })),
+      })),
+    };
   }
 
   /**
