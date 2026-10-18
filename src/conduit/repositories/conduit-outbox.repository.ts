@@ -47,6 +47,15 @@ export class ConduitOutboxRepository {
     ]);
   }
 
+  findStalePending(createdBefore: Date, limit: number) {
+    return this.prisma.client.conduitOutboxEvent.findMany({
+      where: { status: 'PENDING', createdAt: { lt: createdBefore } },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      select: { id: true },
+    });
+  }
+
   resetToPending(id: string) {
     return this.prisma.client.conduitOutboxEvent.update({
       where: { id },

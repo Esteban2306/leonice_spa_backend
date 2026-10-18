@@ -143,7 +143,7 @@ export async function createHarnessModuleWith(extra: {
   return moduleRef;
 }
 
-const TRUNCATE_ALL = `TRUNCATE TABLE "deposit_records", "reservations", "consent_records", "clients", "treatments", "capacity_pools", "categories", "operating_windows", "schedule_exceptions", "automation_executions", "users" RESTART IDENTITY CASCADE`;
+const TRUNCATE_ALL = `TRUNCATE TABLE "deposit_records", "reservations", "consent_records", "clients", "treatments", "capacity_pools", "categories", "operating_windows", "schedule_exceptions", "automation_executions", "conduit_outbox_events", "users" RESTART IDENTITY CASCADE`;
 
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   const ownerUrl = process.env.AUDIT_OWNER_DATABASE_URL;

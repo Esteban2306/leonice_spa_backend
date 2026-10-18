@@ -46,6 +46,13 @@ export class AdminCancelReservationOrchestrator {
     const updated = await this.repository.findById(reservationId);
     if (!updated) throw new NotFoundException('Reserva no encontrada');
 
+    this.eventBus.publish(EVENT_TYPES.RESERVATION_CANCELLED_BY_BUSINESS, {
+      reservationId: updated.id,
+      clientId: updated.clientId,
+      source,
+      reason: updated.cancellationReason,
+    });
+
     if (source === CancellationSource.TIMEOUT) {
       this.eventBus.publish(EVENT_TYPES.RESERVATION_CANCELLED_BY_TIMEOUT, {
         reservationId: updated.id,

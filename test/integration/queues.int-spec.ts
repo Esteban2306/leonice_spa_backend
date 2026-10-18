@@ -4,6 +4,7 @@ import { Job, UnrecoverableError } from 'bullmq';
 import {
   AutomationExecutionResult,
   AutomationExecutionType,
+  CancellationSource,
   DepositCoverage,
   ReservationStatus,
 } from '@prisma/client';
@@ -18,7 +19,12 @@ import { AutomationCommunicationsProcessor } from 'src/automation/processors/aut
 import { AutomationExecutionRepository } from 'src/automation/repositories/automation-execution.repository';
 import { ConduitOutboxProcessor } from 'src/conduit/processors/conduit-outbox.processor';
 import { ConduitOutboxRepository } from 'src/conduit/repositories/conduit-outbox.repository';
-import { ConduitOutboxService } from 'src/conduit/service/conduit-outbox.service';
+import {
+  ConduitOutboxService,
+  OUTBOX_STALE_AFTER_MS,
+  outboxJobId,
+} from 'src/conduit/service/conduit-outbox.service';
+import { ConduitOutboxListener } from 'src/conduit/listeners/conduit-outbox.listener';
 import { ConduitApiClient } from 'src/conduit/client/conduit-api.client';
 import { ReservationsRepository } from 'src/reservations/repositories/reservations.repository';
 import { AdminCancelReservationOrchestrator } from 'src/reservations/orchestrators/admin-cancel-reservation.orchestrator';
@@ -434,22 +440,42 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
     let pushImpl: () => Promise<void>;
     let outboxProcessor: ConduitOutboxProcessor;
     let outboxRepo: ConduitOutboxRepository;
+    let outboxQueue: FakeQueue;
+    let outboxService: ConduitOutboxService;
 
     beforeAll(() => {
       outboxRepo = new ConduitOutboxRepository(prisma);
+      outboxQueue = new FakeQueue(QUEUE_NAMES.CONDUIT_OUTBOX);
+      outboxService = new ConduitOutboxService(
+        outboxRepo,
+        outboxQueue as never,
+      );
       const api = {
         pushBusinessEvent: (p: { eventId: string; eventType: string }) => {
           pushed.push({ eventId: p.eventId, eventType: p.eventType });
           return pushImpl();
         },
       } as unknown as ConduitApiClient;
-      outboxProcessor = new ConduitOutboxProcessor(outboxRepo, api);
+      outboxProcessor = new ConduitOutboxProcessor(
+        outboxRepo,
+        api,
+        outboxService,
+      );
     });
 
     beforeEach(() => {
       pushed.length = 0;
       pushImpl = () => Promise.resolve();
+      outboxQueue.jobs.length = 0;
     });
+
+    const createdEvent = async (enqueue: () => Promise<void>) => {
+      const spy = jest.spyOn(outboxRepo, 'create');
+      await enqueue();
+      const event = (await spy.mock.results[0].value) as { id: string };
+      spy.mockRestore();
+      return event;
+    };
 
     const outboxJob = (id: string, extra: Partial<Job> = {}) =>
       job(
@@ -517,18 +543,199 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
       expect(await service.retry(event.id)).toBe(false);
     });
 
-    it('si Redis falla al encolar, el evento queda PENDING en base y no se pierde (visible para reintento manual)', async () => {
-      const queue = new FakeQueue('x');
-      queue.failNext = true;
-      const service = new ConduitOutboxService(outboxRepo, queue as never);
-      await expect(
-        service.enqueue('reservation.created', { a: 5 }),
-      ).rejects.toThrow();
-      const pending = await prisma.client.conduitOutboxEvent.findMany({
-        where: { status: 'PENDING' },
-      });
-      expect(pending.length).toBeGreaterThan(0);
+    it('si Redis falla al encolar, el evento queda PENDING sin romper el flujo y el barrido lo publica después', async () => {
+      outboxQueue.failNext = true;
+      const event = await createdEvent(() =>
+        outboxService.enqueue('reservation.created', { a: 5 }),
+      );
+      expect((await outboxRepo.findById(event.id))?.status).toBe('PENDING');
+      expect(outboxQueue.jobs).toHaveLength(0);
+
+      const later = new Date(Date.now() + OUTBOX_STALE_AFTER_MS + 1_000);
+      expect(await outboxService.sweepPending(later)).toBeGreaterThanOrEqual(1);
+      expect(outboxQueue.jobs.map((j) => j.opts?.jobId)).toContain(
+        outboxJobId(event.id),
+      );
+      await outboxProcessor.process(outboxJob(event.id));
+      expect((await outboxRepo.findById(event.id))?.status).toBe('SENT');
     });
+
+    it('cada evento se encola con un jobId estable para que BullMQ descarte copias mientras el job siga vivo', async () => {
+      const event = await createdEvent(() =>
+        outboxService.enqueue('reservation.created', { a: 6 }),
+      );
+      expect(outboxQueue.jobs).toEqual([
+        expect.objectContaining({
+          name: JOB_NAMES.PUBLISH_CONDUIT_EVENT,
+          data: { outboxEventId: event.id },
+          opts: { jobId: outboxJobId(event.id) },
+        }),
+      ]);
+    });
+
+    it('el barrido solo reencola pendientes viejos: ignora recientes, enviados y fallidos', async () => {
+      await prisma.client.conduitOutboxEvent.deleteMany({});
+      const old = new Date(Date.now() - OUTBOX_STALE_AFTER_MS - 60_000);
+      const base = { eventType: 'reservation.created', payload: {} };
+      const stale = await prisma.client.conduitOutboxEvent.create({
+        data: { ...base, createdAt: old },
+      });
+      await prisma.client.conduitOutboxEvent.create({ data: base });
+      await prisma.client.conduitOutboxEvent.create({
+        data: { ...base, createdAt: old, status: 'SENT' },
+      });
+      await prisma.client.conduitOutboxEvent.create({
+        data: { ...base, createdAt: old, status: 'FAILED' },
+      });
+
+      expect(await outboxService.sweepPending()).toBe(1);
+      expect(outboxQueue.jobs.map((j) => j.opts?.jobId)).toEqual([
+        outboxJobId(stale.id),
+      ]);
+    });
+
+    it('el job de barrido lo atiende el mismo procesador y su fallo no marca eventos como FAILED', async () => {
+      const sweep = jest
+        .spyOn(outboxService, 'sweepPending')
+        .mockResolvedValueOnce(0);
+      const sweepJob = job(
+        JOB_NAMES.CONDUIT_OUTBOX_SWEEP,
+        {},
+        { queueName: QUEUE_NAMES.CONDUIT_OUTBOX, opts: { attempts: 1 } },
+      );
+      await outboxProcessor.process(sweepJob);
+      expect(sweep).toHaveBeenCalledTimes(1);
+      expect(pushed).toHaveLength(0);
+
+      const markFailed = jest.spyOn(outboxRepo, 'markFailed');
+      await outboxProcessor.onFailed(
+        { ...sweepJob, attemptsMade: 1 } as Job,
+        new Error('barrido caído'),
+      );
+      expect(markFailed).not.toHaveBeenCalled();
+      markFailed.mockRestore();
+      sweep.mockRestore();
+    });
+
+    it('Conduit recibe el ciclo de vida completo: reprogramaciones, cancelaciones del negocio, no-show y completadas', async () => {
+      const listener = new ConduitOutboxListener(outboxService);
+      const enqueue = jest
+        .spyOn(outboxService, 'enqueue')
+        .mockResolvedValue(undefined);
+      const before = new Date('2026-11-01T14:00:00.000Z');
+      const after = new Date('2026-11-02T19:00:00.000Z');
+
+      await listener.handleRescheduledByClient({
+        payload: {
+          originalReservationId: 'r1',
+          newReservationId: 'r1',
+          clientId: 'c1',
+          previousScheduledStart: before,
+          newScheduledStart: after,
+        },
+      } as never);
+      await listener.handleRescheduledByAdmin({
+        payload: {
+          reservationId: 'r2',
+          clientId: 'c2',
+          previousScheduledStart: before,
+          newScheduledStart: after,
+          notifyClient: false,
+        },
+      } as never);
+      await listener.handleCancelledByBusiness({
+        payload: {
+          reservationId: 'r3',
+          clientId: 'c3',
+          source: CancellationSource.TIMEOUT,
+          reason: 'Abono vencido',
+        },
+      } as never);
+      await listener.handleNoShow({
+        payload: { reservationId: 'r4', clientId: 'c4', scheduledStart: after },
+      } as never);
+      await listener.handleCompleted({
+        payload: {
+          reservationId: 'r5',
+          clientId: 'c5',
+          treatmentId: 't5',
+          categoryId: 'k5',
+        },
+      } as never);
+
+      expect(enqueue.mock.calls).toEqual([
+        [
+          'reservation.rescheduled',
+          {
+            reservationId: 'r1',
+            clientId: 'c1',
+            previousScheduledStart: before,
+            scheduledStart: after,
+            rescheduledBy: 'CLIENT',
+          },
+        ],
+        [
+          'reservation.rescheduled',
+          {
+            reservationId: 'r2',
+            clientId: 'c2',
+            previousScheduledStart: before,
+            scheduledStart: after,
+            rescheduledBy: 'ADMIN',
+          },
+        ],
+        [
+          'reservation.cancelled',
+          {
+            reservationId: 'r3',
+            clientId: 'c3',
+            reason: 'Abono vencido',
+            cancelledBy: 'TIMEOUT',
+          },
+        ],
+        [
+          'reservation.no_show',
+          { reservationId: 'r4', clientId: 'c4', scheduledStart: after },
+        ],
+        [
+          'reservation.completed',
+          { reservationId: 'r5', clientId: 'c5', treatmentId: 't5' },
+        ],
+      ]);
+      enqueue.mockRestore();
+    });
+
+    it.each([
+      [
+        'administrador sin avisar a la clienta',
+        CancellationSource.ADMIN,
+        false,
+      ],
+      ['administrador avisando a la clienta', CancellationSource.ADMIN, true],
+      ['vencimiento del abono', CancellationSource.TIMEOUT, false],
+    ])(
+      'cancelar por %s publica exactamente un aviso para Conduit con su origen',
+      async (_label, source, notifyClient) => {
+        const { reservation } = await book();
+        const seen: unknown[] = [];
+        const capture = (event: { payload: unknown }) =>
+          seen.push(event.payload);
+        events.on(EVENT_TYPES.RESERVATION_CANCELLED_BY_BUSINESS, capture);
+        await moduleRef
+          .get(AdminCancelReservationOrchestrator)
+          .execute(reservation.id, 'Motivo de prueba', notifyClient, source);
+        events.off(EVENT_TYPES.RESERVATION_CANCELLED_BY_BUSINESS, capture);
+
+        expect(seen).toEqual([
+          {
+            reservationId: reservation.id,
+            clientId: reservation.clientId,
+            source,
+            reason: 'Motivo de prueba',
+          },
+        ]);
+      },
+    );
   });
 
   describe('comunicaciones', () => {

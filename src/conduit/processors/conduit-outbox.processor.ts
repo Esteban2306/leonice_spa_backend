@@ -2,9 +2,13 @@ import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ConduitOutboxStatus } from '@prisma/client';
-import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
+import {
+  JOB_NAMES,
+  QUEUE_NAMES,
+} from '../../infrastructure/queue/queue.constants';
 import { ConduitOutboxRepository } from '../repositories/conduit-outbox.repository';
 import { ConduitApiClient } from '../client/conduit-api.client';
+import { ConduitOutboxService } from '../service/conduit-outbox.service';
 
 interface PublishConduitEventJobData {
   outboxEventId: string;
@@ -17,11 +21,17 @@ export class ConduitOutboxProcessor extends WorkerHost {
   constructor(
     private readonly repository: ConduitOutboxRepository,
     private readonly conduitApiClient: ConduitApiClient,
+    private readonly outboxService: ConduitOutboxService,
   ) {
     super();
   }
 
   async process(job: Job<PublishConduitEventJobData>): Promise<void> {
+    if (job.name === JOB_NAMES.CONDUIT_OUTBOX_SWEEP) {
+      await this.outboxService.sweepPending();
+      return;
+    }
+
     const event = await this.repository.findById(job.data.outboxEventId);
 
     if (!event) {
@@ -47,7 +57,7 @@ export class ConduitOutboxProcessor extends WorkerHost {
     job: Job<PublishConduitEventJobData> | undefined,
     error: Error,
   ) {
-    if (!job) return;
+    if (!job || job.name === JOB_NAMES.CONDUIT_OUTBOX_SWEEP) return;
     const maxAttempts = job.opts.attempts ?? 1;
 
     if (job.attemptsMade < maxAttempts) {

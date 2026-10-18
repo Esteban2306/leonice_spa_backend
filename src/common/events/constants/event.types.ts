@@ -1,4 +1,8 @@
-import { ReservationChannel, ReservationStatus } from '@prisma/client';
+import {
+  CancellationSource,
+  ReservationChannel,
+  ReservationStatus,
+} from '@prisma/client';
 
 export const EVENT_TYPES = {
   RESERVATION_CREATED: 'reservation.created',
@@ -11,6 +15,7 @@ export const EVENT_TYPES = {
   RESERVATION_NO_SHOW: 'reservation.no_show',
   RESERVATION_RESCHEDULED_BY_ADMIN: 'reservation.rescheduled_by_admin',
   RESERVATION_CANCELLED_BY_ADMIN: 'reservation.cancelled_by_admin',
+  RESERVATION_CANCELLED_BY_BUSINESS: 'reservation.cancelled_by_business',
   RESERVATION_NEEDS_HAIR_PROFILE: 'reservation.needs_hair_profile',
   DEPOSIT_SUBMITTED_FOR_REVIEW: 'deposit.submitted_for_review',
   DEPOSIT_REJECTED: 'deposit.rejected',
@@ -60,6 +65,13 @@ export interface EventPayloadMap {
     reservationId: string;
     clientId: string;
     reason?: string;
+  };
+
+  [EVENT_TYPES.RESERVATION_CANCELLED_BY_BUSINESS]: {
+    reservationId: string;
+    clientId: string;
+    source: CancellationSource;
+    reason: string | null;
   };
 
   [EVENT_TYPES.RESERVATION_NEEDS_HAIR_PROFILE]: {

@@ -12,6 +12,7 @@ import { ConduitOutboxRepository } from './repositories/conduit-outbox.repositor
 import { ConduitOutboxService } from './service/conduit-outbox.service';
 import { ConduitOutboxListener } from './listeners/conduit-outbox.listener';
 import { ConduitOutboxProcessor } from './processors/conduit-outbox.processor';
+import { ConduitOutboxSweepScheduler } from './service/conduit-outbox-sweep.scheduler';
 import { ConduitBookingToolsController } from './conduit-booking-tools.controller';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { CatalogModule } from '../catalog/catalog.module';
@@ -44,6 +45,7 @@ import { BusinessSettingsModule } from '../business-settings/business-settings.m
     ConduitOutboxService,
     ConduitOutboxListener,
     ConduitOutboxProcessor,
+    ConduitOutboxSweepScheduler,
   ],
   exports: [ConduitApiClient, ConduitTemplateResolver, HmacSignatureGuard],
 })
