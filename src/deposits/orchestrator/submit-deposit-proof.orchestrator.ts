@@ -29,15 +29,13 @@ export class SubmitDepositProofOrchestrator {
     private readonly eventBus: EventBusService,
   ) {}
 
-  async execute(params: SubmitParams) {
+  async assertCanSubmit(reservationId: string, phone: string) {
     const reservation =
-      await this.reservationRepository.findByIdWithClientPhone(
-        params.reservationId,
-      );
+      await this.reservationRepository.findByIdWithClientPhone(reservationId);
 
     if (!reservation) throw new NotFoundException('Reserva no encontrada');
 
-    if (normalizePhone(params.phone) !== reservation.client.phone) {
+    if (normalizePhone(phone) !== reservation.client.phone) {
       throw new ForbiddenException(
         'No se pudo verificar la propiedad de esta reserva',
       );
@@ -47,6 +45,14 @@ export class SubmitDepositProofOrchestrator {
         `Esta reserva no está esperando un depósito (estado actual: ${reservation.status})`,
       );
     }
+    return reservation;
+  }
+
+  async execute(params: SubmitParams) {
+    const reservation = await this.assertCanSubmit(
+      params.reservationId,
+      params.phone,
+    );
 
     const uploaded =
       params.preUploadedImage ??

@@ -10,7 +10,10 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { ConduitTool } from './decorators/conduit-tool.decorator';
-import type { RequestWithConduitContact } from './interceptors/conduit-contact.interceptor';
+import {
+  ConduitToolOptionsMeta,
+  type RequestWithConduitContact,
+} from './interceptors/conduit-contact.interceptor';
 import { ConduitHandoffDto } from './dto/conduit-handoff.dto';
 import { BusinessSettingsService } from '../business-settings/business-settings.service';
 import { ClientsRepository } from '../clients/repositories/clients.repository';
@@ -31,6 +34,7 @@ export class ConduitSupportToolsController {
    * Datos que el bot comunica sin inventar: anticipo (monto e
    * instrucciones de pago), políticas, dirección y horario semanal.
    */
+  @ConduitToolOptionsMeta({ publicData: true })
   @Get('business-info')
   businessInfo() {
     return this.businessSettings.forBot();

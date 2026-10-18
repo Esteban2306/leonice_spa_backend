@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ReservationChannel } from '@prisma/client';
 import { ConduitTool } from './decorators/conduit-tool.decorator';
+import { VerifiedPhone } from './decorators/verified-phone.decorator';
 import {
   ConduitToolOptionsMeta,
   hasVerifiedIdentity,
@@ -40,11 +41,13 @@ export class ConduitBookingToolsController {
     private readonly rescheduleReservation: RescheduleReservationOrchestrator,
   ) {}
 
+  @ConduitToolOptionsMeta({ publicData: true })
   @Get('treatments')
   findTreatments(@Query('categoryId') categoryId?: string) {
     return this.treatmentsService.findAll(categoryId);
   }
 
+  @ConduitToolOptionsMeta({ publicData: true })
   @Get('availability')
   async getAvailability(@Query() query: GetAvailabilityDto) {
     const slots = await this.reservationsService.getAvailability(
@@ -58,6 +61,7 @@ export class ConduitBookingToolsController {
    * Disponibilidad de uno o varios servicios (combo) en un rango de días.
    * Con purpose=RESCHEDULE considera la reserva que se moverá.
    */
+  @ConduitToolOptionsMeta({ publicData: true })
   @Get('availability/calendar')
   getAvailabilityCalendar(@Query() query: GetAvailabilityCalendarDto) {
     return this.reservationsService.getAvailabilityCalendar(query);
@@ -76,17 +80,23 @@ export class ConduitBookingToolsController {
 
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
   @Get('reservations/upcoming')
-  findUpcoming(@Query() query: ConduitUpcomingReservationsQueryDto) {
-    return this.cancelReservation.listUpcomingByPhone(query.phone);
+  findUpcoming(
+    @Query() _query: ConduitUpcomingReservationsQueryDto,
+    @VerifiedPhone() phone: string,
+  ) {
+    return this.cancelReservation.listUpcomingByPhone(phone);
   }
 
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
   @HttpCode(HttpStatus.OK)
   @Post('reservations/cancel')
-  cancel(@Body() dto: ConduitCancelReservationDto) {
+  cancel(
+    @Body() dto: ConduitCancelReservationDto,
+    @VerifiedPhone() phone: string,
+  ) {
     return this.cancelReservation.executeVerifiedByPhone({
       reservationId: dto.reservationId,
-      phone: dto.phone,
+      phone,
       scope: dto.scope,
       channel: 'WHATSAPP',
       reason: dto.reason,
@@ -97,10 +107,13 @@ export class ConduitBookingToolsController {
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
   @HttpCode(HttpStatus.OK)
   @Post('reservations/reschedule')
-  reschedule(@Body() dto: ConduitRescheduleReservationDto) {
+  reschedule(
+    @Body() dto: ConduitRescheduleReservationDto,
+    @VerifiedPhone() phone: string,
+  ) {
     return this.rescheduleReservation.execute(
       dto.reservationId,
-      dto.phone,
+      phone,
       new Date(dto.newScheduledStart),
     );
   }

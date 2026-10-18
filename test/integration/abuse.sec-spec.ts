@@ -354,10 +354,16 @@ describe('S5. Validación de DTO, límites, archivos y abuso', () => {
         request(server)
           .post(`${API}/reservations/${reservationId}/deposits/automatic`)
           .set('X-API-Key', key)
+          .set('X-Conduit-Contact-Phone', phone)
           .send({ phone, coverage: 'ANTICIPO', imageBase64 });
       expect(
         (await post('data:text/html;base64,PGgxPg==', 'mala')).status,
       ).toBe(401);
+      const withoutContact = await request(server)
+        .post(`${API}/reservations/${reservationId}/deposits/automatic`)
+        .set('X-API-Key', apiKey)
+        .send({ phone, coverage: 'ANTICIPO', imageBase64: 'no-es-data-uri' });
+      expect(withoutContact.status).toBe(403);
       expect((await post('data:text/html;base64,PGgxPg==')).status).toBe(400);
       expect((await post('no-es-data-uri')).status).toBe(400);
     });

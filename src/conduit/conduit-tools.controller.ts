@@ -9,6 +9,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { ConduitTool } from './decorators/conduit-tool.decorator';
+import { VerifiedPhone } from './decorators/verified-phone.decorator';
 import {
   ConduitToolOptionsMeta,
   type RequestWithConduitContact,
@@ -110,10 +111,11 @@ export class ConduitToolsController {
   }
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
   @Patch()
-  async update(@Body() dto: ConduitUpdateClientDto) {
-    const client = await this.clientsRepository.findByPhone(
-      normalizePhone(dto.phone),
-    );
+  async update(
+    @Body() dto: ConduitUpdateClientDto,
+    @VerifiedPhone() phone: string,
+  ) {
+    const client = await this.clientsRepository.findByPhone(phone);
     if (!client) {
       throw new NotFoundException(
         'No existe ningún cliente registrado con este número',

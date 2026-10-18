@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ConduitTool } from '../conduit/decorators/conduit-tool.decorator';
+import { VerifiedPhone } from '../conduit/decorators/verified-phone.decorator';
 import { PendingDepositLookupService } from './services/pending-deposit-lookup.service';
 import { SubmitDepositProofOrchestrator } from './orchestrator/submit-deposit-proof.orchestrator';
 import { AutomaticDepositVerificationStrategy } from './strategies/automatic-deposit-verification.strategy';
@@ -45,17 +46,21 @@ export class DepositsLookupController {
 
   @ConduitTool({ requiresVerifiedContact: true })
   @Get('pending')
-  findPending(@Query('phone') phone: string) {
+  findPending(@VerifiedPhone() phone: string) {
     return this.lookupService.findCandidates(phone);
   }
 
   @ConduitTool({ requiresVerifiedContact: true })
   @Post('automatic')
-  async submitAutomaticProof(@Body() dto: SubmitAutomaticDepositDto) {
+  async submitAutomaticProof(
+    @Body() dto: SubmitAutomaticDepositDto,
+    @VerifiedPhone() phone: string,
+  ) {
     const reservationId =
-      dto.reservationId ?? (await this.lookupService.resolveSingle(dto.phone));
+      dto.reservationId ?? (await this.lookupService.resolveSingle(phone));
 
     assertValidImageDataUri(dto.imageBase64);
+    await this.submitOrchestrator.assertCanSubmit(reservationId, phone);
     const uploaded = await this.cloudinary.uploadDepositProofFromBase64(
       dto.imageBase64,
       reservationId,
@@ -64,7 +69,7 @@ export class DepositsLookupController {
     return this.submitOrchestrator.execute({
       strategy: this.automaticStrategy,
       reservationId,
-      phone: dto.phone,
+      phone,
       coverage: dto.coverage,
       preUploadedImage: uploaded,
     });

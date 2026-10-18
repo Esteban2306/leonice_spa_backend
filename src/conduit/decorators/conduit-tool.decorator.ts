@@ -7,6 +7,7 @@ import {
   ConduitToolOptionsMeta,
   type ConduitToolOptions,
 } from '../interceptors/conduit-contact.interceptor';
+import { ConduitResponseGuardInterceptor } from '../interceptors/conduit-response-guard.interceptor';
 
 /**
  * Marca una ruta (o controlador) como herramienta del bot de Conduit.
@@ -21,5 +22,5 @@ export const ConduitTool = (options: ConduitToolOptions = {}) =>
     SkipCsrf(),
     UseGuards(ConduitToolAuthGuard),
     ConduitToolOptionsMeta(options),
-    UseInterceptors(ConduitContactInterceptor),
+    UseInterceptors(ConduitContactInterceptor, ConduitResponseGuardInterceptor),
   );

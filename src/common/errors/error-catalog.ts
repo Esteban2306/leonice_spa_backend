@@ -268,6 +268,16 @@ const CONDUIT = {
     message:
       'Por seguridad solo se pueden consultar o modificar las reservas del número que escribe.',
   },
+  CONTACT_REQUIRED: {
+    status: HttpStatus.FORBIDDEN,
+    message:
+      'No se recibió la identidad del chat. Por seguridad no se consultan ni modifican datos de clientes sin ella.',
+  },
+  CONTACT_DATA_BLOCKED: {
+    status: HttpStatus.FORBIDDEN,
+    message:
+      'No es posible compartir esa información por este chat. Si necesitas ayuda, pide hablar con una persona del equipo.',
+  },
   CONDUIT_UNAVAILABLE: {
     status: HttpStatus.BAD_GATEWAY,
     message:

@@ -19,6 +19,7 @@ export interface ConduitToolOptions {
    * (reservas, depósitos, perfil): exige un teléfono verificado por Conduit.
    */
   requiresVerifiedContact?: boolean;
+  publicData?: boolean;
 }
 
 export const ConduitToolOptionsMeta = (options: ConduitToolOptions) =>
@@ -34,9 +35,7 @@ export type RequestWithConduitContact = Request & {
 };
 
 export function hasVerifiedIdentity(req: RequestWithConduitContact): boolean {
-  const contact = req.conduitContact;
-  if (!contact) return false;
-  return contact.phone !== null || contact.lid === null;
+  return typeof req.conduitContact?.phone === 'string';
 }
 
 function header(req: Request, name: string): string | undefined {
@@ -54,9 +53,9 @@ function header(req: Request, name: string): string | undefined {
  * - Query (no modificable de forma fiable en Express 5): debe coincidir.
  * - Chat identificado solo por LID (sin teléfono): se rechazan las
  *   herramientas que operan sobre clientes existentes.
- *
- * Las llamadas sin headers de contacto (scripts internos con la misma API
- * key) siguen funcionando con el teléfono del cuerpo.
+ * - Sin headers de contacto: solo se atienden las herramientas de datos
+ *   públicos del negocio; el resto se rechaza en lugar de confiar en el
+ *   teléfono que haya escrito el modelo.
  */
 @Injectable()
 export class ConduitContactInterceptor implements NestInterceptor {
@@ -73,8 +72,14 @@ export class ConduitContactInterceptor implements NestInterceptor {
     const rawPhone = header(req, 'x-conduit-contact-phone');
     const lid = header(req, 'x-conduit-contact-lid') ?? null;
 
+    if (!rawPhone && !lid) {
+      if (!options.publicData) throw new AppException('CONTACT_REQUIRED');
+      req.conduitContact = { phone: null, lid: null };
+      return next.handle();
+    }
+
     if (!rawPhone) {
-      if (lid && options.requiresVerifiedContact) {
+      if (options.requiresVerifiedContact) {
         throw new AppException('CONTACT_NOT_VERIFIED');
       }
       req.conduitContact = { phone: null, lid };

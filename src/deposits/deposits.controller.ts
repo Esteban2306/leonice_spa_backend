@@ -29,6 +29,7 @@ import { ManualDepositVerificationStrategy } from './strategies/manual-deposit-v
 import { AutomaticDepositVerificationStrategy } from './strategies/automatic-deposit-verification.strategy';
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
 import { ConduitTool } from '../conduit/decorators/conduit-tool.decorator';
+import { VerifiedPhone } from '../conduit/decorators/verified-phone.decorator';
 import { SubmitDepositProofDto } from './dto/submit-deposit-proof.dto';
 import { assertValidImageDataUri } from './validators/assert-valid-image-data-uri';
 
@@ -86,8 +87,10 @@ export class DepositsController {
   async submitAutomaticProof(
     @Param('id', ParseUUIDPipe) reservationId: string,
     @Body() dto: SubmitAutomaticDepositDto,
+    @VerifiedPhone() phone: string,
   ) {
     assertValidImageDataUri(dto.imageBase64);
+    await this.submitOrchestrator.assertCanSubmit(reservationId, phone);
     const uploaded = await this.cloudinary.uploadDepositProofFromBase64(
       dto.imageBase64,
       reservationId,
@@ -96,7 +99,7 @@ export class DepositsController {
     return this.submitOrchestrator.execute({
       strategy: this.automaticStrategy,
       reservationId,
-      phone: dto.phone,
+      phone,
       coverage: dto.coverage,
       preUploadedImage: uploaded,
     });
