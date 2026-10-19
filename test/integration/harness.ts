@@ -46,6 +46,10 @@ export class FakeQueue {
   upsertJobScheduler() {
     return Promise.resolve();
   }
+
+  removeJobScheduler() {
+    return Promise.resolve(true);
+  }
 }
 
 export const fakeQueues = {

@@ -15,6 +15,7 @@ export const JOB_NAMES = {
   // Comunicación saliente — corre en AUTOMATION_COMMUNICATIONS
   RESERVATION_REMINDER_CHECK: 'reservation-reminder-check',
   REACTIVATION_CHECK: 'reactivation-check',
+  CLIENT_RETENTION_SWEEP: 'client-retention-sweep',
 
   // Conduit - corre en CONDUIT_OUTBOX
   PUBLISH_CONDUIT_EVENT: 'publish-conduit-event',

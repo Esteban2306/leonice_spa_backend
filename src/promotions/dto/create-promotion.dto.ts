@@ -5,12 +5,14 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
 
 export class CreatePromotionDto {
   @IsString()
+  @MaxLength(100)
   @MinLength(2)
   name: string;
 

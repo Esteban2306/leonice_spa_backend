@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsIn,
   IsInt,
   IsOptional,
@@ -33,6 +34,7 @@ export class FindCatalogQueryDto {
           .filter(Boolean)
       : value,
   )
+  @ArrayMaxSize(20)
   @Matches(SLUG, { each: true })
   tags?: string[];
 

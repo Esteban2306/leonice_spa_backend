@@ -1,5 +1,5 @@
 import { IsZonedDateTime } from '../../common/validation/date-input.validators';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class AdminRescheduleReservationDto {
   @IsZonedDateTime()
@@ -11,5 +11,6 @@ export class AdminRescheduleReservationDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   internalNote?: string;
 }

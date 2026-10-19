@@ -1,4 +1,10 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import {
   CatalogStatusFilter,
   TransformTrimmedQuery,
@@ -12,6 +18,7 @@ export class FindCapacityPoolsQueryDto {
   @IsOptional()
   @TransformTrimmedQuery()
   @IsString()
+  @MaxLength(100)
   q?: string;
 
   @IsOptional()

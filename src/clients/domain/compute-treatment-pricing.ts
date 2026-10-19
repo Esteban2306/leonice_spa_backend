@@ -8,6 +8,7 @@ import {
   Promotion,
 } from '@prisma/client';
 import { isHairProfileValid } from '../../clients/domain/hair-profile.util';
+import { applyPercentageDiscount } from '../../common/money/percentage-discount';
 
 export interface PricingResult {
   price: number;
@@ -106,9 +107,11 @@ export function applyPromotionDiscount(
   promotion: Promotion | null,
 ): PricingResult {
   if (!promotion) return pricing;
-  const discount = Number(promotion.discountPercentage) / 100;
   return {
     ...pricing,
-    price: Number((pricing.price * (1 - discount)).toFixed(2)),
+    price: applyPercentageDiscount(
+      pricing.price,
+      Number(promotion.discountPercentage),
+    ),
   };
 }

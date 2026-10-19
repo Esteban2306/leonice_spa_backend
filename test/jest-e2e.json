@@ -9,6 +9,10 @@
   },
   "transformIgnorePatterns": ["node_modules/\\.pnpm/(?!(cockatiel)@)"],
   "moduleNameMapper": {
-    "^src/(.*)$": "<rootDir>/../src/$1"
-  }
+    "^src/(.*)$": "<rootDir>/../src/$1",
+    "^load-esm$": "<rootDir>/integration/load-esm-stub.ts"
+  },
+  "setupFiles": ["<rootDir>/e2e/support/env-setup.ts"],
+  "maxWorkers": 1,
+  "testTimeout": 90000
 }

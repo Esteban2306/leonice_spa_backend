@@ -1,10 +1,10 @@
-import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { AppModule } from '../../../src/app.module';
+import { createE2eApp, E2eContext } from '../support/e2e-app';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { AvailabilityRepository } from 'src/reservations/repositories/availability.repository';
 
 describe('Availability concurrency (e2e)', () => {
+  let ctx: E2eContext;
   let app: INestApplication;
   let prisma: PrismaService;
   let availabilityRepository: AvailabilityRepository;
@@ -15,13 +15,9 @@ describe('Availability concurrency (e2e)', () => {
   let clientBId: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    await app.init();
-
-    prisma = app.get(PrismaService);
+    ctx = await createE2eApp();
+    app = ctx.app;
+    prisma = ctx.prisma;
     availabilityRepository = app.get(AvailabilityRepository);
 
     const category = await prisma.client.category.create({
@@ -76,9 +72,7 @@ describe('Availability concurrency (e2e)', () => {
     });
     await prisma.client.category.delete({ where: { id: categoryId } });
 
-    if (app) {
-      await app.close();
-    }
+    if (ctx) await ctx.close();
   });
 
   it('cuando dos solicitudes compiten por el mismo horario con capacidad 1, solo una prospera', async () => {

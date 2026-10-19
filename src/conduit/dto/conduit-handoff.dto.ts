@@ -4,6 +4,7 @@ export class ConduitHandoffDto {
   /** Lo pone Conduit (teléfono verificado del chat); el modelo no lo ve. */
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone?: string;
 

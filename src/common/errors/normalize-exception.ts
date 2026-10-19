@@ -141,7 +141,43 @@ function normalizePrismaError(
   }
 }
 
+interface BodyParserError {
+  status: number;
+  type: string;
+}
+
+export function isBodyParserError(error: unknown): error is BodyParserError {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as Partial<BodyParserError>;
+  return (
+    typeof candidate.status === 'number' &&
+    typeof candidate.type === 'string' &&
+    candidate.type.startsWith('entity.')
+  );
+}
+
+export function normalizeBodyParserError(
+  error: BodyParserError,
+): NormalizedError {
+  if (error.type === 'entity.too.large') {
+    return {
+      status: HttpStatus.PAYLOAD_TOO_LARGE,
+      code: 'PAYLOAD_TOO_LARGE',
+      message: ERROR_CATALOG.PAYLOAD_TOO_LARGE.message,
+    };
+  }
+  return {
+    status: HttpStatus.BAD_REQUEST,
+    code: 'MALFORMED_JSON',
+    message: ERROR_CATALOG.MALFORMED_JSON.message,
+  };
+}
+
 export function normalizeException(exception: unknown): NormalizedError {
+  if (isBodyParserError(exception)) {
+    return normalizeBodyParserError(exception);
+  }
+
   if (exception instanceof AppException) {
     const body = exception.getResponse() as { message: string };
     return {

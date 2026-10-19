@@ -4,6 +4,7 @@ import {
 } from '../../common/validation/date-input.validators';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -11,6 +12,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -21,20 +23,24 @@ class ConsentInputDto {
   healthDataConsent: boolean;
 
   @IsString()
+  @MaxLength(20)
   policyVersion: string;
 }
 
 class ClientInputDto {
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   whatsappJid?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   name?: string;
 
   @IsOptional()
@@ -43,6 +49,7 @@ class ClientInputDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   allergies?: string;
 
   @IsOptional()
@@ -60,6 +67,7 @@ export class CreateReservationDto {
   @Type(() => ClientInputDto)
   client: ClientInputDto;
 
+  @ArrayMaxSize(10)
   @IsArray()
   @ArrayMinSize(1)
   @IsUUID('4', { each: true })

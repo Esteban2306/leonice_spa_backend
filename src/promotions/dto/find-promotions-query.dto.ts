@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
 } from 'class-validator';
 
 export enum PromotionValidity {
@@ -21,6 +22,7 @@ export enum PromotionTarget {
 export class FindPromotionsQueryDto {
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   name?: string;
 
   @IsOptional()

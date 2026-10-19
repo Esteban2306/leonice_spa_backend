@@ -1,5 +1,6 @@
 import { IsCalendarDate } from '../../common/validation/date-input.validators';
 import {
+  ArrayMaxSize,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -28,6 +29,7 @@ export class FindReservationsQueryDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.split(',').filter(Boolean) : value,
   )
+  @ArrayMaxSize(10)
   @IsEnum(CancellationSource, { each: true })
   cancellationSources?: CancellationSource[];
 

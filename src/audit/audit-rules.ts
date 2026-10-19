@@ -5,6 +5,7 @@ export type AuditAction =
   | 'CREATE_CLIENT'
   | 'UPDATE_CLIENT'
   | 'RECORD_CLIENT_CONSENT'
+  | 'ANONYMIZE_CLIENT'
   | 'CREATE_RESERVATION'
   | 'UPDATE_RESERVATION'
   | 'CREATE_TREATMENT'
@@ -55,6 +56,13 @@ export const AUDIT_RULES: readonly AuditRule[] = [
     method: 'POST',
     pattern: /^\/clients\/([^/]+)\/consents\/?$/,
     action: 'RECORD_CLIENT_CONSENT',
+    entityType: 'Client',
+    idSource: 'param',
+  },
+  {
+    method: 'POST',
+    pattern: /^\/clients\/([^/]+)\/anonymize\/?$/,
+    action: 'ANONYMIZE_CLIENT',
     entityType: 'Client',
     idSource: 'param',
   },

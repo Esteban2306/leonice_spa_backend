@@ -101,13 +101,62 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec prisma migrate deploy
-      - name: Reservas, dinero, concurrencia, colas y estructura de datos
-        run: >-
-          pnpm test:integration -- booking-flows concurrency money state-machine
-          transactions queues pool-starvation errors database-integrity
-      - name: Seguridad (informativo hasta cerrar los hallazgos pendientes)
-        continue-on-error: true
-        run: pnpm test:integration -- sec-spec
+      - name: Reglas de negocio, concurrencia, seguridad y privacidad
+        run: pnpm test:integration
+
+  e2e:
+    name: Pruebas e2e (PostgreSQL y Redis reales)
+    runs-on: ubuntu-latest
+    needs: [quality]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
+          POSTGRES_DB: leonice_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d leonice_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/leonice_e2e?schema=public
+      E2E_REDIS_URL: redis://localhost:6379
+      TZ: America/Bogota
+      NODE_ENV: test
+      PORT: 3920
+      REDIS_URL: redis://localhost:6379
+      CORS_ORIGIN: http://localhost:3000
+      JWT_SECRET: ci-jwt-secret-ci-jwt-secret-ci-jwt-secret-0001
+      JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret-ci-0002
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      CANCELLATION_LINK_SECRET: ci-cancellation-secret-ci-cancellation-0003
+      CONDUIT_TOOL_API_KEY: ci-tool-key-ci-tool-key-ci-tool-key-000000004
+      CONDUIT_WEBHOOK_SECRET: ci-webhook-secret-ci-webhook-secret-00005
+      CLOUDINARY_CLOUD_NAME: ci
+      CLOUDINARY_API_KEY: '0'
+      CLOUDINARY_API_SECRET: ci
+      GOOGLE_CLIENT_ID: ci
+      GOOGLE_CLIENT_SECRET: ci
+      GOOGLE_CALLBACK_URL: http://localhost:3920/api/v1/auth/google/callback
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma generate
+      - run: pnpm exec prisma migrate deploy
+      - name: Recorridos de clienta y administradora, casos límite, Redis y colas
+        run: pnpm test:e2e
 
   dependencies:
     name: Auditoría de dependencias de producción

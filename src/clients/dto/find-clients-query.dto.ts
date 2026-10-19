@@ -1,9 +1,17 @@
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class FindClientsQueryDto {
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   q?: string;
 
   @IsOptional()

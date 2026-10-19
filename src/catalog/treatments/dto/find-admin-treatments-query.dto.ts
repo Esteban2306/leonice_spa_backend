@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
 } from 'class-validator';
 import {
@@ -28,6 +29,7 @@ export class FindAdminTreatmentsQueryDto {
   @IsOptional()
   @TransformTrimmedQuery()
   @IsString()
+  @MaxLength(100)
   q?: string;
 
   @IsOptional()

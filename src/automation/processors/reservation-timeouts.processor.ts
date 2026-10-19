@@ -31,6 +31,7 @@ interface TimeoutJobData {
 const NOTIFY_CLIENT_ON_TIMEOUT = false;
 
 const LOST_RACE_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
+  'RESERVATION_PROOF_PENDING',
   'RESERVATION_CONCURRENT_CHANGE',
   'RESERVATION_INVALID_TRANSITION',
 ]);
@@ -288,13 +289,20 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
         reason,
         NOTIFY_CLIENT_ON_TIMEOUT,
         CancellationSource.TIMEOUT,
+        {
+          unlessProofPending:
+            expectedStatus === ReservationStatus.PENDIENTE_DEPOSITO,
+        },
       );
     } catch (error: unknown) {
       if (this.isLostRace(error)) {
         await this.skip(
           type,
           reservationId,
-          'La reserva cambió de estado durante la cancelación',
+          error instanceof AppException &&
+            error.code === 'RESERVATION_PROOF_PENDING'
+            ? 'Llegó un comprobante pendiente de revisión justo antes de cancelar: no se cancela por tiempo'
+            : 'La reserva cambió de estado durante la cancelación',
         );
         return;
       }

@@ -51,9 +51,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
     if (user.lockedUntil && user.lockedUntil > new Date()) {
-      throw new UnauthorizedException(
-        'Cuenta bloqueada temporalmente por intentos fallidos',
-      );
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const passwordValid = await argon2.verify(user.passwordHash, password);

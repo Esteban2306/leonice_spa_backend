@@ -19,6 +19,8 @@ import { ConduitModule } from './conduit/conduit.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ProductsModule } from './products/products.module';
 import { TestimonialsModule } from './testimonials/testimonials.module';
+import { SignedAssetUrlsInterceptor } from './common/interceptors/signed-asset-urls.interceptor';
+import { ClientPrivacyModule } from './client-privacy/client-privacy.module';
 import { EventModule } from './common/events/event.module';
 import { QueueModule } from './infrastructure/queue/bullmq.module';
 import { AutomationModule } from './automation/automation.module';
@@ -61,6 +63,7 @@ import { AdminModule } from './admin/admin.module';
     ConduitModule,
     ProductsModule,
     TestimonialsModule,
+    ClientPrivacyModule,
     CatalogModule,
     QueueModule,
     AutomationModule,
@@ -74,6 +77,7 @@ import { AdminModule } from './admin/admin.module';
   controllers: [HealthController],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: SignedAssetUrlsInterceptor },
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,

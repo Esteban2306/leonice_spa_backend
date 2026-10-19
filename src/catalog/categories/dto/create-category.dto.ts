@@ -10,6 +10,7 @@ import {
 
 export class CreateCategoryDto {
   @IsString()
+  @MaxLength(100)
   @MinLength(2)
   name: string;
 

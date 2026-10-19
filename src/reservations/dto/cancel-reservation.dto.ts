@@ -12,6 +12,7 @@ import {
 
 export class CancelReservationDto {
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone: string;
 

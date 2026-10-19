@@ -1,9 +1,11 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -18,11 +20,13 @@ export class ConduitConsentDto {
   accepted: boolean;
 
   @IsString()
+  @MaxLength(20)
   policyVersion: string;
 }
 
 export class ConduitUpdateClientDto {
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone: string;
 
@@ -32,8 +36,10 @@ export class ConduitUpdateClientDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   allergies?: string;
 
+  @ArrayMaxSize(4)
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

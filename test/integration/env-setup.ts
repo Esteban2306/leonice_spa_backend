@@ -12,6 +12,7 @@ url.pathname = `/${AUDIT_DB}`;
 url.searchParams.set('connection_limit', process.env.AUDIT_POOL ?? '30');
 
 process.env.DATABASE_URL = url.toString();
+process.env.CONDUIT_BASE_URL = 'http://127.0.0.1:9';
 process.env.TZ = 'America/Bogota';
 
 Reflect.set(http, 'globalAgent', new http.Agent({ keepAlive: false }));

@@ -1,4 +1,10 @@
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import {
   CatalogStatusFilter,
   TransformBooleanQuery,
@@ -9,6 +15,7 @@ export class FindAdminCategoriesQueryDto {
   @IsOptional()
   @TransformTrimmedQuery()
   @IsString()
+  @MaxLength(100)
   q?: string;
 
   @IsOptional()

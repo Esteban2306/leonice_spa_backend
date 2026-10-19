@@ -229,6 +229,24 @@ export class ReservationsRepository {
     return result.count === 1;
   }
 
+  async updateStatusIfCurrentUnlessProofPending(
+    id: string,
+    expectedStatus: ReservationStatus,
+    data: UpdateStatusData,
+  ): Promise<'APPLIED' | 'STALE' | 'PROOF_PENDING'> {
+    return this.prisma.client.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${id} FOR UPDATE`;
+      if (await this.hasSubmittedProof(id, tx)) return 'PROOF_PENDING';
+      const applied = await this.updateStatusIfCurrent(
+        id,
+        expectedStatus,
+        data,
+        tx,
+      );
+      return applied ? 'APPLIED' : 'STALE';
+    });
+  }
+
   async updateScheduleIfCurrent(
     id: string,
     expected: { status: ReservationStatus; scheduledStart: Date },

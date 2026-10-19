@@ -1,13 +1,13 @@
 import {
   Injectable,
   Logger,
-  OnModuleDestroy,
+  OnApplicationShutdown,
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
-export class PrismaService implements OnModuleInit, OnModuleDestroy {
+export class PrismaService implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(PrismaService.name);
   readonly client: PrismaClient;
 
@@ -23,7 +23,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('Conexión a PostgreSQL establecida');
   }
 
-  async onModuleDestroy() {
+  async onApplicationShutdown() {
     await this.client.$disconnect();
   }
 }

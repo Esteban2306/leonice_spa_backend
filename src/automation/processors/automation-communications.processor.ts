@@ -34,6 +34,7 @@ import {
   RescheduleNoticeJobData,
 } from '../domain/operational-notifications.constants';
 import { OperationalNotificationsService } from '../operational-notifications.service';
+import { ClientRetentionService } from '../../client-privacy/client-retention.service';
 
 interface ReminderJobData {
   reservationId: string;
@@ -63,6 +64,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     private readonly consentService: ConsentService,
     private readonly notifications: OperationalNotificationsService,
     private readonly templates: ConduitTemplateResolver,
+    private readonly retention: ClientRetentionService,
   ) {
     super();
   }
@@ -83,6 +85,9 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         );
       case JOB_NAMES.REACTIVATION_CHECK:
         return this.checkReactivation(job.data as ReactivationJobData, ctx);
+      case JOB_NAMES.CLIENT_RETENTION_SWEEP:
+        await this.retention.sweep();
+        return;
       case JOB_NAMES.NOTIFY_ADMIN_DEPOSIT_TIMEOUT:
         return this.notifications.notifyAdminDepositTimeout(
           job.data as AdminDepositTimeoutNoticeJobData,

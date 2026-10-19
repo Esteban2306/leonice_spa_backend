@@ -59,6 +59,7 @@ import { CancellationLinksController } from './cancellation-links.controller';
     OperatingScheduleRepository,
     OperatingScheduleService,
     DepositDeadlineService,
+    DepositCreditService,
     CancellationLinkService,
     CreateReservationOrchestrator,
     CancelReservationOrchestrator,

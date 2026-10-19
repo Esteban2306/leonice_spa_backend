@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { ConduitModule } from '../conduit/conduit.module';
 import { ClientsModule } from '../clients/clients.module';
+import { ClientPrivacyModule } from '../client-privacy/client-privacy.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { ReservationTimeoutsProcessor } from './processors/reservation-timeouts.processor';
 import { AutomationCommunicationsProcessor } from './processors/automation-communications.processor';
@@ -21,6 +22,7 @@ import { ReservationSweepsScheduler } from './reservation-sweeps.scheduler';
     ReservationsModule,
     ConduitModule,
     ClientsModule,
+    ClientPrivacyModule,
     AdminNotificationsModule,
   ],
   controllers: [AutomationRulesController],

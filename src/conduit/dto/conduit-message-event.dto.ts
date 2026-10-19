@@ -4,6 +4,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -11,12 +12,15 @@ import { ConduitMessageStatus } from '@prisma/client';
 
 class ConduitMessageEventDataDto {
   @IsString()
+  @MaxLength(200)
   messageId: string;
 
   @IsString()
+  @MaxLength(50)
   channel: string;
 
   @IsString()
+  @MaxLength(200)
   recipient: string;
 
   @IsEnum(ConduitMessageStatus)
@@ -24,10 +28,12 @@ class ConduitMessageEventDataDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   provider?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   providerMessageId?: string;
 
   @IsOptional()
@@ -41,6 +47,7 @@ class ConduitMessageEventDataDto {
 
 export class ConduitMessageEventDto {
   @IsString()
+  @MaxLength(100)
   event: string;
 
   @IsISO8601()

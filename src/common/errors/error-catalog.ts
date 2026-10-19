@@ -14,6 +14,10 @@ const GENERIC = {
     status: HttpStatus.BAD_REQUEST,
     message: 'La solicitud no es válida.',
   },
+  MALFORMED_JSON: {
+    status: HttpStatus.BAD_REQUEST,
+    message: 'El cuerpo de la solicitud no es un JSON válido.',
+  },
   UNAUTHORIZED: {
     status: HttpStatus.UNAUTHORIZED,
     message: 'Debes iniciar sesión.',
@@ -195,6 +199,16 @@ const CLIENT = {
     status: HttpStatus.NOT_FOUND,
     message: 'El cliente no existe.',
   },
+  CLIENT_HAS_ACTIVE_RESERVATIONS: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'La persona tiene reservas activas. Cancélalas o complétalas antes de eliminar sus datos.',
+  },
+  CLIENT_HAS_AVAILABLE_CREDIT: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'La persona tiene un anticipo disponible como crédito. Devuélvelo o aplícalo antes de eliminar sus datos.',
+  },
   CLIENT_ALREADY_EXISTS: {
     status: HttpStatus.CONFLICT,
     message: 'Ya existe un cliente con ese teléfono.',
@@ -254,6 +268,16 @@ const DEPOSIT = {
     status: HttpStatus.CONFLICT,
     message:
       'El comprobante cambió mientras se procesaba. Revisa su estado actual.',
+  },
+  DEPOSIT_PROOF_UPLOAD_FAILED: {
+    status: HttpStatus.BAD_GATEWAY,
+    message:
+      'No pudimos guardar el comprobante. Intenta de nuevo en unos minutos.',
+  },
+  RESERVATION_PROOF_PENDING: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'La reserva tiene un comprobante pendiente de revisión y no se cancela por tiempo.',
   },
 } as const satisfies Record<string, ErrorDefinition>;
 

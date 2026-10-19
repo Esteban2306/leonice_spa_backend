@@ -20,6 +20,7 @@ export class AdminCancelReservationOrchestrator {
     reason: string | undefined,
     notifyClient: boolean,
     source: CancellationSource = CancellationSource.ADMIN,
+    options: { unlessProofPending?: boolean } = {},
   ) {
     const reservation = await this.repository.findById(reservationId);
     if (!reservation) throw new NotFoundException('Reserva no encontrada');
@@ -29,18 +30,34 @@ export class AdminCancelReservationOrchestrator {
       ReservationStatus.CANCELADA,
     );
 
-    const applied = await this.repository.updateStatusIfCurrent(
-      reservationId,
-      reservation.status,
-      {
-        status: ReservationStatus.CANCELADA,
-        cancelledAt: new Date(),
-        cancellationReason: reason ?? DEFAULT_ADMIN_CANCEL_REASON,
-        cancellationSource: source,
-      },
-    );
-    if (!applied) {
-      throw new AppException('RESERVATION_CONCURRENT_CHANGE');
+    const cancellation = {
+      status: ReservationStatus.CANCELADA,
+      cancelledAt: new Date(),
+      cancellationReason: reason ?? DEFAULT_ADMIN_CANCEL_REASON,
+      cancellationSource: source,
+    };
+    if (options.unlessProofPending) {
+      const outcome =
+        await this.repository.updateStatusIfCurrentUnlessProofPending(
+          reservationId,
+          reservation.status,
+          cancellation,
+        );
+      if (outcome === 'PROOF_PENDING') {
+        throw new AppException('RESERVATION_PROOF_PENDING');
+      }
+      if (outcome === 'STALE') {
+        throw new AppException('RESERVATION_CONCURRENT_CHANGE');
+      }
+    } else {
+      const applied = await this.repository.updateStatusIfCurrent(
+        reservationId,
+        reservation.status,
+        cancellation,
+      );
+      if (!applied) {
+        throw new AppException('RESERVATION_CONCURRENT_CHANGE');
+      }
     }
 
     const updated = await this.repository.findById(reservationId);

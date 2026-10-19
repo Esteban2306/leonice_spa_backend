@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { RequestContextService } from '../context/request-context.service';
+import { redactUrl } from '../logging/redact-url';
 import {
   normalizeException,
   type ErrorResponseBody,
@@ -26,7 +27,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const normalized = normalizeException(exception);
     const correlationId = this.requestContext.getCorrelationId();
 
-    const logLine = `${request.method} ${request.originalUrl} → ${normalized.status} ${normalized.code}`;
+    const logLine = `${request.method} ${redactUrl(request.originalUrl)} → ${normalized.status} ${normalized.code}`;
     if (normalized.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         logLine,

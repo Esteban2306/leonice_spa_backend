@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
   ValidateIf,
   ValidateNested,
@@ -14,19 +15,23 @@ class ConsentInputDto {
   healthDataConsent: boolean;
 
   @IsString()
+  @MaxLength(20)
   policyVersion: string;
 }
 
 export class ResolveClientDto {
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone: string;
 
   @IsString()
+  @MaxLength(64)
   @IsOptional()
   whatsappJid?: string;
 
   @IsString()
+  @MaxLength(100)
   @IsOptional()
   name?: string;
 
@@ -36,6 +41,7 @@ export class ResolveClientDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   allergies?: string;
 
   @IsOptional()

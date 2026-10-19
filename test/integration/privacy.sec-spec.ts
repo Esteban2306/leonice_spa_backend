@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { INestApplication, Logger } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
 import request from 'supertest';
@@ -256,9 +258,7 @@ describe('S7. Datos personales y de salud: acceso, cifrado, consentimiento, traz
       expect(erasure.length).toBeGreaterThan(0);
     });
 
-    it('existe una política de retención automatizada para datos de clientes inactivos', async () => {
-      const fs = await import('node:fs');
-      const path = await import('node:path');
+    it('existe una política de retención automatizada para datos de clientes inactivos', () => {
       const walk = (dir: string): string[] =>
         fs
           .readdirSync(dir, { withFileTypes: true })

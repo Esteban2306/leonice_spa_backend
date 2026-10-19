@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { TransformBooleanQuery } from '../../catalog/common/catalog-filters';
@@ -16,6 +17,7 @@ export class FindProductsQueryDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   search?: string;
 
   @IsOptional()

@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
@@ -14,6 +15,7 @@ export class CreateTreatmentDto {
   categoryId: string;
 
   @IsString()
+  @MaxLength(100)
   @MinLength(2)
   name: string;
 

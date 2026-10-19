@@ -1,7 +1,6 @@
-import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { ReservationStatus } from '@prisma/client';
-import { AppModule } from '../../../src/app.module';
+import { createE2eApp, E2eContext } from '../support/e2e-app';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { CreateReservationOrchestrator } from 'src/reservations/orchestrators/create-reservation.orchestrator';
 import { CancelReservationOrchestrator } from 'src/reservations/orchestrators/cancel-reservation.orchestrator';
@@ -13,6 +12,7 @@ import { CompleteReservationOrchestrator } from 'src/reservations/orchestrators/
 import { AdminRescheduleReservationOrchestrator } from 'src/reservations/orchestrators/admin-reservartion.orchestator';
 
 describe('Reservation lifecycle (e2e)', () => {
+  let ctx: E2eContext;
   let app: INestApplication;
   let prisma: PrismaService;
   let createO: CreateReservationOrchestrator;
@@ -54,13 +54,9 @@ describe('Reservation lifecycle (e2e)', () => {
   };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    await app.init();
-
-    prisma = app.get(PrismaService);
+    ctx = await createE2eApp();
+    app = ctx.app;
+    prisma = ctx.prisma;
     createO = app.get(CreateReservationOrchestrator);
     cancelO = app.get(CancelReservationOrchestrator);
     rescheduleO = app.get(RescheduleReservationOrchestrator);
@@ -190,7 +186,7 @@ describe('Reservation lifecycle (e2e)', () => {
     await prisma.client.client.deleteMany({
       where: { phone: { in: [...phones.values()] } },
     });
-    if (app) await app.close();
+    if (ctx) await ctx.close();
   });
 
   it('recorre el ciclo completo: crear -> depósito -> check-in -> completar', async () => {

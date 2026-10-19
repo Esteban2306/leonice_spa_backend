@@ -29,6 +29,7 @@ import { resolveApplicablePromotion } from 'src/promotions/domain/resolve-applic
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
 import { AppException } from 'src/common/errors/app.exception';
 import { uniqueSlug } from '../common/slugify';
+import { applyPercentageDiscount } from '../../common/money/percentage-discount';
 
 interface RangeCheck {
   basePriceMin?: number | Decimal | null;
@@ -323,10 +324,10 @@ export class TreatmentsService {
     });
     if (!promo) return { ...treatment, activePromotion: null };
 
-    const discount = Number(promo.discountPercentage) / 100;
+    const discountPercentage = Number(promo.discountPercentage);
     const applyDiscount = (price: unknown) =>
       price != null
-        ? Number((Number(price) * (1 - discount)).toFixed(2))
+        ? applyPercentageDiscount(Number(price), discountPercentage)
         : null;
 
     return {

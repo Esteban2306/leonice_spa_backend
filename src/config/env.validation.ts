@@ -11,6 +11,7 @@ import {
   IsUrl,
   validateSync,
 } from 'class-validator';
+import { encryptionKeyIssues, productionIssues } from './production-safety';
 
 enum Environment {
   Development = 'development',
@@ -94,11 +95,15 @@ export function validateEnv(config: Record<string, unknown>) {
     skipMissingProperties: false,
   });
 
-  if (errors.length > 0) {
-    const messages = errors
-      .map((error) => Object.values(error.constraints ?? {}).join(', '))
-      .join('\n');
-    throw new Error(`Configuración de entorno inválida:\n${messages}`);
+  const messages = [
+    ...errors.map((error) => Object.values(error.constraints ?? {}).join(', ')),
+    ...encryptionKeyIssues(config),
+    ...productionIssues(config),
+  ];
+  if (messages.length > 0) {
+    throw new Error(
+      `Configuración de entorno inválida:\n${messages.join('\n')}`,
+    );
   }
 
   return validatedConfig;

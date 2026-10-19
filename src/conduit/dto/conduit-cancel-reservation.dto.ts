@@ -14,12 +14,14 @@ import {
 
 export class ConduitUpcomingReservationsQueryDto {
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone!: string;
 }
 
 export class ConduitCancelReservationDto {
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone!: string;
 
@@ -38,6 +40,7 @@ export class ConduitCancelReservationDto {
 export class ConduitRescheduleReservationDto {
   /** Lo reemplaza Leonice por el teléfono verificado del chat. */
   @IsString()
+  @MaxLength(32)
   @MinLength(10)
   phone!: string;
 

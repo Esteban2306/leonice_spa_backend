@@ -7,6 +7,15 @@ import type {
 import { CLOUDINARY } from './cloudinary.constants';
 import { withUploadRetry } from './upload-retry';
 
+const AUTHENTICATED_URL =
+  /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/authenticated\/(?:v(\d+)\/)?(.+)$/;
+
+const AUTHENTICATED_FOLDERS = ['leonice-spa/deposit-proofs/'];
+
+function isAuthenticatedAssetId(publicId: string): boolean {
+  return AUTHENTICATED_FOLDERS.some((folder) => publicId.startsWith(folder));
+}
+
 export const TESTIMONIAL_IMAGE_WIDTH = 800;
 export const TESTIMONIAL_IMAGE_HEIGHT = 1000;
 
@@ -73,6 +82,7 @@ export class CloudinaryService {
       folder: 'leonice-spa/deposit-proofs',
       public_id: `deposit-${reservationId}-${Date.now()}`,
       resource_type: 'image',
+      type: 'authenticated',
     });
 
     return {
@@ -126,6 +136,24 @@ export class CloudinaryService {
     await this.cloudinary.uploader.destroy(publicId, {
       resource_type: 'image',
       invalidate: true,
+      type: isAuthenticatedAssetId(publicId) ? 'authenticated' : 'upload',
+    });
+  }
+
+  signAuthenticatedUrl(url: string): string {
+    const match = AUTHENTICATED_URL.exec(url);
+    if (!match) return url;
+    const [, version, path] = match;
+    const extension = path.lastIndexOf('.');
+    const publicId = extension === -1 ? path : path.slice(0, extension);
+    const format = extension === -1 ? undefined : path.slice(extension + 1);
+    return this.cloudinary.url(publicId, {
+      resource_type: 'image',
+      type: 'authenticated',
+      sign_url: true,
+      secure: true,
+      ...(version ? { version } : {}),
+      ...(format ? { format } : {}),
     });
   }
 
@@ -179,6 +207,7 @@ export class CloudinaryService {
         folder: 'leonice-spa/deposit-proofs',
         public_id: publicId,
         resource_type: 'image',
+        type: 'authenticated',
       }),
     );
     return { url: result.secure_url, publicId: result.public_id };
