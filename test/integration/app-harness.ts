@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
+import { createHmac } from 'node:crypto';
 import { Global, Module } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { AppModule } from 'src/app.module';
@@ -182,4 +183,13 @@ export function breakThrottleStorage(): () => void {
   return () => {
     redisStorage.prototype.increment = original;
   };
+}
+
+export function cancellationLinkSecret(): string {
+  return (
+    process.env.CANCELLATION_LINK_SECRET ||
+    createHmac('sha256', process.env.JWT_SECRET as string)
+      .update('cancellation-link-v1')
+      .digest('hex')
+  );
 }

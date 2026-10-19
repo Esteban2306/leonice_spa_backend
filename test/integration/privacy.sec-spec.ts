@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { INestApplication, Logger } from '@nestjs/common';
-import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { CloudinaryService } from 'src/infrastructure/cloudinary/cloudinary.service';
@@ -17,6 +16,7 @@ import {
   seedAdmin,
   Session,
   toSession,
+  cancellationLinkSecret,
 } from './app-harness';
 import { futureSlot, newClientDto, seedWorld, World } from './harness';
 import { collectRoutes } from './route-inventory';
@@ -179,9 +179,7 @@ describe('S7. Datos personales y de salud: acceso, cifrado, consentimiento, traz
       const row = await prisma.client.client.findUniqueOrThrow({
         where: { phone: client.phone },
       });
-      const secret = createHmac('sha256', process.env.JWT_SECRET as string)
-        .update('cancellation-link-v1')
-        .digest('hex');
+      const secret = cancellationLinkSecret();
       const token = signCancellationLink(secret, {
         clientId: row.id,
         reservationId: created.reservations[0].id,

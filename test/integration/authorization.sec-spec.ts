@@ -1,5 +1,4 @@
 import { INestApplication } from '@nestjs/common';
-import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { CreateReservationOrchestrator } from 'src/reservations/orchestrators/create-reservation.orchestrator';
@@ -14,6 +13,7 @@ import {
   resetThrottle,
   seedAdmin,
   toSession,
+  cancellationLinkSecret,
 } from './app-harness';
 import { futureSlot, newClientDto, seedWorld, World } from './harness';
 import { collectRoutes, RouteInfo, SAMPLE_UUID } from './route-inventory';
@@ -312,9 +312,7 @@ describe('S2. Autorización por rol y por recurso', () => {
       const clientRow = await prisma.client.client.findUniqueOrThrow({
         where: { phone: client.phone },
       });
-      const secret = createHmac('sha256', process.env.JWT_SECRET as string)
-        .update('cancellation-link-v1')
-        .digest('hex');
+      const secret = cancellationLinkSecret();
       const valid = signCancellationLink(secret, {
         clientId: clientRow.id,
         reservationId: reservation.id,
@@ -377,9 +375,7 @@ describe('S2. Autorización por rol y por recurso', () => {
       const clientA = await prisma.client.client.findUniqueOrThrow({
         where: { phone: a.client.phone },
       });
-      const secret = createHmac('sha256', process.env.JWT_SECRET as string)
-        .update('cancellation-link-v1')
-        .digest('hex');
+      const secret = cancellationLinkSecret();
       const tokenA = signCancellationLink(secret, {
         clientId: clientA.id,
         reservationId: a.reservation.id,
