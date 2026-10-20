@@ -509,7 +509,7 @@ const CONTENT: CategoryContent[] = [
       },
       {
         slug: 'alisado',
-        displayOrder: 10,
+        displayOrder: 0,
         tagline: 'Cabello liso, sin frizz y más fácil de llevar.',
         summary:
           'El alisado modifica temporalmente la forma de la fibra para reducir el frizz, el volumen y las ondas. Es un proceso con calor y producto profesional, por eso empezamos siempre valorando tu cabello: su historia química y su estado definen la fórmula y el resultado posible.',
