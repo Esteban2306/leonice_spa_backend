@@ -32,6 +32,10 @@ export function signAuthenticatedUrls(
   ) {
     return value;
   }
+  const serializable = value as { toJSON?: () => unknown };
+  if (typeof serializable.toJSON === 'function') {
+    return signAuthenticatedUrls(serializable.toJSON(), sign, depth + 1);
+  }
   const out: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
     out[key] = signAuthenticatedUrls(item, sign, depth + 1);
