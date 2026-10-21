@@ -36,7 +36,7 @@ describe('Herramientas del bot de Conduit (llamadas como las hace Conduit)', () 
   });
 
   const asConduit = (
-    method: 'post' | 'patch',
+    method: 'get' | 'post' | 'patch',
     path: string,
     phone: string,
     idempotencyKey = `prueba-${Math.random().toString(36).slice(2)}`,
@@ -57,6 +57,36 @@ describe('Herramientas del bot de Conduit (llamadas como las hace Conduit)', () 
     });
     return rows.map((r) => r.type).sort();
   };
+
+  it('listar_tratamientos entrega solo lo necesario para ofrecer y reservar, sin contenido de marketing', async () => {
+    const res = await asConduit(
+      'get',
+      '/conduit/booking/treatments',
+      '+573001110000',
+    );
+    expect(res.status).toBe(200);
+    const items = res.body as Record<string, unknown>[];
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      expect(item).toHaveProperty('id');
+      expect(item).toHaveProperty('name');
+      expect(item).toHaveProperty('basePriceMin');
+      expect(item).toHaveProperty('baseDurationMinMinutes');
+      expect(item).toHaveProperty('requiresPriorAssessment');
+      for (const heavy of [
+        'aftercare',
+        'benefits',
+        'idealFor',
+        'results',
+        'videoUrl',
+        'posterUrl',
+        'considerations',
+        'createdAt',
+      ]) {
+        expect(item).not.toHaveProperty(heavy);
+      }
+    }
+  });
 
   it('registrar un cliente guarda solo los consentimientos aceptados', async () => {
     const { phone, name, birthDate } = newClientDto('consentimientos');

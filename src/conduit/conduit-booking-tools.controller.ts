@@ -18,6 +18,7 @@ import {
 } from './interceptors/conduit-contact.interceptor';
 import { RescheduleReservationOrchestrator } from '../reservations/orchestrators/reschedule-reservation.orchestrator';
 import { GetAvailabilityCalendarDto } from '../reservations/dto/get-availability-calendar.dto';
+import { toBotTreatment } from './tools/bot-treatment-view';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationOrchestrator } from '../reservations/orchestrators/create-reservation.orchestrator';
@@ -43,8 +44,9 @@ export class ConduitBookingToolsController {
 
   @ConduitToolOptionsMeta({ publicData: true })
   @Get('treatments')
-  findTreatments(@Query('categoryId') categoryId?: string) {
-    return this.treatmentsService.findAll(categoryId);
+  async findTreatments(@Query('categoryId') categoryId?: string) {
+    const treatments = await this.treatmentsService.findAll(categoryId);
+    return treatments.map(toBotTreatment);
   }
 
   @ConduitToolOptionsMeta({ publicData: true })
