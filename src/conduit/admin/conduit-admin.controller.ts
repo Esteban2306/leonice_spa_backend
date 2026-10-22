@@ -26,6 +26,11 @@ import {
   FindOutboxQueryDto,
 } from './conduit-admin.dto';
 import { ConduitTemplateResolver } from '../templates/conduit-template-resolver';
+import {
+  maskSecrets,
+  scrubSecrets,
+} from '../../common/conduit-security/redact-secrets';
+import { toPublicAiModel, toPublicAiModels } from './ai-model-public';
 
 type ConduitPayload = Record<string, unknown>;
 
@@ -59,23 +64,23 @@ export class ConduitAdminController {
   async overview() {
     const [health, connection, connectionHealth, bot, templates] =
       await Promise.allSettled([
-        this.conduit.admin('GET', 'health'),
-        this.conduit.admin(
+        this.adminScrubbed('GET', 'health'),
+        this.adminScrubbed(
           'GET',
           `whatsapp/connections/${this.connectionId()}`,
         ),
-        this.conduit.admin(
+        this.adminScrubbed(
           'GET',
           `whatsapp/connections/${this.connectionId()}/health`,
         ),
-        this.conduit.admin('GET', `bot/config/${this.botId()}`),
+        this.adminScrubbed('GET', `bot/config/${this.botId()}`),
         this.templateResolver.describe(),
       ]);
 
     const value = (r: PromiseSettledResult<unknown>) =>
       r.status === 'fulfilled' ? r.value : null;
     const error = (r: PromiseSettledResult<unknown>) =>
-      r.status === 'rejected' ? (r.reason as Error).message : null;
+      r.status === 'rejected' ? maskSecrets((r.reason as Error).message) : null;
 
     return {
       reachable: health.status === 'fulfilled',
@@ -214,27 +219,35 @@ export class ConduitAdminController {
   }
 
   @Get('bot/models')
-  models() {
-    return this.call('GET', `bot/config/${this.botId()}/models`);
+  async models() {
+    return toPublicAiModels(
+      await this.call('GET', `bot/config/${this.botId()}/models`),
+    );
   }
 
-  /** Agregar un modelo de IA (la API key se guarda cifrada en Conduit). */
+  /** Agregar un modelo de IA (la API key se guarda cifrada en Conduit y no se devuelve). */
   @Post('bot/models')
-  addModel(@Body() body: ConduitPayload) {
-    return this.call('POST', `bot/config/${this.botId()}/models`, { body });
+  async addModel(@Body() body: ConduitPayload) {
+    return toPublicAiModel(
+      await this.call('POST', `bot/config/${this.botId()}/models`, { body }),
+    );
   }
 
   @Delete('bot/models/:modelId')
-  removeModel(@Param('modelId', ParseUUIDPipe) modelId: string) {
-    return this.call('DELETE', `bot/config/${this.botId()}/models/${modelId}`);
+  async removeModel(@Param('modelId', ParseUUIDPipe) modelId: string) {
+    return toPublicAiModel(
+      await this.call('DELETE', `bot/config/${this.botId()}/models/${modelId}`),
+    );
   }
 
   /** Reactivar un modelo marcado como no disponible (p. ej. sin saldo). */
   @Patch('bot/models/:modelId/reset')
-  resetModel(@Param('modelId', ParseUUIDPipe) modelId: string) {
-    return this.call(
-      'PATCH',
-      `bot/config/${this.botId()}/models/${modelId}/reset`,
+  async resetModel(@Param('modelId', ParseUUIDPipe) modelId: string) {
+    return toPublicAiModel(
+      await this.call(
+        'PATCH',
+        `bot/config/${this.botId()}/models/${modelId}/reset`,
+      ),
     );
   }
 
@@ -458,10 +471,18 @@ export class ConduitAdminController {
     options: { query?: AdminQuery; body?: unknown } = {},
   ): Promise<T> {
     try {
-      return await this.conduit.admin<T>(method, path, options);
+      return await this.adminScrubbed<T>(method, path, options);
     } catch (error) {
       throw this.translate(error);
     }
+  }
+
+  private async adminScrubbed<T = unknown>(
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    path: string,
+    options: { query?: AdminQuery; body?: unknown } = {},
+  ): Promise<T> {
+    return scrubSecrets(await this.conduit.admin<T>(method, path, options));
   }
 
   private translate(error: unknown): AppException {
@@ -470,7 +491,7 @@ export class ConduitAdminController {
     }
     if (error.status === null || error.status >= 500) {
       return new AppException('CONDUIT_UNAVAILABLE', {
-        details: { conduitMessage: error.message },
+        details: { conduitMessage: maskSecrets(error.message) },
       });
     }
     if (error.status === 401 || error.status === 403) {
@@ -480,10 +501,12 @@ export class ConduitAdminController {
       });
     }
     if (error.status === 404) {
-      return new AppException('NOT_FOUND', { message: error.message });
+      return new AppException('NOT_FOUND', {
+        message: maskSecrets(error.message),
+      });
     }
     return new AppException('CONDUIT_REQUEST_REJECTED', {
-      message: error.message,
+      message: maskSecrets(error.message),
       details: { conduitStatus: error.status },
     });
   }
