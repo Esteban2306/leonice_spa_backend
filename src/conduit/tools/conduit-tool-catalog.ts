@@ -60,15 +60,10 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'listar_tratamientos',
     description:
-      'Servicios activos con duración, precio y promoción vigente (activePromotion y precio con descuento effectiveBasePriceMin/Max). Úsala antes de ofrecer un servicio, cuando pregunten precios o promociones, o si hay ambigüedad.',
+      'Servicios activos con id, precio en pesos, duración y promoción vigente (promotion). Úsala una vez antes de ofrecer un servicio, cuando pregunten precios o promociones, o si hay ambigüedad; el resultado sirve para toda la conversación.',
     httpMethod: 'GET',
     path: '/conduit/booking/treatments',
-    parametersSchema: {
-      type: 'object',
-      properties: {
-        categoryId: UUID('Opcional: solo los servicios de esta categoría'),
-      },
-    },
+    parametersSchema: { type: 'object', properties: {} },
   },
   {
     name: 'consultar_disponibilidad',

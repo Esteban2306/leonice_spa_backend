@@ -70,9 +70,12 @@ describe('Herramientas del bot de Conduit (llamadas como las hace Conduit)', () 
     for (const item of items) {
       expect(item).toHaveProperty('id');
       expect(item).toHaveProperty('name');
-      expect(item).toHaveProperty('basePriceMin');
-      expect(item).toHaveProperty('baseDurationMinMinutes');
-      expect(item).toHaveProperty('requiresPriorAssessment');
+      expect(item).toHaveProperty('price');
+      expect(item.price).toMatch(/^\$[\d.]+( – \$[\d.]+)?$/);
+      expect(item).toHaveProperty('duration');
+      expect(item).not.toHaveProperty('basePriceMin');
+      expect(item).not.toHaveProperty('categoryId');
+      expect(item).not.toHaveProperty('hasHairVariablePricing');
       for (const heavy of [
         'aftercare',
         'benefits',
