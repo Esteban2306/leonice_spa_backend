@@ -1,17 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { UpdateBusinessSettingsDto } from './dto/update-business-settings.dto';
+import { EventBusService } from '../common/events/event.service';
+import { EVENT_TYPES } from '../common/events/constants/event.types';
+import { BUSINESS_DAY_NAMES, buildBotBusinessInfo } from './business-info';
 
 const SETTINGS_ID = 'default';
-const DAY_NAMES = [
-  'domingo',
-  'lunes',
-  'martes',
-  'miércoles',
-  'jueves',
-  'viernes',
-  'sábado',
-];
+const DAY_NAMES = BUSINESS_DAY_NAMES;
 
 function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -19,17 +14,12 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function minutesToClock(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const suffix = h < 12 ? 'a. m.' : 'p. m.';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
-}
-
 @Injectable()
 export class BusinessSettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventBus: EventBusService,
+  ) {}
 
   async get() {
     const settings = await this.prisma.client.businessSettings.findUnique({
@@ -50,13 +40,17 @@ export class BusinessSettingsService {
     );
   }
 
-  update(dto: UpdateBusinessSettingsDto, userId?: string) {
+  async update(dto: UpdateBusinessSettingsDto, userId?: string) {
     const data = { ...dto, updatedByUserId: userId ?? null };
-    return this.prisma.client.businessSettings.upsert({
+    const saved = await this.prisma.client.businessSettings.upsert({
       where: { id: SETTINGS_ID },
       create: { id: SETTINGS_ID, ...data },
       update: data,
     });
+    this.eventBus.publish(EVENT_TYPES.BUSINESS_INFO_CHANGED, {
+      source: 'settings',
+    });
+    return saved;
   }
 
   async publicHours() {
@@ -90,30 +84,6 @@ export class BusinessSettingsService {
         orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
       }),
     ]);
-
-    const schedule = DAY_NAMES.map((day, dayOfWeek) => {
-      const ranges = windows
-        .filter((w) => w.dayOfWeek === dayOfWeek)
-        .map(
-          (w) =>
-            `${minutesToClock(w.startMinute)} a ${minutesToClock(w.endMinute)}`,
-        );
-      return { day, hours: ranges.length ? ranges.join(' y ') : 'cerrado' };
-    });
-
-    return {
-      depositAmount: settings.depositAmount,
-      depositAmountCop:
-        settings.depositAmount != null ? settings.depositAmount * 1000 : null,
-      depositInstructions: settings.depositInstructions,
-      depositPolicy: settings.depositPolicy,
-      depositDeadline:
-        'El anticipo debe pagarse y enviarse el comprobante dentro de 2 horas de atención; si no, la reserva se cancela.',
-      cancellationPolicy: settings.cancellationPolicy,
-      address: settings.address,
-      additionalInfo: settings.additionalInfo,
-      timeZone: 'America/Bogota',
-      weeklySchedule: schedule,
-    };
+    return buildBotBusinessInfo(settings, windows);
   }
 }

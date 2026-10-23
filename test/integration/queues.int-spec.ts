@@ -619,7 +619,7 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
     });
 
     it('Conduit recibe el ciclo de vida completo: reprogramaciones, cancelaciones del negocio, no-show y completadas', async () => {
-      const listener = new ConduitOutboxListener(outboxService);
+      const listener = new ConduitOutboxListener(outboxService, {} as never);
       const enqueue = jest
         .spyOn(outboxService, 'enqueue')
         .mockResolvedValue(undefined);

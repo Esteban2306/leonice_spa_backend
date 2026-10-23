@@ -21,6 +21,7 @@ export const EVENT_TYPES = {
   DEPOSIT_REJECTED: 'deposit.rejected',
   RESERVATION_CANCELLED_BY_TIMEOUT: 'reservation.cancelled_by_timeout',
   CONDUIT_HANDOFF_REQUESTED: 'conduit.handoff_requested',
+  BUSINESS_INFO_CHANGED: 'business.info_changed',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -101,6 +102,10 @@ export interface EventPayloadMap {
     reservationId: string;
     clientId: string;
     reason?: string;
+  };
+
+  [EVENT_TYPES.BUSINESS_INFO_CHANGED]: {
+    source: 'settings' | 'schedule';
   };
 
   [EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED]: {

@@ -6,10 +6,26 @@ import {
 } from '../../common/events/constants/event.types';
 import type { EventOf } from '../../common/events/interface/event.interface';
 import { ConduitOutboxService } from '../service/conduit-outbox.service';
+import { BusinessSettingsService } from '../../business-settings/business-settings.service';
+import {
+  BUSINESS_INFO_EVENT,
+  businessInfoEventPayload,
+} from '../../business-settings/business-info';
 
 @Injectable()
 export class ConduitOutboxListener {
-  constructor(private readonly outbox: ConduitOutboxService) {}
+  constructor(
+    private readonly outbox: ConduitOutboxService,
+    private readonly businessSettings: BusinessSettingsService,
+  ) {}
+
+  @OnEvent(EVENT_TYPES.BUSINESS_INFO_CHANGED)
+  async handleBusinessInfoChanged() {
+    await this.outbox.enqueue(
+      BUSINESS_INFO_EVENT,
+      businessInfoEventPayload(await this.businessSettings.forBot()),
+    );
+  }
 
   @OnEvent(EVENT_TYPES.RESERVATION_CREATED)
   async handleCreated(

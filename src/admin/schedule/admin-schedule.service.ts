@@ -1,3 +1,5 @@
+import { EventBusService } from '../../common/events/event.service';
+import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, ScheduleExceptionType } from '@prisma/client';
 import { AppException } from '../../common/errors/app.exception';
@@ -66,6 +68,7 @@ export class AdminScheduleService {
     private readonly availabilityRepository: AvailabilityRepository,
     private readonly cache: SafeCacheService,
     private readonly depositDeadline: DepositDeadlineService,
+    private readonly eventBus: EventBusService,
   ) {}
 
   async getBaseSchedule() {
@@ -127,6 +130,9 @@ export class AdminScheduleService {
         ),
       ),
     );
+    this.eventBus.publish(EVENT_TYPES.BUSINESS_INFO_CHANGED, {
+      source: 'schedule',
+    });
     this.logger.log(
       `Horario semanal actualizado (${windows.length} franjas); plazos de depósito extendidos: ${extended.length}`,
     );

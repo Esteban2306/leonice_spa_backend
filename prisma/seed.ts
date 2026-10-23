@@ -4,6 +4,7 @@ import { ARGON2_OPTIONS } from '../src/auth/constants/auth.constants';
 import { DEFAULT_WEEKLY_WINDOWS } from '../src/reservations/domain/operating-hours';
 import { seedConduitTemplates } from './seed-conduit-templates';
 import { seedConduitTools } from './seed-conduit-tools';
+import { seedConduitPrompt } from './seed-conduit-prompt';
 import { slugify } from '../src/catalog/common/slugify';
 
 const prisma = new PrismaClient();
@@ -281,6 +282,14 @@ async function main() {
   } catch (error) {
     console.warn(
       `[conduit] No se pudieron sembrar las herramientas: ${(error as Error).message}`,
+    );
+  }
+
+  try {
+    await seedConduitPrompt();
+  } catch (error) {
+    console.warn(
+      `[conduit] No se pudo sembrar el prompt: ${(error as Error).message}`,
     );
   }
 }

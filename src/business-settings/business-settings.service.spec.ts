@@ -9,7 +9,12 @@ describe('BusinessSettingsService.publicHours', () => {
     const prisma = {
       client: { operatingWindow: { findMany } },
     } as unknown as PrismaService;
-    return { service: new BusinessSettingsService(prisma), findMany };
+    return {
+      service: new BusinessSettingsService(prisma, {
+        publish: jest.fn(),
+      } as never),
+      findMany,
+    };
   };
 
   it('devuelve los siete días con sus franjas en hora de Bogotá', async () => {
