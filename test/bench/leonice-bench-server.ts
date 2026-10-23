@@ -8,6 +8,9 @@ import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { CONDUIT_TEMPLATE_CATALOG } from 'src/conduit/templates/conduit-template-catalog';
 import { normalizePhone } from 'src/clients/utils/normalize-phone.util';
 import { seedConduitTemplates } from '../../prisma/seed-conduit-templates';
+import { seedConduitTools } from '../../prisma/seed-conduit-tools';
+import { seedConduitPrompt } from '../../prisma/seed-conduit-prompt';
+import { BusinessSettingsService } from 'src/business-settings/business-settings.service';
 import { conduitSeedRequest } from '../../prisma/conduit-seed-request';
 
 const BENCH_DB = 'leonice_bench';
@@ -47,8 +50,10 @@ function assertIsolated(): void {
   }
 }
 
-async function wireConduitTemplates(): Promise<void> {
+async function wireConduit(): Promise<void> {
   await seedConduitTemplates(process.env);
+  await seedConduitTools(process.env);
+  await seedConduitPrompt(process.env);
   const request = conduitSeedRequest(
     process.env.CONDUIT_BASE_URL!,
     process.env.CONDUIT_API_KEY!,
@@ -178,7 +183,7 @@ const fakeUpload = (reservationId: string) => ({
 
 async function main(): Promise<void> {
   assertIsolated();
-  await wireConduitTemplates();
+  await wireConduit();
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(CloudinaryService)
@@ -195,21 +200,6 @@ async function main(): Promise<void> {
   configureApp(app);
   const prisma = app.get(PrismaService);
 
-  await prisma.client.businessSettings.upsert({
-    where: { id: 'default' },
-    update: {},
-    create: {
-      id: 'default',
-      depositAmount: 50,
-      depositInstructions:
-        'Transferencia Nequi o Bancolombia (datos de prueba del banco de conversaciones).',
-      depositPolicy:
-        'El anticipo separa el cupo y se descuenta del valor del servicio.',
-      cancellationPolicy:
-        'Puedes cancelar o reagendar con 24 horas de anticipación; el anticipo no es reembolsable.',
-      address: 'Dirección de prueba del banco de conversaciones',
-    },
-  });
   await prisma.client.adminNotificationRecipient.upsert({
     where: { phone: '+573000000999' },
     update: {},
@@ -245,6 +235,16 @@ async function main(): Promise<void> {
   app.use('/__bench', benchRoutes);
 
   await app.listen(Number(process.env.PORT), '127.0.0.1');
+  await app.get(BusinessSettingsService).update({
+    depositAmount: 50,
+    depositInstructions:
+      'Transferencia Nequi o Bancolombia (datos de prueba del banco de conversaciones).',
+    depositPolicy:
+      'El anticipo separa el cupo y se descuenta del valor del servicio.',
+    cancellationPolicy:
+      'Puedes cancelar o reagendar con 24 horas de anticipación; el anticipo no es reembolsable.',
+    address: 'Dirección de prueba del banco de conversaciones',
+  });
   process.stdout.write(`BENCH_LEONICE_READY ${process.env.PORT}\n`);
 
   const shutdown = () => {
