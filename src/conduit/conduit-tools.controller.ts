@@ -2,6 +2,7 @@ import { calendarDateToUtcMidnight } from '../common/validation/date-input.valid
 import {
   Body,
   Controller,
+  Get,
   NotFoundException,
   Post,
   Patch,
@@ -21,6 +22,7 @@ import { normalizePhone } from 'src/clients/utils/normalize-phone.util';
 import { ConduitUpdateClientDto } from './dto/conduit-update-client.dto';
 import { ConduitCreateClientDto } from './dto/conduit-create-client.dto';
 import { ConsentService } from 'src/clients/consent/consent.service';
+import { toBotClient } from './tools/bot-client-view';
 
 @Controller({ path: 'conduit/clients', version: '1' })
 @ConduitTool()
@@ -30,6 +32,18 @@ export class ConduitToolsController {
     private readonly clientsService: ClientsService,
     private readonly consentService: ConsentService,
   ) {}
+
+  @Get('me')
+  async me(@Req() req: RequestWithConduitContact) {
+    const phone = req.conduitContact?.phone;
+    const client = phone
+      ? await this.clientsRepository.findByPhone(phone)
+      : null;
+    const termsAccepted = client
+      ? await this.consentService.hasTermsConsent(client.id)
+      : false;
+    return toBotClient(client, termsAccepted);
+  }
 
   @Post()
   async createOrUpdate(

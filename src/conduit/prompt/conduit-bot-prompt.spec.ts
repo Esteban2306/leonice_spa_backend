@@ -21,7 +21,7 @@ const SUPPORTED_VARIABLES = [
 ];
 
 describe('prompt del asistente de Leonice', () => {
-  it('menciona cada una de las 13 herramientas del catálogo', () => {
+  it('menciona cada una de las 14 herramientas del catálogo', () => {
     const missing = TOOL_NAMES.filter(
       (name) => !CONDUIT_BOT_PROMPT_TEMPLATE.includes(name),
     );
@@ -68,7 +68,7 @@ describe('prompt del asistente de Leonice', () => {
   it('Sofía se presenta, pide nombre y apellido y fecha, y registra a la clienta antes de reservar', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(CONDUIT_BOT_SETTINGS.agentName).toBe('Sofía');
-    expect(t).toMatch(/preséntate \("Hola, soy \{\{agentName\}\}/);
+    expect(t).toMatch(/Hola, soy \{\{agentName\}\} de \{\{companyName\}\}/);
     expect(t).toMatch(/nombre y apellido y su fecha de nacimiento/);
     expect(t).toMatch(/sin apellido o sin fecha no reserves/);
     expect(t.indexOf('registrar_cliente con name')).toBeGreaterThan(-1);
@@ -76,6 +76,20 @@ describe('prompt del asistente de Leonice', () => {
       t.indexOf('crear_reserva_whatsapp una sola vez'),
     );
     expect(t).toMatch(/ficha queda creada/);
+  });
+
+  it('busca a la clienta primero, la saluda por su nombre y no repite datos si ya está registrada', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(/Lo primero.*consultar_cliente/);
+    expect(t).toMatch(/con su primer nombre \("Hola, Diana, soy/);
+    expect(t).toMatch(/registered true, ya los tenemos; no le pidas nombre/);
+    expect(t).toMatch(/termsAccepted/);
+  });
+
+  it('explica los precios: rango con diagnóstico o precio personalizado', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(/priceIsRange.*rango.*después del diagnóstico en el spa/);
+    expect(t).toMatch(/personalizedPrice.*perfil capilar/);
   });
 
   it('prohíbe mostrar datos técnicos y contempla errores de negocio y técnicos', () => {

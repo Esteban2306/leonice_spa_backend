@@ -34,6 +34,7 @@ describe('toBotTreatment', () => {
       category: 'Spa Capilar',
       tagline: 'Cabello liso',
       price: `$${(250000).toLocaleString('es-CO')} – $${(380000).toLocaleString('es-CO')}`,
+      priceIsRange: true,
       duration: '3 a 4 h',
       requiresAssessment: true,
     });
@@ -73,19 +74,92 @@ describe('toBotTreatment', () => {
     });
   });
 
-  it('envía las tablas de cabello solo si el precio depende del cabello', () => {
-    const plain = toBotTreatment({ ...base, hairLengthPricing: [{ a: 1 }] });
-    const variable = toBotTreatment({
+  describe('precio según el perfil capilar', () => {
+    const variable = {
       ...base,
+      requiresPriorAssessment: false,
       hasHairVariablePricing: true,
-      hairLengthPricing: [{ a: 1 }],
-      hairColorSurcharges: [{ b: 2 }],
+      basePriceMin: '200',
+      basePriceMax: '320',
+      hairLengthPricing: [
+        { hairLength: 'CORTO' as const, price: '200', durationMinutes: 120 },
+        { hairLength: 'MEDIANO' as const, price: '260', durationMinutes: 150 },
+        { hairLength: 'LARGO' as const, price: '300', durationMinutes: 180 },
+      ],
+      hairColorSurcharges: [
+        {
+          hairColor: 'CLARO' as const,
+          surcharge: '20',
+          extraDurationMinutes: 30,
+        },
+        {
+          hairColor: 'OSCURO' as const,
+          surcharge: '0',
+          extraDurationMinutes: 0,
+        },
+      ],
+    };
+    const profile = (hairProfileUpdatedAt: Date | null) => ({
+      hairLength: 'MEDIANO' as const,
+      hairColor: 'CLARO' as const,
+      hairProfileUpdatedAt,
     });
-    expect(plain).not.toHaveProperty('hairLengthPricing');
-    expect(variable).toMatchObject({
-      priceDependsOnHair: true,
-      hairLengthPricing: [{ a: 1 }],
-      hairColorSurcharges: [{ b: 2 }],
+
+    it('sin clienta o sin perfil entrega el rango y avisa que es un rango', () => {
+      for (const client of [undefined, null, profile(null)]) {
+        const view = toBotTreatment(variable, client);
+        expect(view.price).toBe(
+          `$${(200000).toLocaleString('es-CO')} – $${(320000).toLocaleString('es-CO')}`,
+        );
+        expect(view).toMatchObject({ priceIsRange: true });
+        expect(view).not.toHaveProperty('personalizedPrice');
+      }
+    });
+
+    it('con perfil vigente entrega el precio fijo de su largo y color, y su duración', () => {
+      const view = toBotTreatment(variable, profile(new Date()));
+      expect(view.price).toBe(`$${(280000).toLocaleString('es-CO')}`);
+      expect(view.duration).toBe('3 h');
+      expect(view).toMatchObject({ personalizedPrice: true });
+      expect(view).not.toHaveProperty('priceIsRange');
+    });
+
+    it('con perfil vencido vuelve al rango', () => {
+      const old = new Date();
+      old.setFullYear(old.getFullYear() - 3);
+      const view = toBotTreatment(variable, profile(old));
+      expect(view).toMatchObject({ priceIsRange: true });
+    });
+
+    it('la promoción se aplica al precio fijo de la clienta', () => {
+      const view = toBotTreatment(
+        {
+          ...variable,
+          activePromotion: {
+            id: 'p',
+            name: 'Octubre',
+            discountPercentage: '10',
+          },
+        },
+        profile(new Date()),
+      );
+      expect(view.promotion?.price).toBe(
+        `$${(252000).toLocaleString('es-CO')}`,
+      );
+    });
+
+    it('no manda las tablas de cabello al bot', () => {
+      const view = toBotTreatment(variable, profile(new Date()));
+      expect(view).not.toHaveProperty('hairLengthPricing');
+      expect(view).not.toHaveProperty('hairColorSurcharges');
+    });
+
+    it('un servicio de precio único no es un rango aunque haya clienta', () => {
+      const view = toBotTreatment(
+        { ...base, basePriceMax: '250', requiresPriorAssessment: false },
+        profile(new Date()),
+      );
+      expect(view).not.toHaveProperty('priceIsRange');
     });
   });
 

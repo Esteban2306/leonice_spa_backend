@@ -20,6 +20,7 @@ import { RescheduleReservationOrchestrator } from '../reservations/orchestrators
 import { GetAvailabilityCalendarDto } from '../reservations/dto/get-availability-calendar.dto';
 import { toBotTreatment } from './tools/bot-treatment-view';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
+import { ClientsRepository } from '../clients/repositories/clients.repository';
 import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationOrchestrator } from '../reservations/orchestrators/create-reservation.orchestrator';
 import { GetAvailabilityDto } from '../reservations/dto/get-availability.dto';
@@ -40,13 +41,21 @@ export class ConduitBookingToolsController {
     private readonly createReservation: CreateReservationOrchestrator,
     private readonly cancelReservation: CancelReservationOrchestrator,
     private readonly rescheduleReservation: RescheduleReservationOrchestrator,
+    private readonly clientsRepository: ClientsRepository,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
   @Get('treatments')
-  async findTreatments(@Query('categoryId') categoryId?: string) {
-    const treatments = await this.treatmentsService.findAll(categoryId);
-    return treatments.map(toBotTreatment);
+  async findTreatments(
+    @Req() req: RequestWithConduitContact,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    const phone = req.conduitContact?.phone;
+    const [treatments, client] = await Promise.all([
+      this.treatmentsService.findAll(categoryId),
+      phone ? this.clientsRepository.findByPhone(phone) : null,
+    ]);
+    return treatments.map((treatment) => toBotTreatment(treatment, client));
   }
 
   @ConduitToolOptionsMeta({ publicData: true })

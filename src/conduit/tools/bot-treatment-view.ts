@@ -1,3 +1,14 @@
+import { combineHairPricing } from '../../clients/domain/compute-treatment-pricing';
+import { isHairProfileValid } from '../../clients/domain/hair-profile.util';
+import { applyPercentageDiscount } from '../../common/money/percentage-discount';
+import type { HairColor, HairLength } from '@prisma/client';
+
+export interface BotPricingClient {
+  hairLength: HairLength | null;
+  hairColor: HairColor | null;
+  hairProfileUpdatedAt: Date | null;
+}
+
 interface BotTreatmentSource {
   id: string;
   name: string;
@@ -17,8 +28,16 @@ interface BotTreatmentSource {
   } | null;
   effectiveBasePriceMin?: number | null;
   effectiveBasePriceMax?: number | null;
-  hairLengthPricing?: unknown[];
-  hairColorSurcharges?: unknown[];
+  hairLengthPricing?: Array<{
+    hairLength: HairLength;
+    price: unknown;
+    durationMinutes: number;
+  }>;
+  hairColorSurcharges?: Array<{
+    hairColor: HairColor;
+    surcharge: unknown;
+    extraDurationMinutes: number;
+  }>;
 }
 
 const toNumber = (value: unknown): number | null => {
@@ -60,23 +79,69 @@ export function formatDurationRange(
     : `${formatMinutes(low)} a ${formatMinutes(high)}`;
 }
 
-export function toBotTreatment(treatment: BotTreatmentSource) {
+function personalizedPricing(
+  treatment: BotTreatmentSource,
+  client: BotPricingClient | null | undefined,
+): { price: number; durationMinutes: number } | null {
+  if (
+    !client ||
+    !treatment.hasHairVariablePricing ||
+    !treatment.hairLengthPricing?.length ||
+    !isHairProfileValid(client)
+  ) {
+    return null;
+  }
+  try {
+    return combineHairPricing(
+      treatment.hairLengthPricing as never,
+      (treatment.hairColorSurcharges ?? []) as never,
+      client.hairLength!,
+      client.hairColor!,
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function toBotTreatment(
+  treatment: BotTreatmentSource,
+  client?: BotPricingClient | null,
+) {
   const promotion = treatment.activePromotion;
-  const promotionPrice = formatPriceRange(
+  const personal = personalizedPricing(treatment, client);
+  const rangePrice = formatPriceRange(
+    treatment.basePriceMin,
+    treatment.basePriceMax,
+  );
+  const promotionRange = formatPriceRange(
     treatment.effectiveBasePriceMin,
     treatment.effectiveBasePriceMax,
   );
+  const promotionPrice = personal
+    ? formatCop(
+        applyPercentageDiscount(
+          personal.price,
+          Number(promotion?.discountPercentage ?? 0),
+        ),
+      )
+    : promotionRange;
+  const price = personal ? formatCop(personal.price) : rangePrice;
 
   return {
     id: treatment.id,
     name: treatment.name,
     category: treatment.category?.name ?? null,
     ...(treatment.tagline && { tagline: treatment.tagline }),
-    price: formatPriceRange(treatment.basePriceMin, treatment.basePriceMax),
-    duration: formatDurationRange(
-      treatment.baseDurationMinMinutes,
-      treatment.baseDurationMaxMinutes,
-    ),
+    price,
+    ...(personal
+      ? { personalizedPrice: true }
+      : price?.includes('–') && { priceIsRange: true }),
+    duration: personal
+      ? formatDurationRange(personal.durationMinutes, personal.durationMinutes)
+      : formatDurationRange(
+          treatment.baseDurationMinMinutes,
+          treatment.baseDurationMaxMinutes,
+        ),
     ...(treatment.requiresPriorAssessment && { requiresAssessment: true }),
     ...(promotion && {
       promotion: {
@@ -84,11 +149,6 @@ export function toBotTreatment(treatment: BotTreatmentSource) {
         discount: `${promotion.discountPercentage} %`,
         ...(promotionPrice && { price: promotionPrice }),
       },
-    }),
-    ...(treatment.hasHairVariablePricing && {
-      priceDependsOnHair: true,
-      hairLengthPricing: treatment.hairLengthPricing,
-      hairColorSurcharges: treatment.hairColorSurcharges,
     }),
   };
 }

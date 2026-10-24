@@ -25,7 +25,12 @@ interface ReservationSeed {
 
 interface StateSeed {
   phone: string;
-  client?: { name: string; birthDate: string };
+  client?: {
+    name: string;
+    birthDate: string;
+    hairLength?: 'CORTO' | 'MEDIANO' | 'LARGO';
+    hairColor?: 'CLARO' | 'OSCURO';
+  };
   reservations?: ReservationSeed[];
 }
 
@@ -52,8 +57,13 @@ function assertIsolated(): void {
 
 async function wireConduit(): Promise<void> {
   await seedConduitTemplates(process.env);
-  await seedConduitTools(process.env);
-  await seedConduitPrompt(process.env);
+  const sourceOfTruth = {
+    ...process.env,
+    CONDUIT_TOOLS_OVERWRITE: 'true',
+    CONDUIT_PROMPT_OVERWRITE: 'true',
+  };
+  await seedConduitTools(sourceOfTruth);
+  await seedConduitPrompt(sourceOfTruth);
   const request = conduitSeedRequest(
     process.env.CONDUIT_BASE_URL!,
     process.env.CONDUIT_API_KEY!,
@@ -92,6 +102,12 @@ async function seedState(prisma: PrismaService, seed: StateSeed) {
       phone,
       name: seed.client.name,
       birthDate: new Date(seed.client.birthDate),
+      ...(seed.client.hairLength &&
+        seed.client.hairColor && {
+          hairLength: seed.client.hairLength,
+          hairColor: seed.client.hairColor,
+          hairProfileUpdatedAt: new Date(),
+        }),
     },
   });
   await db.consentRecord.create({
@@ -181,6 +197,53 @@ const fakeUpload = (reservationId: string) => ({
   publicId: `bench-${reservationId}`,
 });
 
+async function seedHairPricing(prisma: PrismaService): Promise<void> {
+  const db = prisma.client;
+  const treatment = await db.treatment.findFirst({
+    where: { name: 'Alisado' },
+  });
+  if (!treatment) return;
+  await db.treatment.update({
+    where: { id: treatment.id },
+    data: { hasHairVariablePricing: true },
+  });
+  const lengths = { CORTO: 250, MEDIANO: 300, LARGO: 350 } as const;
+  for (const [hairLength, price] of Object.entries(lengths)) {
+    await db.treatmentHairLengthPricing.upsert({
+      where: {
+        treatmentId_hairLength: {
+          treatmentId: treatment.id,
+          hairLength: hairLength as keyof typeof lengths,
+        },
+      },
+      update: { price },
+      create: {
+        treatmentId: treatment.id,
+        hairLength: hairLength as keyof typeof lengths,
+        price,
+        durationMinutes: 180,
+      },
+    });
+  }
+  const colors = { CLARO: 30, OSCURO: 0 } as const;
+  for (const [hairColor, surcharge] of Object.entries(colors)) {
+    await db.treatmentHairColorSurcharge.upsert({
+      where: {
+        treatmentId_hairColor: {
+          treatmentId: treatment.id,
+          hairColor: hairColor as keyof typeof colors,
+        },
+      },
+      update: { surcharge },
+      create: {
+        treatmentId: treatment.id,
+        hairColor: hairColor as keyof typeof colors,
+        surcharge,
+      },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   assertIsolated();
   await wireConduit();
@@ -235,6 +298,7 @@ async function main(): Promise<void> {
   app.use('/__bench', benchRoutes);
 
   await app.listen(Number(process.env.PORT), '127.0.0.1');
+  await seedHairPricing(prisma);
   await app.get(BusinessSettingsService).update({
     depositAmount: 50,
     depositInstructions:

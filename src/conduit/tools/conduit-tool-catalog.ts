@@ -50,6 +50,14 @@ const CONSENTS = {
 
 export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
+    name: 'consultar_cliente',
+    description:
+      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
+    httpMethod: 'GET',
+    path: '/conduit/clients/me',
+    parametersSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'info_negocio',
     description:
       'Datos reales del spa: anticipo (monto e instrucciones de pago), políticas, dirección y horario semanal. Úsala antes de responder sobre pagos, políticas, ubicación u horario; nunca inventes estos datos.',
@@ -60,7 +68,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'listar_tratamientos',
     description:
-      'Servicios activos con id, precio en pesos, duración y promoción vigente (promotion). Úsala una vez antes de ofrecer un servicio, cuando pregunten precios o promociones, o si hay ambigüedad; el resultado sirve para toda la conversación.',
+      'Servicios activos con id, precio en pesos, duración y promoción vigente (promotion). Si la clienta tiene perfil capilar vigente el precio es el suyo (personalizedPrice); si no, es un rango (priceIsRange) y el precio final se confirma tras el diagnóstico en el spa. Úsala antes de ofrecer un servicio, cuando pregunten precios o promociones, o si hay ambigüedad.',
     httpMethod: 'GET',
     path: '/conduit/booking/treatments',
     parametersSchema: { type: 'object', properties: {} },
