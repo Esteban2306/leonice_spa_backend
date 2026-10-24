@@ -65,6 +65,27 @@ describe('prompt del asistente de Leonice', () => {
     );
   });
 
+  it('Sofía se presenta, pide nombre y apellido y fecha, y registra a la clienta antes de reservar', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(CONDUIT_BOT_SETTINGS.agentName).toBe('Sofía');
+    expect(t).toMatch(/preséntate \("Hola, soy \{\{agentName\}\}/);
+    expect(t).toMatch(/nombre y apellido y su fecha de nacimiento/);
+    expect(t).toMatch(/sin apellido o sin fecha no reserves/);
+    expect(t.indexOf('registrar_cliente con name')).toBeGreaterThan(-1);
+    expect(t.indexOf('registrar_cliente con name')).toBeLessThan(
+      t.indexOf('crear_reserva_whatsapp una sola vez'),
+    );
+    expect(t).toMatch(/ficha queda creada/);
+  });
+
+  it('prohíbe mostrar datos técnicos y contempla errores de negocio y técnicos', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(/ids, códigos, JSON, nombres de herramientas/);
+    expect(t).toMatch(/Error de negocio/);
+    expect(t).toMatch(/Fallo técnico/);
+    expect(t).toMatch(/Nunca inventes/);
+  });
+
   it('no manda al bot a decir que el comprobante no llega por el chat', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).not.toMatch(
       /no le digas que puede enviarte/i,
