@@ -9,6 +9,16 @@ export interface BotPricingClient {
   hairProfileUpdatedAt: Date | null;
 }
 
+export interface BotTreatmentContent {
+  summary?: string | null;
+  idealFor?: string[];
+  benefits?: string[];
+  results?: string | null;
+  considerations?: string[];
+  aftercare?: string[];
+  recommendedFrequency?: string | null;
+}
+
 interface BotTreatmentSource {
   id: string;
   name: string;
@@ -150,5 +160,57 @@ export function toBotTreatment(
         ...(promotionPrice && { price: promotionPrice }),
       },
     }),
+  };
+}
+
+const PRICE_RANGE_NOTE =
+  'El precio final se confirma después del diagnóstico en el spa.';
+const ASSESSMENT_NOTE = 'Antes de agendar se hace una valoración.';
+
+/**
+ * Ficha de un tratamiento lista para mostrar (textos que el spa decide) más
+ * el detalle completo para cuando la conversación sigue con la IA.
+ */
+export function toBotTreatmentDetail(
+  treatment: BotTreatmentSource & BotTreatmentContent,
+  client?: BotPricingClient | null,
+) {
+  const base = toBotTreatment(treatment, client);
+  const facts: string[] = [];
+  if (base.price) {
+    facts.push(
+      'personalizedPrice' in base && base.personalizedPrice
+        ? `💰 Precio para ti: ${base.price}`
+        : `💰 Precio: ${base.price}`,
+    );
+  }
+  if (base.promotion?.price) {
+    facts.push(
+      `🏷️ Promoción ${base.promotion.discount}: ${base.promotion.price}`,
+    );
+  }
+  if (base.duration) facts.push(`⏱️ Duración: ${base.duration}`);
+
+  const notes: string[] = [];
+  if ('priceIsRange' in base && base.priceIsRange) notes.push(PRICE_RANGE_NOTE);
+  if (base.requiresAssessment) notes.push(ASSESSMENT_NOTE);
+
+  return {
+    ...base,
+    detail: {
+      summary: treatment.summary ?? null,
+      idealFor: treatment.idealFor ?? [],
+      benefits: treatment.benefits ?? [],
+      results: treatment.results ?? null,
+      considerations: treatment.considerations ?? [],
+      recommendedFrequency: treatment.recommendedFrequency ?? null,
+    },
+    card: {
+      title: `*${treatment.name}*`,
+      summary: treatment.summary?.trim() || treatment.tagline?.trim() || null,
+      facts,
+      benefits: (treatment.benefits ?? []).slice(0, 5).map((b) => `• ${b}`),
+      notes,
+    },
   };
 }

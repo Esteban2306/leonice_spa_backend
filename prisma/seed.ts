@@ -5,6 +5,7 @@ import { DEFAULT_WEEKLY_WINDOWS } from '../src/reservations/domain/operating-hou
 import { seedConduitTemplates } from './seed-conduit-templates';
 import { seedConduitTools } from './seed-conduit-tools';
 import { seedConduitPrompt } from './seed-conduit-prompt';
+import { seedConduitIntents } from './seed-conduit-intents';
 import { slugify } from '../src/catalog/common/slugify';
 
 const prisma = new PrismaClient();
@@ -290,6 +291,14 @@ async function main() {
   } catch (error) {
     console.warn(
       `[conduit] No se pudo sembrar el prompt: ${(error as Error).message}`,
+    );
+  }
+
+  try {
+    await seedConduitIntents();
+  } catch (error) {
+    console.warn(
+      `[conduit] No se pudieron sembrar las intenciones: ${(error as Error).message}`,
     );
   }
 }

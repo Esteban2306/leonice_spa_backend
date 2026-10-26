@@ -74,6 +74,25 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     parametersSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'info_tratamiento',
+    description:
+      'Ficha de UN tratamiento por su nombre: qué es, para quién, beneficios, precio (con la aclaración de rango o precio propio), duración y si requiere valoración. Si el nombre es ambiguo devuelve las opciones.',
+    httpMethod: 'GET',
+    path: '/conduit/booking/treatments/detail',
+    parametersSchema: {
+      type: 'object',
+      required: ['query'],
+      properties: {
+        query: {
+          type: 'string',
+          minLength: 2,
+          maxLength: 80,
+          description: 'Nombre del tratamiento tal como lo dijo la clienta',
+        },
+      },
+    },
+  },
+  {
     name: 'consultar_disponibilidad',
     description:
       'Horarios libres de un servicio en un día. Ofrece solo los horarios que devuelva.',

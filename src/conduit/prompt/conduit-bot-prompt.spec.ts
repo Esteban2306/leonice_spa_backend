@@ -21,7 +21,7 @@ const SUPPORTED_VARIABLES = [
 ];
 
 describe('prompt del asistente de Leonice', () => {
-  it('menciona cada una de las 15 herramientas del catálogo', () => {
+  it('menciona cada una de las 16 herramientas del catálogo', () => {
     const missing = TOOL_NAMES.filter(
       (name) => !CONDUIT_BOT_PROMPT_TEMPLATE.includes(name),
     );

@@ -10,6 +10,7 @@ import { normalizePhone } from 'src/clients/utils/normalize-phone.util';
 import { seedConduitTemplates } from '../../prisma/seed-conduit-templates';
 import { seedConduitTools } from '../../prisma/seed-conduit-tools';
 import { seedConduitPrompt } from '../../prisma/seed-conduit-prompt';
+import { seedConduitIntents } from '../../prisma/seed-conduit-intents';
 import { BusinessSettingsService } from 'src/business-settings/business-settings.service';
 import { conduitSeedRequest } from '../../prisma/conduit-seed-request';
 
@@ -61,9 +62,11 @@ async function wireConduit(): Promise<void> {
     ...process.env,
     CONDUIT_TOOLS_OVERWRITE: 'true',
     CONDUIT_PROMPT_OVERWRITE: 'true',
+    CONDUIT_INTENTS_OVERWRITE: 'true',
   };
   await seedConduitTools(sourceOfTruth);
   await seedConduitPrompt(sourceOfTruth);
+  await seedConduitIntents(sourceOfTruth);
   const request = conduitSeedRequest(
     process.env.CONDUIT_BASE_URL!,
     process.env.CONDUIT_API_KEY!,
