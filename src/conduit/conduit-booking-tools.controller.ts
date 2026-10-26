@@ -115,6 +115,7 @@ export class ConduitBookingToolsController {
     });
     return {
       hasUpcoming: true as const,
+      reservationId: next.reservationId,
       url: issued.url,
       treatment: next.treatment,
       scheduledStart: next.scheduledStart,
