@@ -99,7 +99,7 @@ Reservar
 4. Confirma servicio, día, hora y precio (con la aclaración de rango si aplica). Si es nueva o termsAccepted es false, dile que al confirmar acepta los términos del servicio. Espera un sí claro.
 5. Con el sí no vuelvas a consultar ni a preguntar. Si no está registrada, llama registrar_cliente con name completo, birthDate y consents [{type TERMINOS_SERVICIO, accepted true, policyVersion "v1"}]; si está registrada pero termsAccepted es false, solo con ese consent. Después, crear_reserva_whatsapp una sola vez.
 6. Cuéntale el estado y el resumen tal como los devuelve la herramienta, con el anticipo y cómo pagarlo. No digas que está confirmada si no lo está.
-- Nunca preguntes por alergias ni embarazo por iniciativa propia. El permiso de salud (DATOS_SALUD) se pide solo si ella dice que SÍ tiene alergias o está embarazada: explica que es por su seguridad y, sin permiso, no lo guardes. Si dice que no tiene nada, no lo menciones y no envíes isPregnant, allergies ni consent en client.
+- Nunca preguntes por alergias ni embarazo por iniciativa propia. El permiso de salud (DATOS_SALUD) se pide solo si ella dice que SÍ tiene alergias o está embarazada: explica que es por su seguridad y, sin permiso, no lo guardes (con actualizar_perfil_cliente si ya está registrada). Si dice que no tiene nada, no lo menciones y no envíes isPregnant, allergies ni consent en client (mandarlos en falso hace fallar la reserva).
 
 Cambiar o cancelar
 - reservas_proximas muestra la cita. Si pide cancelar de forma explícita ("cancélala"), llama cancelar_reserva_whatsapp (scope SINGLE o DAY) en ese turno y dile que los anticipos no se devuelven. Para reagendar: disponibilidad_combo con purpose=RESCHEDULE, confirma la nueva hora y usa reagendar_reserva_whatsapp.
@@ -201,6 +201,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     respectsOpenFlow: true,
     cooldownSeconds: 60,
     config: {
+      greetingSource: true,
       tool: 'consultar_cliente',
       identityOptional: true,
       cache: { scope: 'contact', seconds: 60 },
@@ -221,6 +222,14 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
       },
     },
     variants: {
+      prefix_registered: [
+        '¡Hola {{nombre}}! Soy {{agente}} de {{negocio}} 😊',
+        '¡Hola {{nombre}}! 🌿 Soy {{agente}} de {{negocio}}.',
+      ],
+      prefix_default: [
+        '¡Hola! Soy {{agente}} de {{negocio}} 😊',
+        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}.',
+      ],
       registered: [
         '¡Hola {{nombre}}! 😊 Soy {{agente}} de {{negocio}}. ¿En qué te puedo ayudar hoy?',
         '¡Hola {{nombre}}! 🌿 Soy {{agente}} de {{negocio}}. Cuéntame, ¿qué necesitas?',
@@ -269,7 +278,11 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     ],
     maxTokens: 14,
     allowsQuestion: false,
-    config: { tool: 'enlace_cancelacion', render: cancelRender },
+    config: {
+      greetFirstContact: true,
+      tool: 'enlace_cancelacion',
+      render: cancelRender,
+    },
     variants: {
       link: [
         'Claro 🌿 Aquí tienes el enlace seguro para cancelar tu cita de *{{tratamiento}}* del {{fecha}}:\n\n{{enlace}}\n\nSi prefieres reagendar, dime la nueva fecha y te ayudo por aquí.',
@@ -298,7 +311,11 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     maxTokens: 14,
     allowsQuestion: false,
     negationOk: true,
-    config: { tool: 'enlace_cancelacion', render: cancelRender },
+    config: {
+      greetFirstContact: true,
+      tool: 'enlace_cancelacion',
+      render: cancelRender,
+    },
     variants: {
       link: [
         'Gracias por avisarme 🌿 Tienes dos opciones para tu cita de *{{tratamiento}}* del {{fecha}}:\n\n1) Cancelarla con este enlace:\n{{enlace}}\n\n2) Reagendarla: dime la fecha que prefieres y la cambio por ti.',
@@ -328,6 +345,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     ],
     maxTokens: 10,
     config: {
+      greetFirstContact: true,
       tool: 'info_negocio',
       cache: TOOL_CACHE_PUBLIC,
       render: {
@@ -366,6 +384,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     denyPatterns: [`\\b(?:${TOPICS_DENY}|y|pero)\\b`],
     maxTokens: 10,
     config: {
+      greetFirstContact: true,
       tool: 'info_negocio',
       cache: TOOL_CACHE_PUBLIC,
       render: {
@@ -394,6 +413,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     denyPatterns: ['\\b(?:y|pero|quiero|necesito)\\b'],
     maxTokens: 12,
     config: {
+      greetFirstContact: true,
       tool: 'info_negocio',
       cache: TOOL_CACHE_PUBLIC,
       render: {
@@ -422,6 +442,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     denyPatterns: ['\\b(?:y|pero|pague|pagado|ya|estado|llego|confirm\\w*)\\b'],
     maxTokens: 12,
     config: {
+      greetFirstContact: true,
       tool: 'info_negocio',
       cache: TOOL_CACHE_PUBLIC,
       render: {
@@ -479,6 +500,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         'Los medios de pago te los confirmamos al agendar tu cita 🌿 Si ya tienes una cita, pregúntanos por aquí y una persona del equipo te ayuda.',
       ],
     },
+    config: { greetFirstContact: true },
   },
   {
     key: 'my_bookings',
@@ -497,6 +519,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     denyPatterns: [`\\b(?:${TOPICS_DENY}|y|pero)\\b`],
     maxTokens: 10,
     config: {
+      greetFirstContact: true,
       tool: 'reservas_proximas',
       render: {
         branches: [
@@ -547,6 +570,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     denyPatterns: [`\\b(?:${TOPICS_DENY}|y|pero)\\b`],
     maxTokens: 12,
     config: {
+      greetFirstContact: true,
       tool: 'depositos_pendientes',
       render: {
         branches: [
@@ -601,6 +625,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     ],
     maxTokens: 12,
     config: {
+      greetFirstContact: true,
       tool: 'listar_tratamientos',
       cache: TOOL_CACHE_CONTACT,
       render: {
@@ -645,6 +670,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     denyPatterns: [`\\b(?:${NOT_TREATMENT}|y|pero|todos|todo)\\b`],
     maxTokens: 12,
     config: {
+      greetFirstContact: true,
       tool: 'info_tratamiento',
       params: { query: '$entity' },
       cache: TOOL_CACHE_CONTACT,

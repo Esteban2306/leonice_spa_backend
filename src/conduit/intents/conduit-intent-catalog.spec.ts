@@ -96,4 +96,32 @@ describe('CONDUIT_INTENT_CATALOG', () => {
       expect(rule.variants.default.length).toBeGreaterThan(0);
     }
   });
+
+  it('la intención de saludo tiene su variante de prefijo por cada rama y las que saludan en el primer contacto existen', () => {
+    const sources = CONDUIT_INTENT_CATALOG.filter(
+      (i) =>
+        (i.config as { greetingSource?: boolean } | undefined)?.greetingSource,
+    );
+    expect(sources).toHaveLength(1);
+    const render = (sources[0].config as { render: RenderLike }).render;
+    for (const branch of render.branches) {
+      expect(Object.keys(sources[0].variants)).toContain(
+        `prefix_${branch.variant}`,
+      );
+    }
+    const greeters = CONDUIT_INTENT_CATALOG.filter(
+      (i) =>
+        (i.config as { greetFirstContact?: boolean } | undefined)
+          ?.greetFirstContact,
+    ).map((i) => i.key);
+    expect(greeters).toEqual(
+      expect.arrayContaining([
+        'cancel_booking',
+        'business_hours',
+        'treatment_info',
+      ]),
+    );
+    expect(greeters).not.toContain('human_request');
+    expect(greeters).not.toContain('courtesy');
+  });
 });
