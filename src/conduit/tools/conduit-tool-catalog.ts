@@ -234,6 +234,19 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     },
   },
   {
+    name: 'enlace_cancelacion',
+    description:
+      'Enlace seguro para que la clienta gestione o cancele su próxima cita sin escribir al spa. Úsala cuando quiera cancelar y prefiera el enlace.',
+    httpMethod: 'GET',
+    path: '/conduit/booking/reservations/cancellation-link',
+    injectPhoneParamName: 'phone',
+    parametersSchema: {
+      type: 'object',
+      required: ['phone'],
+      properties: { phone: PHONE },
+    },
+  },
+  {
     name: 'cancelar_reserva_whatsapp',
     description:
       'Cancela una cita (SINGLE) o todas las del día (DAY) tras confirmación explícita. Ofrece reagendar antes. Los anticipos no se devuelven.',

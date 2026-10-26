@@ -21,7 +21,7 @@ const SUPPORTED_VARIABLES = [
 ];
 
 describe('prompt del asistente de Leonice', () => {
-  it('menciona cada una de las 14 herramientas del catálogo', () => {
+  it('menciona cada una de las 15 herramientas del catálogo', () => {
     const missing = TOOL_NAMES.filter(
       (name) => !CONDUIT_BOT_PROMPT_TEMPLATE.includes(name),
     );
@@ -32,7 +32,7 @@ describe('prompt del asistente de Leonice', () => {
     const mentioned =
       CONDUIT_BOT_PROMPT_TEMPLATE.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? [];
     const toolLike = mentioned.filter((word) =>
-      /^(listar|consultar|disponibilidad|registrar|actualizar|crear|reservas|reagendar|cancelar|depositos|pasar|info)_/.test(
+      /^(listar|consultar|disponibilidad|registrar|actualizar|crear|reservas|reagendar|cancelar|depositos|pasar|info|enlace)_/.test(
         word,
       ),
     );

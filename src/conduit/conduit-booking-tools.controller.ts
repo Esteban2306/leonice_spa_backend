@@ -25,6 +25,7 @@ import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationOrchestrator } from '../reservations/orchestrators/create-reservation.orchestrator';
 import { GetAvailabilityDto } from '../reservations/dto/get-availability.dto';
 import { CreateReservationDto } from '../reservations/dto/create-reservation.dto';
+import { CancellationLinkService } from '../reservations/service/cancellation-link.service';
 import { CancelReservationOrchestrator } from '../reservations/orchestrators/cancel-reservation.orchestrator';
 import {
   ConduitCancelReservationDto,
@@ -42,6 +43,7 @@ export class ConduitBookingToolsController {
     private readonly cancelReservation: CancelReservationOrchestrator,
     private readonly rescheduleReservation: RescheduleReservationOrchestrator,
     private readonly clientsRepository: ClientsRepository,
+    private readonly cancellationLinks: CancellationLinkService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -96,6 +98,30 @@ export class ConduitBookingToolsController {
     @VerifiedPhone() phone: string,
   ) {
     return this.cancelReservation.listUpcomingByPhone(phone);
+  }
+
+  @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
+  @Get('reservations/cancellation-link')
+  async cancellationLink(
+    @Query() _query: ConduitUpcomingReservationsQueryDto,
+    @VerifiedPhone() phone: string,
+  ) {
+    const { days } = await this.cancelReservation.listUpcomingByPhone(phone);
+    const next = days[0]?.reservations[0];
+    if (!next) return { hasUpcoming: false as const };
+
+    const issued = await this.cancellationLinks.issue(next.reservationId, {
+      send: false,
+    });
+    return {
+      hasUpcoming: true as const,
+      url: issued.url,
+      treatment: next.treatment,
+      scheduledStart: next.scheduledStart,
+      expiresAt: issued.expiresAt,
+      sameDayCount: days[0].reservations.length,
+      upcomingDays: days.length,
+    };
   }
 
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })

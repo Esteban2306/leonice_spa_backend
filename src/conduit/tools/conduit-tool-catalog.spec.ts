@@ -16,7 +16,7 @@ const schemaAt = (
     );
 
 describe('CONDUIT_TOOL_CATALOG', () => {
-  it('trae las 14 herramientas que revisa el panel', () => {
+  it('trae las 15 herramientas que revisa el panel', () => {
     expect(CONDUIT_TOOL_CATALOG.map((t) => t.name).sort()).toEqual(
       [
         'consultar_cliente',
@@ -30,6 +30,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
         'reservas_proximas',
         'reagendar_reserva_whatsapp',
         'cancelar_reserva_whatsapp',
+        'enlace_cancelacion',
         'depositos_pendientes',
         'registrar_comprobante_automatico',
         'pasar_a_persona',
