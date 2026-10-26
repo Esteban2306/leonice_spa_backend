@@ -57,19 +57,25 @@ export class ConduitSupportToolsController {
       (dto.phone ? normalizePhone(dto.phone) : null);
     const client = phone ? await this.clients.findByPhone(phone) : null;
 
-    this.eventBus.publish(EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED, {
-      phone,
-      lid: req.conduitContact?.lid ?? null,
-      clientName: client?.name ?? null,
-      reason: dto.reason,
-      summary: dto.summary ?? null,
-      requestId: idempotencyKey ?? randomUUID(),
-    });
+    const results = await this.eventBus.publishAsync(
+      EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED,
+      {
+        phone,
+        lid: req.conduitContact?.lid ?? null,
+        clientName: client?.name ?? null,
+        reason: dto.reason,
+        summary: dto.summary ?? null,
+        requestId: idempotencyKey ?? randomUUID(),
+      },
+    );
 
+    const teamNotified = results.some(Boolean);
     return {
-      handedOff: true,
-      message:
-        'El equipo fue notificado y responderá por este mismo chat lo antes posible.',
+      handedOff: teamNotified,
+      teamNotified,
+      message: teamNotified
+        ? 'El equipo fue notificado y responderá por este mismo chat lo antes posible.'
+        : 'No hay nadie del equipo a quien avisar en este momento; no prometas que una persona escribirá.',
     };
   }
 }

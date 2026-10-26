@@ -8,6 +8,7 @@ import {
 import { Request, Response } from 'express';
 import { RequestContextService } from '../context/request-context.service';
 import { redactUrl } from '../logging/redact-url';
+import { nextStepFor } from '../errors/next-step';
 import {
   normalizeException,
   type ErrorResponseBody,
@@ -42,6 +43,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       code: normalized.code,
       message: normalized.message,
       ...(normalized.details ? { details: normalized.details } : {}),
+      ...(nextStepFor(normalized.code)
+        ? { nextStep: nextStepFor(normalized.code) }
+        : {}),
       correlationId,
       timestamp: new Date().toISOString(),
       path: request.originalUrl,

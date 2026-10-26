@@ -9,6 +9,7 @@ export interface ErrorResponseBody {
   code: ErrorCode;
   message: string;
   details?: ErrorDetails;
+  nextStep?: string;
   correlationId: string;
   timestamp: string;
   path: string;

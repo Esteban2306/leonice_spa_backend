@@ -219,10 +219,10 @@ export class OperationalNotificationsListener {
       EventPayloadMap,
       typeof EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED
     >,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const { requestId, ...payload } = event.payload;
     try {
-      await this.enqueueForAdmins<AdminHandoffNoticeJobData>(
+      const queued = await this.enqueueForAdmins<AdminHandoffNoticeJobData>(
         JOB_NAMES.NOTIFY_ADMIN_HANDOFF,
         'traspaso a una persona',
         (recipientId) => ({
@@ -230,9 +230,11 @@ export class OperationalNotificationsListener {
           opts: { jobId: `admin-handoff-${requestId}-${recipientId}` },
         }),
       );
+      return queued > 0;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`No se pudo encolar el aviso de traspaso: ${message}`);
+      return false;
     }
   }
 
@@ -240,18 +242,20 @@ export class OperationalNotificationsListener {
     jobName: string,
     label: string,
     build: (recipientId: string) => AdminJobSpec<T>,
-  ): Promise<void> {
+  ): Promise<number> {
     const active = await this.recipients.findActive();
     if (active.length === 0) {
       this.logger.warn(
         `Aviso "${label}" sin enviar: no hay destinatarios admin activos`,
       );
-      return;
+      return 0;
     }
+    let queued = 0;
     for (const recipient of active) {
       try {
         const { data, opts } = build(recipient.id);
         await this.queue.add(jobName, data, { ...NOTICE_JOB_OPTIONS, ...opts });
+        queued += 1;
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(
@@ -259,12 +263,13 @@ export class OperationalNotificationsListener {
         );
       }
     }
+    return queued;
   }
 
   private async guard(
     label: string,
     reservationId: string,
-    fn: () => Promise<void>,
+    fn: () => Promise<unknown>,
   ): Promise<void> {
     try {
       await fn();

@@ -107,7 +107,7 @@ Cambiar o cancelar
 Fuera de esto
 - Si pide hablar con una persona, tiene una queja, un tema de salud delicado o no logras resolver tras dos intentos, usa pasar_a_persona con el motivo y un resumen breve.
 - Si quiere enviar un comprobante de pago, pídele que mande la foto por este chat.
-- Error de negocio: explícalo en una frase simple y propón el siguiente paso. Fallo técnico: di con honestidad que no pudiste completarlo y usa pasar_a_persona.`;
+- Resultado con expected:true: explícalo en una frase simple y sigue su nextStep (OFFER_OTHER_SLOT: ofrece los horarios de alternatives o consulta otro día; SHOW_UPCOMING: revisa sus citas; ASK_CLIENT_DATA: pide el dato; OFFER_HANDOFF: ofrece pasar con una persona). No avises a nadie por esto. Fallo técnico: di que no pudiste completarlo; el sistema avisa al equipo solo. Nunca digas que una persona escribirá si pasar_a_persona no devolvió éxito.`;
 
 export const TREATMENT_SLIM_PROMPT = `Eres {{agentName}}, recepcionista de {{companyName}} (spa capilar y de uñas), por WhatsApp. La clienta pregunta por un tratamiento.
 Idioma: {{language}}. Tono: {{tone}}. Responde de forma {{responseLength}}. {{emojiInstruction}} {{formatInstruction}}
@@ -807,6 +807,35 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     priority: 0,
     patterns: [],
     variants: {},
+  },
+  {
+    key: 'rule.handoff',
+    name: 'Regla: traspaso hecho por el sistema',
+    description:
+      'Texto fijo cuando el sistema pasa el chat a una persona (fallo técnico o paso siguiente "traspaso") y el aviso al equipo quedó verificado',
+    handler: 'TEMPLATE',
+    priority: 0,
+    patterns: [],
+    variants: {
+      default: [
+        'Ya avisé al equipo y una persona te escribirá por este mismo chat lo antes posible 🙏',
+        'Tuvimos un inconveniente de nuestro lado. Ya le avisé al equipo y una persona te escribirá por aquí en breve 🙏',
+      ],
+    },
+  },
+  {
+    key: 'rule.handoff_failed',
+    name: 'Regla: traspaso sin nadie a quien avisar',
+    description:
+      'Texto fijo cuando no se pudo avisar a nadie del equipo: no promete que una persona escribirá',
+    handler: 'TEMPLATE',
+    priority: 0,
+    patterns: [],
+    variants: {
+      default: [
+        'En este momento no pude completar tu solicitud. Por favor escríbenos de nuevo en unos minutos 🙏',
+      ],
+    },
   },
   {
     key: 'rule.abuse',

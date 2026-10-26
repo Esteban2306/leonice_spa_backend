@@ -88,6 +88,8 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     );
     expect(rules.map((r) => r.key).sort()).toEqual([
       'rule.abuse',
+      'rule.handoff',
+      'rule.handoff_failed',
       'rule.opt_in',
       'rule.opt_out',
       'rule.spam',

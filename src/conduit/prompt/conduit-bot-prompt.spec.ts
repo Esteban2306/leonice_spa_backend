@@ -95,7 +95,9 @@ describe('prompt del asistente de Leonice', () => {
   it('prohíbe mostrar datos técnicos y contempla errores de negocio y técnicos', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toMatch(/ids, códigos, JSON, nombres de herramientas/);
-    expect(t).toMatch(/Error de negocio/);
+    expect(t).toMatch(/expected:true/);
+    expect(t).toMatch(/OFFER_OTHER_SLOT/);
+    expect(t).toMatch(/Nunca digas que una persona escribirá/);
     expect(t).toMatch(/Fallo técnico/);
     expect(t).toMatch(/Nunca inventes/);
   });

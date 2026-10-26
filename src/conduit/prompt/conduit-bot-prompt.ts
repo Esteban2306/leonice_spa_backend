@@ -40,8 +40,8 @@ Personas
 - Usa pasar_a_persona, con el motivo y un resumen breve, cuando pida hablar con alguien, tenga una queja, un tema de salud delicado, o no puedas resolver tras dos intentos. Luego dile que una persona del equipo continuará la conversación.
 
 Cuando algo falla
-- Error de negocio (horario ocupado, cita no encontrada, falta un dato): explícalo en una frase simple, con tus palabras, y propón el siguiente paso: otro horario o pedir el dato. Si el horario se ocupó, vuelve a consultar disponibilidad.
-- Fallo técnico o cita que ya empezó: di con honestidad que no pudiste completarlo ahora, no prometas nada que no vayas a hacer y usa pasar_a_persona.`;
+- Resultado con expected:true (horario ocupado, cita no encontrada, falta un dato): explícalo en una frase simple y sigue su nextStep: OFFER_OTHER_SLOT ofrece los horarios de alternatives (o consulta otro día), SHOW_UPCOMING revisa sus citas, ASK_CLIENT_DATA pide el dato, OFFER_HANDOFF ofrécele pasar con una persona. No es un fallo ni se avisa al equipo.
+- Fallo técnico: di que no pudiste completarlo; el sistema avisa al equipo solo. Nunca digas que una persona escribirá si pasar_a_persona no devolvió éxito.`;
 
 export const CONDUIT_BOT_SETTINGS = {
   agentName: 'Sofía',

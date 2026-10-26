@@ -10,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ReservationChannel } from '@prisma/client';
+import { AppException } from '../common/errors/app.exception';
 import { ConduitTool } from './decorators/conduit-tool.decorator';
 import { VerifiedPhone } from './decorators/verified-phone.decorator';
 import {
@@ -37,6 +38,13 @@ import {
   ConduitRescheduleReservationDto,
   ConduitUpcomingReservationsQueryDto,
 } from './dto/conduit-cancel-reservation.dto';
+
+const SLOT_ERRORS = new Set<string>([
+  'PLACEMENT_NO_SLOT_THAT_DAY',
+  'PLACEMENT_NO_CAPACITY',
+  'PLACEMENT_CATEGORY_DAY_CONFLICT',
+  'PLACEMENT_CLIENT_OVERLAP',
+]);
 
 @Controller({ path: 'conduit/booking', version: '1' })
 @ConduitTool()
@@ -124,15 +132,19 @@ export class ConduitBookingToolsController {
     @Req() req: RequestWithConduitContact,
   ) {
     const treatments = await this.resolveTreatmentIds(dto);
-    return this.createReservation.execute(
-      {
-        client: dto.client,
-        treatments,
-        scheduledStart: dto.scheduledStart,
-        channel: ReservationChannel.WHATSAPP,
-      },
-      { trustedIdentity: hasVerifiedIdentity(req) },
-    );
+    try {
+      return await this.createReservation.execute(
+        {
+          client: dto.client,
+          treatments,
+          scheduledStart: dto.scheduledStart,
+          channel: ReservationChannel.WHATSAPP,
+        },
+        { trustedIdentity: hasVerifiedIdentity(req) },
+      );
+    } catch (error) {
+      throw await this.withAlternatives(error, treatments, dto.scheduledStart);
+    }
   }
 
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
@@ -229,5 +241,42 @@ export class ConduitBookingToolsController {
       }
     }
     return [...new Set(resolved)];
+  }
+
+  /**
+   * Si el horario pedido no está disponible, el error lleva los próximos
+   * horarios libres para que el bot los ofrezca sin consultar de nuevo.
+   */
+  private async withAlternatives(
+    error: unknown,
+    treatments: string[],
+    scheduledStart: string,
+  ): Promise<unknown> {
+    if (!(error instanceof AppException) || !SLOT_ERRORS.has(error.code)) {
+      return error;
+    }
+    try {
+      const from = scheduledStart.slice(0, 10);
+      const to = new Date(`${from}T00:00:00Z`);
+      to.setUTCDate(to.getUTCDate() + 8);
+      const calendar = await this.reservationsService.getAvailabilityCalendar({
+        treatmentIds: treatments,
+        from,
+        to: to.toISOString().slice(0, 10),
+      });
+      const alternatives = calendar.days
+        .filter((day) => day.available && day.slots.length > 0)
+        .slice(0, 3)
+        .map((day) => ({
+          date: day.date,
+          times: day.slots.slice(0, 4).map((slot) => slot.localTime),
+        }));
+      if (alternatives.length === 0) return error;
+      return new AppException(error.code, {
+        details: { ...error.details, alternatives },
+      });
+    } catch {
+      return error;
+    }
   }
 }
