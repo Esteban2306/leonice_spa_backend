@@ -27,7 +27,7 @@ class ConsentInputDto {
   policyVersion: string;
 }
 
-class ClientInputDto {
+export class ClientInputDto {
   @IsString()
   @MaxLength(32)
   @MinLength(10)

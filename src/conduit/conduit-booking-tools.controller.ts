@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -28,7 +29,7 @@ import { ClientsRepository } from '../clients/repositories/clients.repository';
 import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationOrchestrator } from '../reservations/orchestrators/create-reservation.orchestrator';
 import { GetAvailabilityDto } from '../reservations/dto/get-availability.dto';
-import { CreateReservationDto } from '../reservations/dto/create-reservation.dto';
+import { ConduitCreateReservationDto } from './dto/conduit-create-reservation.dto';
 import { CancellationLinkService } from '../reservations/service/cancellation-link.service';
 import { CancelReservationOrchestrator } from '../reservations/orchestrators/cancel-reservation.orchestrator';
 import {
@@ -118,12 +119,18 @@ export class ConduitBookingToolsController {
   }
 
   @Post('reservations')
-  create(
-    @Body() dto: CreateReservationDto,
+  async create(
+    @Body() dto: ConduitCreateReservationDto,
     @Req() req: RequestWithConduitContact,
   ) {
+    const treatments = await this.resolveTreatmentIds(dto);
     return this.createReservation.execute(
-      { ...dto, channel: ReservationChannel.WHATSAPP },
+      {
+        client: dto.client,
+        treatments,
+        scheduledStart: dto.scheduledStart,
+        channel: ReservationChannel.WHATSAPP,
+      },
       { trustedIdentity: hasVerifiedIdentity(req) },
     );
   }
@@ -191,5 +198,36 @@ export class ConduitBookingToolsController {
       phone,
       new Date(dto.newScheduledStart),
     );
+  }
+
+  private async resolveTreatmentIds(
+    dto: ConduitCreateReservationDto,
+  ): Promise<string[]> {
+    const ids = dto.treatments ?? [];
+    const names = dto.treatmentNames ?? [];
+    if (ids.length === 0 && names.length === 0) {
+      throw new BadRequestException(
+        'Indica los servicios con treatments (ids) o treatmentNames (nombres).',
+      );
+    }
+    if (names.length === 0) return ids;
+
+    const catalog = await this.treatmentsService.findAll();
+    const resolved = [...ids];
+    for (const name of names) {
+      const match = matchTreatment(name, catalog);
+      if (match.status === 'found') {
+        resolved.push(match.treatment.id);
+      } else if (match.status === 'ambiguous') {
+        throw new BadRequestException(
+          `El servicio "${name}" coincide con varios (${match.options.map((t) => t.name).join(', ')}). Pregúntale a la clienta cuál es.`,
+        );
+      } else {
+        throw new BadRequestException(
+          `No encontré el servicio "${name}" en el catálogo.`,
+        );
+      }
+    }
+    return [...new Set(resolved)];
   }
 }

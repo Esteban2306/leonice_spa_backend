@@ -180,7 +180,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     injectPhoneParamName: 'client.phone',
     parametersSchema: {
       type: 'object',
-      required: ['client', 'treatments', 'scheduledStart'],
+      required: ['client', 'scheduledStart'],
       properties: {
         client: {
           type: 'object',
@@ -208,7 +208,14 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
           type: 'array',
           minItems: 1,
           items: { type: 'string', format: 'uuid' },
-          description: 'IDs de los servicios confirmados',
+          description: 'IDs de los servicios confirmados (si los tienes)',
+        },
+        treatmentNames: {
+          type: 'array',
+          minItems: 1,
+          items: { type: 'string', minLength: 2, maxLength: 80 },
+          description:
+            'Nombres de los servicios confirmados, como se los dijiste a la clienta. Úsalo si no tienes el id: no hace falta consultar la lista de nuevo',
         },
         scheduledStart: {
           type: 'string',
