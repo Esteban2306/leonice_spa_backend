@@ -12,6 +12,7 @@ export interface ConduitTemplateDefinition {
   subject?: string;
   variables: readonly string[];
   body: string;
+  variants?: readonly string[];
 }
 
 export const templateChannel = (
@@ -44,6 +45,22 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       '',
       '¿Nos confirmas tu asistencia? Si necesitas reprogramar o cancelar, respóndenos por aquí y te ayudamos.',
     ].join('\n'),
+    variants: [
+      [
+        'Hola {{nombre}} 🌿',
+        '',
+        'Te escribimos de Leonice Arenas Spa Capilar para recordarte que tu cita es el *{{fecha}}*.',
+        '',
+        '¿Confirmas que podrás asistir? Si necesitas cambiarla o cancelarla, respóndenos por aquí y lo resolvemos.',
+      ].join('\n'),
+      [
+        '{{nombre}}, ¡qué gusto saludarte! 🌿',
+        '',
+        'Tu cita en Leonice Arenas Spa Capilar está programada para el *{{fecha}}*.',
+        '',
+        'Cuéntanos por aquí si vas a asistir o si prefieres reprogramar o cancelar; te ayudamos con gusto.',
+      ].join('\n'),
+    ],
   },
   {
     code: 'REACTIVATION',
@@ -60,6 +77,22 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       '',
       '¿Te gustaría agendar tu próxima cita? Respóndenos por aquí y te mostramos los horarios disponibles.',
     ].join('\n'),
+    variants: [
+      [
+        'Hola {{nombre}} 🌿',
+        '',
+        'Hace {{dias}} días no te vemos en Leonice Arenas Spa Capilar y nos encantaría seguir cuidando tu cabello.',
+        '',
+        '¿Quieres que te ayudemos a agendar tu próxima cita? Respóndenos por aquí y te compartimos los horarios libres.',
+      ].join('\n'),
+      [
+        '{{nombre}}, ¿cómo has estado? 🌿',
+        '',
+        'Han pasado {{dias}} días desde tu última visita a Leonice Arenas Spa Capilar. Con gusto retomamos el cuidado de tu cabello.',
+        '',
+        'Si quieres agendar, escríbenos por aquí y te mostramos los horarios disponibles.',
+      ].join('\n'),
+    ],
   },
   {
     code: 'REACTIVATION_PROMO',
@@ -76,6 +109,22 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       '',
       '¿Quieres que te ayudemos a agendar? Respóndenos por aquí y te mostramos los horarios disponibles.',
     ].join('\n'),
+    variants: [
+      [
+        'Hola {{nombre}} 🌿',
+        '',
+        'Hace {{dias}} días no vienes y te tenemos una sorpresa: *{{promocion}}* con *{{descuento}}% de descuento*.',
+        '',
+        '¿Te ayudamos a agendar? Respóndenos por aquí y te compartimos los horarios disponibles.',
+      ].join('\n'),
+      [
+        '{{nombre}}, te extrañamos 🌿',
+        '',
+        'Desde tu última visita pasaron {{dias}} días, y por eso tenemos para ti *{{promocion}}* con *{{descuento}}% de descuento*.',
+        '',
+        'Si te interesa, escríbenos por aquí y reservamos tu horario.',
+      ].join('\n'),
+    ],
   },
   {
     code: 'CLIENT_DEPOSIT_REJECTED',

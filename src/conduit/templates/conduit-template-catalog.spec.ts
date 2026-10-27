@@ -65,4 +65,27 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
       }
     }
   });
+
+  it('los mensajes proactivos a muchas clientas tienen variantes con las mismas variables', () => {
+    const withVariants = CONDUIT_TEMPLATE_CATALOG.filter((t) => t.variants);
+    expect(withVariants.map((t) => t.code).sort()).toEqual([
+      'REACTIVATION',
+      'REACTIVATION_PROMO',
+      'RESERVATION_REMINDER',
+    ]);
+    for (const template of withVariants) {
+      const variants = template.variants ?? [];
+      expect(variants.length).toBeGreaterThanOrEqual(2);
+      expect(variants.length).toBeLessThanOrEqual(3);
+      expect(new Set([template.body, ...variants]).size).toBe(
+        variants.length + 1,
+      );
+      for (const variant of variants) {
+        expect(templatePlaceholders(variant).sort()).toEqual(
+          [...template.variables].sort(),
+        );
+        expect(variant.length).toBeLessThan(700);
+      }
+    }
+  });
 });

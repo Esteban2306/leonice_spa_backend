@@ -11,11 +11,21 @@ interface RemoteTemplate {
   name: string;
   channel: string;
   bodyHandlebars: string;
+  bodyVariants?: string[];
 }
 
 const templateKey = (channel: string, name: string) => `${channel}:${name}`;
 
 type Outcome = 'created' | 'updated' | 'kept';
+
+function sameVariants(
+  remote: readonly string[] | undefined,
+  local: readonly string[] | undefined,
+): boolean {
+  const a = remote ?? [];
+  const b = local ?? [];
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
 
 const LIST_PAGE_SIZE = 100;
 
@@ -53,6 +63,7 @@ export async function seedConduitTemplates(
       channel: templateChannel(template),
       ...(template.subject ? { subject: template.subject } : {}),
       bodyHandlebars: template.body,
+      bodyVariants: [...(template.variants ?? [])],
       variadblesSchema: Object.fromEntries(
         template.variables.map((variable) => [variable, 'string']),
       ),
@@ -76,7 +87,11 @@ export async function seedConduitTemplates(
       continue;
     }
 
-    if (overwrite && current.bodyHandlebars !== template.body) {
+    if (
+      overwrite &&
+      (current.bodyHandlebars !== template.body ||
+        !sameVariants(current.bodyVariants, template.variants))
+    ) {
       await request('PUT', `templates/${current.id}`, payload);
       results.push({
         template,
@@ -110,6 +125,17 @@ export async function seedConduitTemplates(
     if (outcome === 'kept' && unknown.length > 0) {
       console.warn(
         `[conduit]   ⚠ usa variables que el backend no envía: ${unknown.join(', ')} (quedarán vacías)`,
+      );
+    }
+    const remote = byName.get(
+      templateKey(templateChannel(template), template.name),
+    );
+    if (
+      outcome === 'kept' &&
+      !sameVariants(remote?.bodyVariants, template.variants)
+    ) {
+      console.warn(
+        `[conduit]   ⚠ las variantes del texto no están aplicadas; vuelve a correr con CONDUIT_TEMPLATES_OVERWRITE=true para activarlas`,
       );
     }
     if (missing.length > 0) {
