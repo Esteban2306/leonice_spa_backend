@@ -7,6 +7,11 @@ describe('resolveCorrelationId', () => {
     expect(resolveCorrelationId('front-7f3a9c21')).toBe('front-7f3a9c21');
   });
 
+  it('conserva el id de turno (UUID) que Conduit envía en cada llamada de herramienta', () => {
+    const turn = '6fe86651-8c77-46a6-a943-477c492250d7';
+    expect(resolveCorrelationId(turn)).toBe(turn);
+  });
+
   it.each([
     [undefined],
     [['a', 'b']],
