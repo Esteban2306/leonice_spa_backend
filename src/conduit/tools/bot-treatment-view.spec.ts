@@ -3,6 +3,7 @@ import {
   formatDurationRange,
   formatPriceRange,
   toBotTreatment,
+  toBotTreatmentListItem,
 } from './bot-treatment-view';
 
 const base = {
@@ -196,5 +197,20 @@ describe('formatos', () => {
     expect(formatDurationRange(45, 45)).toBe('45 min');
     expect(formatDurationRange(150, 210)).toBe('2 h 30 min a 3 h 30 min');
     expect(formatDurationRange(null, null)).toBeNull();
+  });
+});
+
+describe('toBotTreatmentListItem', () => {
+  it('es la misma vista sin el eslogan, y pesa menos', () => {
+    const source = { ...base, activePromotion: null } as Parameters<
+      typeof toBotTreatment
+    >[0];
+    const full = toBotTreatment(source);
+    const item = toBotTreatmentListItem(source);
+    expect(item).not.toHaveProperty('tagline');
+    expect({ ...item, tagline: full.tagline }).toEqual(full);
+    expect(JSON.stringify(item).length).toBeLessThan(
+      JSON.stringify(full).length,
+    );
   });
 });

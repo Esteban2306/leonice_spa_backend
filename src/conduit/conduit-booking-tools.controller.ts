@@ -21,7 +21,7 @@ import {
 import { RescheduleReservationOrchestrator } from '../reservations/orchestrators/reschedule-reservation.orchestrator';
 import { GetAvailabilityCalendarDto } from '../reservations/dto/get-availability-calendar.dto';
 import {
-  toBotTreatment,
+  toBotTreatmentListItem,
   toBotTreatmentDetail,
 } from './tools/bot-treatment-view';
 import { matchTreatment } from './tools/treatment-matcher';
@@ -70,7 +70,9 @@ export class ConduitBookingToolsController {
       this.treatmentsService.findAll(categoryId),
       phone ? this.clientsRepository.findByPhone(phone) : null,
     ]);
-    return treatments.map((treatment) => toBotTreatment(treatment, client));
+    return treatments.map((treatment) =>
+      toBotTreatmentListItem(treatment, client),
+    );
   }
 
   /**

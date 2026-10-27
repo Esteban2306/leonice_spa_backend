@@ -163,6 +163,21 @@ export function toBotTreatment(
   };
 }
 
+/**
+ * Elemento de la lista que ve el modelo: sin el eslogan de marketing, que ya
+ * viaja en la ficha (info_tratamiento) y pesaba ~37 % de cada lista.
+ */
+export function toBotTreatmentListItem(
+  treatment: BotTreatmentSource,
+  client?: BotPricingClient | null,
+) {
+  const full: Record<string, unknown> = {
+    ...toBotTreatment(treatment, client),
+  };
+  delete full.tagline;
+  return full as Omit<ReturnType<typeof toBotTreatment>, 'tagline'>;
+}
+
 const PRICE_RANGE_NOTE =
   'El precio final se confirma después del diagnóstico en el spa.';
 const ASSESSMENT_NOTE = 'Antes de agendar se hace una valoración.';
