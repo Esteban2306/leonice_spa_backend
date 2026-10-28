@@ -3,9 +3,9 @@ import { ConduitTool } from '../conduit/decorators/conduit-tool.decorator';
 import { VerifiedPhone } from '../conduit/decorators/verified-phone.decorator';
 import { PendingDepositLookupService } from './services/pending-deposit-lookup.service';
 import { SubmitDepositProofOrchestrator } from './orchestrator/submit-deposit-proof.orchestrator';
-import { AutomaticDepositVerificationStrategy } from './strategies/automatic-deposit-verification.strategy';
+import { ManualDepositVerificationStrategy } from './strategies/manual-deposit-verification.strategy';
 import { CloudinaryService } from '../infrastructure/cloudinary/cloudinary.service';
-import { SubmitAutomaticDepositDto } from './dto/submit-automatic-deposit.dto';
+import { SubmitConduitDepositDto } from './dto/submit-conduit-deposit.dto';
 import { assertValidImageDataUri } from './validators/assert-valid-image-data-uri';
 import { FindDepositsQueryDto } from './dto/find-deposits-query.dto';
 import { DepositsRepository } from './repositories/deposits.repositories';
@@ -17,7 +17,7 @@ export class DepositsLookupController {
   constructor(
     private readonly lookupService: PendingDepositLookupService,
     private readonly submitOrchestrator: SubmitDepositProofOrchestrator,
-    private readonly automaticStrategy: AutomaticDepositVerificationStrategy,
+    private readonly manualStrategy: ManualDepositVerificationStrategy,
     private readonly cloudinary: CloudinaryService,
     private readonly depositsRepository: DepositsRepository,
     private readonly depositCredit: DepositCreditService,
@@ -53,7 +53,7 @@ export class DepositsLookupController {
   @ConduitTool({ requiresVerifiedContact: true })
   @Post('automatic')
   async submitAutomaticProof(
-    @Body() dto: SubmitAutomaticDepositDto,
+    @Body() dto: SubmitConduitDepositDto,
     @VerifiedPhone() phone: string,
   ) {
     const reservationId =
@@ -67,10 +67,9 @@ export class DepositsLookupController {
     );
 
     return this.submitOrchestrator.execute({
-      strategy: this.automaticStrategy,
+      strategy: this.manualStrategy,
       reservationId,
       phone,
-      coverage: dto.coverage,
       preUploadedImage: uploaded,
     });
   }

@@ -306,7 +306,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'registrar_comprobante_automatico',
     description:
-      'Registra la foto del comprobante de pago que la clienta acaba de enviar. Sin reservationId usa la única reserva pendiente.',
+      'Sube la foto del comprobante que la clienta envió para que el equipo la revise. No confirma el pago ni registra montos. Sin reservationId usa la única reserva pendiente.',
     httpMethod: 'POST',
     path: '/deposits/automatic',
     injectPhoneParamName: 'phone',
@@ -314,13 +314,9 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     imageParamName: 'imageBase64',
     parametersSchema: {
       type: 'object',
-      required: ['phone', 'coverage'],
+      required: ['phone'],
       properties: {
         phone: PHONE,
-        coverage: {
-          enum: ['ANTICIPO', 'PAGO_COMPLETO'],
-          description: 'Si pagó solo el anticipo o el valor completo',
-        },
         reservationId: UUID('Opcional si solo hay una reserva pendiente'),
       },
     },

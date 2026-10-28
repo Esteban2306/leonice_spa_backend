@@ -89,6 +89,10 @@ Reglas
 - Si no sabes si está registrada, consultar_cliente primero. Si es el primer mensaje del bot en la conversación, preséntate ("Hola, {nombre}, soy {{agentName}} de {{companyName}}"); si ya te presentaste, no lo repitas.
 - Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo.
 - Servicios, duración, precio, promociones e id: listar_tratamientos. Nunca inventes un id: una herramienta que necesita un id se llama después de recibirlo.
+- Solo al presentar varios tratamientos usa este formato con emojis (en otros mensajes, casi sin emojis): una frase de introducción, cada servicio como bloque separado por línea en blanco y una pregunta corta al final:
+✨ *Nombre del servicio*
+⏱ 60 min · 💰 $250.000
+Rango (priceIsRange): 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁; requiere valoración: línea 📋. Un título en negrita por categoría si hay varias. Máximo 8 servicios por mensaje. Negrita con un solo asterisco.
 - Horarios libres: consultar_disponibilidad (un servicio, un día) o disponibilidad_combo (varios servicios o días; purpose=RESCHEDULE al reagendar). Ofrece solo horarios que devuelvan; si no hay cupo, busca los días siguientes.
 - Anticipo, medios de pago y políticas: info_negocio.
 
@@ -106,7 +110,7 @@ Cambiar o cancelar
 
 Fuera de esto
 - Si pide hablar con una persona, tiene una queja, un tema de salud delicado o no logras resolver tras dos intentos, usa pasar_a_persona con el motivo y un resumen breve.
-- Si quiere enviar un comprobante de pago, pídele que mande la foto por este chat.
+- Si quiere enviar un comprobante de pago, pídele que mande la foto por este chat. Cuando haya una imagen en la conversación, llama registrar_comprobante_automatico sin preguntar cuánto pagó; no confirmes ni registres montos, solo di que el equipo revisará el comprobante.
 - Resultado con expected:true: explícalo en una frase simple y sigue su nextStep (OFFER_OTHER_SLOT: ofrece los horarios de alternatives o consulta otro día; SHOW_UPCOMING: revisa sus citas; ASK_CLIENT_DATA: pide el dato; OFFER_HANDOFF: ofrece pasar con una persona). No avises a nadie por esto. Fallo técnico: di que no pudiste completarlo; el sistema avisa al equipo solo. Nunca digas que una persona escribirá si pasar_a_persona no devolvió éxito.`;
 
 export const TREATMENT_SLIM_PROMPT = `Eres {{agentName}}, recepcionista de {{companyName}} (spa capilar y de uñas), por WhatsApp. La clienta pregunta por un tratamiento.
@@ -116,6 +120,10 @@ Reglas
 - Usa info_tratamiento con el nombre que dijo (o listar_tratamientos si no nombró uno) y responde SOLO con lo que devuelvan; nunca inventes beneficios, precios, duraciones ni resultados. Si el dato no está, dilo con naturalidad y ofrece pasarla con una persona del equipo.
 - Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo. Dinero en pesos colombianos, tal como lo entregan las herramientas.
 - Mensajes cortos y una sola pregunta. Nunca muestres ids ni nombres de herramientas.
+- Si listas varios tratamientos usa este formato con emojis (en otros mensajes casi ninguno): una frase de introducción y cada servicio como bloque separado por línea en blanco, con una pregunta corta al final:
+✨ *Nombre del servicio*
+⏱ 60 min · 💰 $250.000
+Rango: 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁; requiere valoración: línea 📋. Máximo 8 servicios; negrita con un solo asterisco.
 - Si quiere agendar, dile que con gusto la ayudas y pregúntale el día que prefiere. Si pide una persona o tiene una queja, usa pasar_a_persona.`;
 
 export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
@@ -857,14 +865,36 @@ function treatmentsList() {
     path: '[*]',
     item: [
       {
-        when: { path: 'promotion.price', exists: true },
-        text: '• {name} — {price} · promo {promotion.discount}: {promotion.price}',
+        when: {
+          all: [
+            { path: 'promotion.price', exists: true },
+            { path: 'duration', exists: true },
+          ],
+        },
+        text: '✨ *{name}*\n⏱ {duration} · 💰 {price}\n🎁 Promo {promotion.discount}: {promotion.price}',
       },
-      { when: { path: 'price', exists: true }, text: '• {name} — {price}' },
-      { text: '• {name}' },
+      {
+        when: { path: 'promotion.price', exists: true },
+        text: '✨ *{name}*\n💰 {price}\n🎁 Promo {promotion.discount}: {promotion.price}',
+      },
+      {
+        when: {
+          all: [
+            { path: 'price', exists: true },
+            { path: 'duration', exists: true },
+          ],
+        },
+        text: '✨ *{name}*\n⏱ {duration} · 💰 {price}',
+      },
+      {
+        when: { path: 'price', exists: true },
+        text: '✨ *{name}*\n💰 {price}',
+      },
+      { text: '✨ *{name}*' },
     ],
+    separator: '\n\n',
     groupBy: 'category',
-    groupHeader: '*{}*',
+    groupHeader: '🌿 *{}*',
     limit: 25,
   };
 }

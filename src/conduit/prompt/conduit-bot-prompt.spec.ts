@@ -112,7 +112,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(6700);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(7300);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

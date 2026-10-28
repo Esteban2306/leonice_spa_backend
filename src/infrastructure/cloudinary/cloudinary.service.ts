@@ -8,7 +8,7 @@ import { CLOUDINARY } from './cloudinary.constants';
 import { withUploadRetry } from './upload-retry';
 
 const AUTHENTICATED_URL =
-  /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/authenticated\/(?:v(\d+)\/)?(.+)$/;
+  /^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/authenticated\/(?:s--[^/]+--\/)?(?:v(\d+)\/)?([^?]+)(?:\?.*)?$/;
 
 const AUTHENTICATED_FOLDERS = ['leonice-spa/deposit-proofs/'];
 
