@@ -6,11 +6,13 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
 import type { CatalogSort } from './product-catalog.mapper';
 
+export const MAX_PAGE_SIZE = 48;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const CATALOG_SORTS: CatalogSort[] = [
   'featured',
@@ -58,4 +60,17 @@ export class FindCatalogQueryDto {
   @IsOptional()
   @IsIn(CATALOG_SORTS)
   sort?: CatalogSort;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(MAX_PAGE_SIZE)
+  pageSize?: number;
 }

@@ -9,6 +9,8 @@ export interface CatalogFilters {
   minPrice?: number;
   maxPrice?: number;
   sort?: CatalogSort;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CatalogVariant {
@@ -62,6 +64,9 @@ export interface CatalogProductDetail extends CatalogProductCard {
 export interface CatalogResult {
   items: CatalogProductCard[];
   total: number;
+  page: number;
+  pageSize: number | null;
+  pageCount: number;
   facets: {
     categories: (CatalogFacetOption & {
       iconKey: string | null;
@@ -290,9 +295,22 @@ export function queryCatalog(
     .filter((product) => passes(product, normalized, 'price'))
     .flatMap(prices);
 
+  const sorted = sortProducts(matching, sort);
+  const pageSize = filters.pageSize ?? null;
+  const pageCount =
+    pageSize === null ? 1 : Math.max(Math.ceil(sorted.length / pageSize), 1);
+  const page = Math.min(Math.max(filters.page ?? 1, 1), pageCount);
+  const visible =
+    pageSize === null
+      ? sorted
+      : sorted.slice((page - 1) * pageSize, page * pageSize);
+
   return {
-    items: sortProducts(matching, sort).map(toProductCard),
+    items: visible.map(toProductCard),
     total: matching.length,
+    page,
+    pageSize,
+    pageCount,
     facets: {
       categories,
       tags: tagOptions,

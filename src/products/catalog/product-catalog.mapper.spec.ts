@@ -121,6 +121,34 @@ describe('queryCatalog', () => {
     ]);
   });
 
+  it('sin tamaño de página devuelve todo el catálogo en una sola página', () => {
+    const result = queryCatalog(CATALOG, {});
+
+    expect(result.items).toHaveLength(CATALOG.length);
+    expect(result).toMatchObject({ page: 1, pageSize: null, pageCount: 1 });
+  });
+
+  it('pagina el resultado y conserva el total y las facetas', () => {
+    const first = queryCatalog(CATALOG, { pageSize: 2, page: 1 });
+    const second = queryCatalog(CATALOG, { pageSize: 2, page: 2 });
+
+    expect(first.items).toHaveLength(2);
+    expect(second.items).toHaveLength(CATALOG.length - 2);
+    expect(first.total).toBe(CATALOG.length);
+    expect(first.pageCount).toBe(Math.ceil(CATALOG.length / 2));
+    expect(first.facets).toEqual(second.facets);
+    expect(
+      [...first.items, ...second.items].map((item) => item.slug).sort(),
+    ).toEqual(CATALOG.map((product) => product.slug).sort());
+  });
+
+  it('ajusta una página fuera de rango a la última', () => {
+    const result = queryCatalog(CATALOG, { pageSize: 2, page: 99 });
+
+    expect(result.page).toBe(result.pageCount);
+    expect(result.items.length).toBeGreaterThan(0);
+  });
+
   it('filtra por rango de precio si alguna presentación cae dentro', () => {
     const result = queryCatalog(CATALOG, { maxPrice: 44000 });
 
