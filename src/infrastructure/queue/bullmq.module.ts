@@ -47,6 +47,14 @@ import { QueueConnectionMonitor } from './queue-connection-monitor.service';
         },
       },
       {
+        name: QUEUE_NAMES.SIIGO_SYNC,
+        defaultJobOptions: {
+          attempts: 1,
+          removeOnComplete: true,
+          removeOnFail: { count: 100 },
+        },
+      },
+      {
         name: QUEUE_NAMES.CONDUIT_OUTBOX,
         defaultJobOptions: {
           attempts: 5,

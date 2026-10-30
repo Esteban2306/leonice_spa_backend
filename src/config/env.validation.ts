@@ -49,6 +49,59 @@ class EnvironmentVariables {
   CONDUIT_WEBHOOK_SECRET?: string;
 
   @IsOptional()
+  @IsString()
+  SIIGO_ENABLED?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_USERNAME?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_ACCESS_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_PARTNER_ID?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(5000)
+  SIIGO_TIMEOUT_MS?: number;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_RECEIPT_DOCUMENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_INCOME_CONCEPT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_PAYMENT_CASH_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_PAYMENT_TRANSFER_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_COST_CENTER_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_CUSTOMER_IDENTIFICATION?: string;
+
+  @IsOptional()
+  @IsString()
+  SIIGO_CUSTOMER_BRANCH_OFFICE?: string;
+
+  @IsOptional()
   @IsInt()
   THROTTLE_LIMIT?: number;
 

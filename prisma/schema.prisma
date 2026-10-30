@@ -42,8 +42,8 @@ model Client {
   updatedAt            DateTime         @updatedAt @map("updated_at")
   hairColor            HairColor?       @map("hair_color")
   hairLength           HairLength?      @map("hair_length")
-  hairProfileUpdatedAt DateTime?        @map("hair_profile_updated_at")
   hairDensity          HairDensity?     @map("hair_density")
+  hairProfileUpdatedAt DateTime?        @map("hair_profile_updated_at")
   whatsappJid          String?          @unique @map("whatsapp_jid")
   consentRecords       ConsentRecord[]
   productViewLogs      ProductViewLog[]
@@ -287,6 +287,7 @@ model SiigoSync {
   attempts        Int             @default(0)
   lastError       String?         @map("last_error")
   siigoDocumentId String?         @map("siigo_document_id")
+  receipts        Json?
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   syncedAt        DateTime?       @map("synced_at")
@@ -637,6 +638,12 @@ enum HairLength {
 enum HairColor {
   CLARO
   OSCURO
+}
+
+enum HairDensity {
+  BAJA
+  MEDIA
+  ALTA
 }
 
 enum AutomationExecutionType {

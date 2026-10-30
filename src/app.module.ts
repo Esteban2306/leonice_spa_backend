@@ -16,6 +16,7 @@ import { LoggingModule } from './common/logging/logging.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ConduitModule } from './conduit/conduit.module';
+import { SiigoSyncModule } from './siigo/sync/siigo-sync.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ProductsModule } from './products/products.module';
 import { TestimonialsModule } from './testimonials/testimonials.module';
@@ -61,6 +62,7 @@ import { AdminModule } from './admin/admin.module';
     ClientsModule,
     ReservationsModule,
     ConduitModule,
+    SiigoSyncModule,
     ProductsModule,
     TestimonialsModule,
     ClientPrivacyModule,
