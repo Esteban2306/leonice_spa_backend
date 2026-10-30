@@ -65,6 +65,7 @@ export class ConfirmDepositOrchestrator {
       reservationId: updated.id,
       clientId: updated.clientId,
       scheduledStart: updated.scheduledStart,
+      comboGroupId: updated.comboGroupId,
     });
   }
 

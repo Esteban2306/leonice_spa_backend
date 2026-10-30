@@ -155,6 +155,38 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     ].join('\n'),
   },
   {
+    code: 'CLIENT_RESERVATION_CONFIRMED',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_RESERVATION_CONFIRMED',
+    name: 'leonice_cita_aceptada',
+    description:
+      'Avisa a la clienta que el spa revisó su comprobante y aceptó la cita.',
+    audience: 'CLIENT',
+    variables: ['nombre', 'tratamiento', 'fecha'],
+    body: [
+      'Hola {{nombre}} 🌿',
+      '',
+      'Revisamos tu comprobante y tu cita de *{{tratamiento}}* fue aceptada. Te esperamos en Leonice Arenas Spa Capilar el *{{fecha}}*.',
+      '',
+      'Si necesitas reprogramar o cancelar, respóndenos por aquí y te ayudamos.',
+    ].join('\n'),
+  },
+  {
+    code: 'CLIENT_CANCELLED_BY_ADMIN',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_CANCELLED_BY_ADMIN',
+    name: 'leonice_cita_cancelada_por_spa',
+    description:
+      'Avisa a la clienta que el spa canceló su cita e incluye el motivo que escribió la administradora.',
+    audience: 'CLIENT',
+    variables: ['nombre', 'tratamiento', 'fecha', 'motivo'],
+    body: [
+      'Hola {{nombre}}, lamentamos informarte que tu cita de *{{tratamiento}}* del {{fecha}} fue cancelada.',
+      '',
+      '*Motivo:* {{motivo}}',
+      '',
+      'Si quieres agendar de nuevo, escríbenos por aquí y con gusto te ayudamos. 🌿',
+    ].join('\n'),
+  },
+  {
     code: 'CLIENT_RESCHEDULED',
     envKey: 'CONDUIT_TEMPLATE_CLIENT_RESCHEDULED',
     name: 'leonice_cita_reprogramada',

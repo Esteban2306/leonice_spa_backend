@@ -30,7 +30,9 @@ import {
   AdminHandoffNoticeJobData,
   CancellationLinkNoticeJobData,
   ClientCancellationNoticeJobData,
+  ClientCancelledByAdminNoticeJobData,
   ClientDepositRejectedNoticeJobData,
+  ClientReservationConfirmedNoticeJobData,
   RescheduleNoticeJobData,
 } from '../domain/operational-notifications.constants';
 import { OperationalNotificationsService } from '../operational-notifications.service';
@@ -46,6 +48,8 @@ type AutomationJobData =
   | ReactivationJobData
   | AdminDepositTimeoutNoticeJobData
   | ClientDepositRejectedNoticeJobData
+  | ClientReservationConfirmedNoticeJobData
+  | ClientCancelledByAdminNoticeJobData
   | RescheduleNoticeJobData
   | AdminRescheduleNoticeJobData
   | ClientCancellationNoticeJobData
@@ -96,6 +100,16 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       case JOB_NAMES.NOTIFY_CLIENT_DEPOSIT_REJECTED:
         return this.notifications.notifyClientDepositRejected(
           job.data as ClientDepositRejectedNoticeJobData,
+          ctx,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_RESERVATION_CONFIRMED:
+        return this.notifications.notifyClientReservationConfirmed(
+          job.data as ClientReservationConfirmedNoticeJobData,
+          ctx,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_CANCELLED_BY_ADMIN:
+        return this.notifications.notifyClientCancelledByAdmin(
+          job.data as ClientCancelledByAdminNoticeJobData,
           ctx,
         );
       case JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED:
@@ -177,6 +191,10 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.ADMIN_DEPOSIT_TIMEOUT_NOTICE;
       case JOB_NAMES.NOTIFY_CLIENT_DEPOSIT_REJECTED:
         return AutomationExecutionType.CLIENT_DEPOSIT_REJECTED_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_RESERVATION_CONFIRMED:
+        return AutomationExecutionType.CLIENT_RESERVATION_CONFIRMED_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_CANCELLED_BY_ADMIN:
+        return AutomationExecutionType.CLIENT_CANCELLED_BY_ADMIN_NOTICE;
       case JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED:
         return AutomationExecutionType.CLIENT_RESCHEDULE_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_RESCHEDULED:

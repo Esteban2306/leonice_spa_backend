@@ -183,6 +183,67 @@ describe('E2E: recorrido completo de la administradora (HTTP, Postgres y Redis r
       ).toBe(true);
     });
 
+    it('al aceptar el comprobante la clienta recibe el aviso de cita aceptada, sin bot', async () => {
+      const { client, id } = await book('aceptaadmin', futureSlot(5, 14));
+      expectStatus(
+        await request(ctx.server)
+          .post(`${API}/reservations/${id}/deposits`)
+          .field('phone', client.phone)
+          .attach('image', PNG, {
+            filename: 'c.png',
+            contentType: 'image/png',
+          }),
+        201,
+      );
+
+      expectStatus(
+        await asAdmin(
+          ctx,
+          'patch',
+          `/reservations/${id}/deposits/approve`,
+        ).send({ coverage: 'ANTICIPO', amount: 25 }),
+        200,
+      );
+
+      expect(await statusOf(id)).toBe(ReservationStatus.CONFIRMADA);
+      expect(
+        await ctx.sink.waitFor(() =>
+          messagesTo(client.phone).some((m) =>
+            JSON.stringify(m.body).includes('"tratamiento"'),
+          ),
+        ),
+      ).toBe(true);
+    });
+
+    it('al cancelar con motivo la clienta recibe ese motivo por mensaje automático', async () => {
+      const { client, id } = await book('motivoadmin', futureSlot(6, 14));
+      expectStatus(
+        await asAdmin(ctx, 'patch', `/reservations/${id}/admin-cancel`).send({
+          reason: 'No logramos validar tu pago',
+          notifyClient: true,
+        }),
+        200,
+      );
+      expect(
+        await ctx.sink.waitFor(() =>
+          messagesTo(client.phone).some((m) =>
+            JSON.stringify(m.body).includes('No logramos validar tu pago'),
+          ),
+        ),
+      ).toBe(true);
+    });
+
+    it('cancelar avisando a la clienta exige un motivo', async () => {
+      const { id } = await book('sinmotivo', futureSlot(6, 16));
+      const res = await asAdmin(
+        ctx,
+        'patch',
+        `/reservations/${id}/admin-cancel`,
+      ).send({ notifyClient: true });
+      expect(res.status).toBe(400);
+      expect(await statusOf(id)).toBe(ReservationStatus.PENDIENTE_DEPOSITO);
+    });
+
     it('la administradora cancela una reserva avisando a la clienta, y el horario queda libre', async () => {
       const { id } = await book('cancelaadmin', futureSlot(6, 9));
       expectStatus(
@@ -256,11 +317,41 @@ describe('E2E: recorrido completo de la administradora (HTTP, Postgres y Redis r
         200,
       );
       expect(await statusOf(id)).toBe(ReservationStatus.CITA_EN_CURSO);
+      await ctx.prisma.client.reservation.update({
+        where: { id },
+        data: { finalPrice: 250 },
+      });
+      const settlement = await asAdmin(
+        ctx,
+        'get',
+        `/reservations/${id}/settlement`,
+      );
+      expectStatus(settlement, 200);
+      const due = (settlement.body as { balanceDue: number }).balanceDue;
+
+      const wrong = await asAdmin(
+        ctx,
+        'patch',
+        `/reservations/${id}/complete`,
+      ).send({ cashAmount: due + 1, transferAmount: 0 });
+      expect((wrong.body as { code: string }).code).toBe(
+        'PAYMENT_AMOUNT_MISMATCH',
+      );
+      expect(await statusOf(id)).toBe(ReservationStatus.CITA_EN_CURSO);
+
       expectStatus(
-        await asAdmin(ctx, 'patch', `/reservations/${id}/complete`),
+        await asAdmin(ctx, 'patch', `/reservations/${id}/complete`).send({
+          cashAmount: due,
+          transferAmount: 0,
+        }),
         200,
       );
       expect(await statusOf(id)).toBe(ReservationStatus.COMPLETADA);
+      expect(
+        await ctx.prisma.client.siigoSync.count({
+          where: { reservationId: id },
+        }),
+      ).toBe(1);
     });
   });
 

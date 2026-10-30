@@ -21,7 +21,9 @@ import {
   type AdminHandoffNoticeJobData,
   type CancellationLinkNoticeJobData,
   type ClientCancellationNoticeJobData,
+  type ClientCancelledByAdminNoticeJobData,
   type ClientDepositRejectedNoticeJobData,
+  type ClientReservationConfirmedNoticeJobData,
   type RescheduleNoticeJobData,
 } from '../domain/operational-notifications.constants';
 interface AdminJobSpec<T extends object> {
@@ -74,6 +76,50 @@ export class OperationalNotificationsListener {
         ...NOTICE_JOB_OPTIONS,
       });
     });
+  }
+
+  @OnEvent(EVENT_TYPES.RESERVATION_CONFIRMED)
+  async handleReservationConfirmed(
+    event: EventOf<EventPayloadMap, typeof EVENT_TYPES.RESERVATION_CONFIRMED>,
+  ): Promise<void> {
+    const { reservationId, comboGroupId } = event.payload;
+    const data: ClientReservationConfirmedNoticeJobData = { reservationId };
+    await this.guard(
+      'aviso cliente por cita aceptada',
+      reservationId,
+      async () => {
+        await this.queue.add(
+          JOB_NAMES.NOTIFY_CLIENT_RESERVATION_CONFIRMED,
+          data,
+          {
+            ...NOTICE_JOB_OPTIONS,
+            jobId: `client-confirmed-${comboGroupId ?? reservationId}`,
+          },
+        );
+      },
+    );
+  }
+
+  @OnEvent(EVENT_TYPES.RESERVATION_CANCELLED_BY_ADMIN)
+  async handleCancelledByAdmin(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.RESERVATION_CANCELLED_BY_ADMIN
+    >,
+  ): Promise<void> {
+    const { reservationId, reason } = event.payload;
+    if (!reason) return;
+    const data: ClientCancelledByAdminNoticeJobData = { reservationId, reason };
+    await this.guard(
+      'aviso cliente por cancelación del spa',
+      reservationId,
+      async () => {
+        await this.queue.add(JOB_NAMES.NOTIFY_CLIENT_CANCELLED_BY_ADMIN, data, {
+          ...NOTICE_JOB_OPTIONS,
+          jobId: `client-cancelled-${reservationId}`,
+        });
+      },
+    );
   }
 
   @OnEvent(EVENT_TYPES.RESERVATION_RESCHEDULED)

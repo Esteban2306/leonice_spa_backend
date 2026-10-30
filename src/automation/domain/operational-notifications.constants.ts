@@ -5,6 +5,8 @@ export const OPERATIONAL_TEMPLATE_ENV_KEYS = {
   CLIENT_DEPOSIT_REJECTED: 'CONDUIT_TEMPLATE_CLIENT_DEPOSIT_REJECTED',
   CLIENT_DEPOSIT_REJECTED_NO_DEADLINE:
     'CONDUIT_TEMPLATE_CLIENT_DEPOSIT_REJECTED_NO_DEADLINE',
+  CLIENT_RESERVATION_CONFIRMED: 'CONDUIT_TEMPLATE_CLIENT_RESERVATION_CONFIRMED',
+  CLIENT_CANCELLED_BY_ADMIN: 'CONDUIT_TEMPLATE_CLIENT_CANCELLED_BY_ADMIN',
   CLIENT_RESCHEDULED: 'CONDUIT_TEMPLATE_CLIENT_RESCHEDULED',
   ADMIN_RESCHEDULED: 'CONDUIT_TEMPLATE_ADMIN_RESCHEDULED',
   CLIENT_CANCELLATION_CONFIRMED:
@@ -42,6 +44,15 @@ export interface AdminDepositTimeoutNoticeJobData {
 export interface ClientDepositRejectedNoticeJobData {
   reservationId: string;
   hasDeadline: boolean;
+}
+
+export interface ClientReservationConfirmedNoticeJobData {
+  reservationId: string;
+}
+
+export interface ClientCancelledByAdminNoticeJobData {
+  reservationId: string;
+  reason: string;
 }
 
 export interface RescheduleNoticeJobData {

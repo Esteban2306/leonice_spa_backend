@@ -29,7 +29,9 @@ import {
   type CancellationChannel,
   type CancellationLinkNoticeJobData,
   type ClientCancellationNoticeJobData,
+  type ClientCancelledByAdminNoticeJobData,
   type ClientDepositRejectedNoticeJobData,
+  type ClientReservationConfirmedNoticeJobData,
   type OperationalTemplate,
   type RescheduleNoticeJobData,
 } from './domain/operational-notifications.constants';
@@ -174,6 +176,80 @@ export class OperationalNotificationsService {
         { nombre: reservation.client.name },
       );
     }
+    await this.executed(type, reservationId);
+  }
+
+  async notifyClientReservationConfirmed(
+    data: ClientReservationConfirmedNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.CLIENT_RESERVATION_CONFIRMED_NOTICE;
+    const { reservationId } = data;
+
+    const reservation = await this.loadWithDetails(reservationId);
+    if (!reservation) {
+      await this.skip(type, reservationId, RESERVATION_GONE_REASON);
+      return;
+    }
+
+    const group = reservation.comboGroupId
+      ? await this.reservations.findByComboGroupId(reservation.comboGroupId)
+      : [reservation];
+    const confirmed = (
+      await this.reservations.findManyByIdsWithDetails(group.map((r) => r.id))
+    )
+      .filter((r) => r.status === ReservationStatus.CONFIRMADA)
+      .sort((a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime());
+    const first = confirmed[0];
+    if (!first) {
+      await this.skip(
+        type,
+        reservationId,
+        `Ya no está confirmada (está en ${reservation.status}); el aviso de aceptación ya no aplica`,
+      );
+      return;
+    }
+
+    await this.send(ctx, 'CLIENT_RESERVATION_CONFIRMED', first.client.phone, {
+      nombre: first.client.name,
+      tratamiento: confirmed.map((r) => r.treatment.name).join(', '),
+      fecha: formatNotificationDateTime(first.scheduledStart),
+    });
+    await this.executed(type, reservationId);
+  }
+
+  async notifyClientCancelledByAdmin(
+    data: ClientCancelledByAdminNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.CLIENT_CANCELLED_BY_ADMIN_NOTICE;
+    const { reservationId, reason } = data;
+
+    const reservation = await this.loadWithDetails(reservationId);
+    if (!reservation) {
+      await this.skip(type, reservationId, RESERVATION_GONE_REASON);
+      return;
+    }
+    if (reservation.status !== ReservationStatus.CANCELADA) {
+      await this.skip(
+        type,
+        reservationId,
+        `Ya no está cancelada (está en ${reservation.status}); el aviso de cancelación ya no aplica`,
+      );
+      return;
+    }
+
+    await this.send(
+      ctx,
+      'CLIENT_CANCELLED_BY_ADMIN',
+      reservation.client.phone,
+      {
+        nombre: reservation.client.name,
+        tratamiento: reservation.treatment.name,
+        fecha: formatNotificationDateTime(reservation.scheduledStart),
+        motivo: reason,
+      },
+    );
     await this.executed(type, reservationId);
   }
 
