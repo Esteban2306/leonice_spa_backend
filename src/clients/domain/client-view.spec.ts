@@ -17,6 +17,7 @@ const client: Client = {
   updatedAt: new Date('2026-01-01T15:00:00.000Z'),
   hairColor: null,
   hairLength: null,
+  hairDensity: null,
   hairProfileUpdatedAt: null,
   whatsappJid: null,
 };

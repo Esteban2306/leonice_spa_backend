@@ -72,6 +72,7 @@ export class ClientAnonymizationService {
           isPregnant: false,
           hairColor: null,
           hairLength: null,
+          hairDensity: null,
           hairProfileUpdatedAt: null,
           whatsappJid: null,
         },

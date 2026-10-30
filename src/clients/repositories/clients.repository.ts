@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import type { Client, HairColor, HairLength } from '@prisma/client';
+import type {
+  Client,
+  HairColor,
+  HairDensity,
+  HairLength,
+} from '@prisma/client';
 import { Prisma, ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EncryptionService } from '../../infrastructure/encryption/encryption.service';
@@ -201,7 +206,11 @@ export class ClientsRepository {
 
   async setHairProfile(
     id: string,
-    profile: { hairLength: HairLength; hairColor: HairColor },
+    profile: {
+      hairLength: HairLength;
+      hairColor: HairColor;
+      hairDensity: HairDensity;
+    },
     at: Date,
   ) {
     const client = await this.prisma.client.client.update({

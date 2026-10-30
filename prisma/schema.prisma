@@ -43,6 +43,7 @@ model Client {
   hairColor            HairColor?       @map("hair_color")
   hairLength           HairLength?      @map("hair_length")
   hairProfileUpdatedAt DateTime?        @map("hair_profile_updated_at")
+  hairDensity          HairDensity?     @map("hair_density")
   whatsappJid          String?          @unique @map("whatsapp_jid")
   consentRecords       ConsentRecord[]
   productViewLogs      ProductViewLog[]

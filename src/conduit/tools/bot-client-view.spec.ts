@@ -35,6 +35,17 @@ describe('toBotClient', () => {
     });
   });
 
+  it('con perfil vigente y densidad registrada también la informa', () => {
+    expect(
+      toBotClient(client({ hairDensity: 'MEDIA' }), true, now).hairProfile,
+    ).toEqual({
+      status: 'VALID',
+      hairLength: 'LARGO',
+      hairColor: 'OSCURO',
+      hairDensity: 'MEDIA',
+    });
+  });
+
   it('con perfil vencido o sin perfil solo informa el estado', () => {
     expect(
       toBotClient(client({ hairProfileUpdatedAt: stale }), true, now)

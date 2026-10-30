@@ -77,6 +77,7 @@ describe('toHairProfileView', () => {
     expect(toHairProfileView(profile(local(2026, 9, 1)), now)).toEqual({
       hairLength: 'LARGO',
       hairColor: 'OSCURO',
+      hairDensity: null,
       updatedAt: local(2026, 9, 1),
       validUntil: local(2027, 1, 1),
       status: 'VALID',
@@ -92,9 +93,38 @@ describe('toHairProfileView', () => {
     ).toEqual({
       hairLength: null,
       hairColor: null,
+      hairDensity: null,
       updatedAt: null,
       validUntil: null,
       status: 'MISSING',
     });
+  });
+
+  it('expone la densidad registrada', () => {
+    expect(
+      toHairProfileView(
+        {
+          hairLength: 'LARGO',
+          hairColor: 'OSCURO',
+          hairDensity: 'ALTA',
+          hairProfileUpdatedAt: new Date(2026, 9, 1),
+        },
+        now,
+      ).hairDensity,
+    ).toBe('ALTA');
+  });
+
+  it('un perfil anterior sin densidad sigue vigente y la muestra vacía', () => {
+    const view = toHairProfileView(
+      {
+        hairLength: 'LARGO',
+        hairColor: 'OSCURO',
+        hairProfileUpdatedAt: new Date(2026, 9, 1),
+      },
+      now,
+    );
+
+    expect(view.status).toBe('VALID');
+    expect(view.hairDensity).toBeNull();
   });
 });

@@ -197,7 +197,11 @@ export class ClientsService {
     await this.requireClient(id);
     const updated = await this.repository.setHairProfile(
       id,
-      { hairLength: dto.hairLength, hairColor: dto.hairColor },
+      {
+        hairLength: dto.hairLength,
+        hairColor: dto.hairColor,
+        hairDensity: dto.hairDensity,
+      },
       new Date(),
     );
     return toHairProfileView(updated);

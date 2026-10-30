@@ -1,4 +1,4 @@
-import { HairColor, HairLength } from '@prisma/client';
+import { HairColor, HairDensity, HairLength } from '@prisma/client';
 import { IsEnum } from 'class-validator';
 
 export class SetHairProfileDto {
@@ -7,4 +7,7 @@ export class SetHairProfileDto {
 
   @IsEnum(HairColor)
   hairColor!: HairColor;
+
+  @IsEnum(HairDensity)
+  hairDensity!: HairDensity;
 }

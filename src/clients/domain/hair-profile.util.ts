@@ -1,4 +1,4 @@
-import { Client, HairColor, HairLength } from '@prisma/client';
+import { Client, HairColor, HairDensity, HairLength } from '@prisma/client';
 import { HAIR_PROFILE_VALID_MONTHS } from './hair-profile.constants';
 
 export type HairProfileStatus = 'MISSING' | 'EXPIRED' | 'VALID';
@@ -8,9 +8,13 @@ export type HairProfileFields = Pick<
   'hairLength' | 'hairColor' | 'hairProfileUpdatedAt'
 >;
 
+export type HairProfileSource = HairProfileFields &
+  Partial<Pick<Client, 'hairDensity'>>;
+
 export interface HairProfileView {
   hairLength: HairLength | null;
   hairColor: HairColor | null;
+  hairDensity: HairDensity | null;
   updatedAt: Date | null;
   validUntil: Date | null;
   status: HairProfileStatus;
@@ -58,13 +62,14 @@ export function isHairProfileValid(
 }
 
 export function toHairProfileView(
-  client: HairProfileFields,
+  client: HairProfileSource,
   now: Date = new Date(),
 ): HairProfileView {
   const status = getHairProfileStatus(client, now);
   return {
     hairLength: client.hairLength,
     hairColor: client.hairColor,
+    hairDensity: client.hairDensity ?? null,
     updatedAt: client.hairProfileUpdatedAt,
     validUntil:
       status === 'MISSING' || !client.hairProfileUpdatedAt

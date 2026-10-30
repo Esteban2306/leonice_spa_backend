@@ -1,4 +1,4 @@
-import { HairColor, HairLength } from '@prisma/client';
+import { HairColor, HairDensity, HairLength } from '@prisma/client';
 import {
   getHairProfileStatus,
   type HairProfileStatus,
@@ -8,6 +8,7 @@ interface BotClientSource {
   name: string;
   hairLength: HairLength | null;
   hairColor: HairColor | null;
+  hairDensity?: HairDensity | null;
   hairProfileUpdatedAt: Date | null;
 }
 
@@ -20,6 +21,7 @@ export interface BotClientView {
     status: HairProfileStatus;
     hairLength?: HairLength;
     hairColor?: HairColor;
+    hairDensity?: HairDensity;
   };
 }
 
@@ -42,6 +44,7 @@ export function toBotClient(
             status,
             hairLength: client.hairLength!,
             hairColor: client.hairColor!,
+            ...(client.hairDensity ? { hairDensity: client.hairDensity } : {}),
           }
         : { status },
   };
