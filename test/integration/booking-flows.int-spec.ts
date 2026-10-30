@@ -8,6 +8,7 @@ import { RescheduleReservationOrchestrator } from 'src/reservations/orchestrator
 import { AdminRescheduleReservationOrchestrator } from 'src/reservations/orchestrators/admin-reservartion.orchestator';
 import { AdminCancelReservationOrchestrator } from 'src/reservations/orchestrators/admin-cancel-reservation.orchestrator';
 import { CheckInReservationOrchestrator } from 'src/reservations/orchestrators/check-in-reservation.orchestrator';
+import { ReservationSettlementService } from 'src/reservations/service/reservation-settlement.service';
 import { CompleteReservationOrchestrator } from 'src/reservations/orchestrators/complete-reservation.orchestrator';
 import { MarkNoShowOrchestrator } from 'src/reservations/orchestrators/mark-no-show.orchestrator';
 import { ApproveDepositOrchestrator } from 'src/deposits/orchestrator/approve-deposit.orchestrator';
@@ -267,12 +268,31 @@ describe('1. Flujos de reserva de principio a fin', () => {
       await checkIn.execute(id, checkInDay);
       expect(await status(id)).toBe(ReservationStatus.CITA_EN_CURSO);
 
-      await complete.execute(id);
+      const settlement = await moduleRef
+        .get(ReservationSettlementService)
+        .compute(id);
+      expect(settlement.advance).toBe(25);
+      expect(settlement.balanceDue).toBe(settlement.price - 25);
+
+      await complete.execute({
+        reservationId: id,
+        adminUserId: world.admin.id,
+        cashAmount: settlement.price - 25,
+        transferAmount: 0,
+      });
       const done = await prisma.client.reservation.findUniqueOrThrow({
         where: { id },
+        include: { payment: true, siigoSync: true },
       });
       expect(done.status).toBe(ReservationStatus.COMPLETADA);
       expect(done.completedAt).not.toBeNull();
+      expect(done.payment?.method).toBe('MIXTO');
+      expect(done.payment?.advanceAmount.toNumber()).toBe(25);
+      expect(done.siigoSync?.status).toBe('PENDIENTE');
+      expect(
+        (done.siigoSync?.payload as { amountCopThousands: number })
+          .amountCopThousands,
+      ).toBe(settlement.price);
     });
 
     it('no-show: CONFIRMADA → NO_SHOW libera el cupo y el admin puede atender tarde (check-in)', async () => {

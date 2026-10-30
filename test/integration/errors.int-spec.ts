@@ -59,7 +59,12 @@ class ProbeController {
 
   @Post('complete/:id')
   completeIt(@Param('id') id: string) {
-    return this.complete.execute(id);
+    return this.complete.execute({
+      reservationId: id,
+      adminUserId: 'probe-admin',
+      cashAmount: 0,
+      transferAmount: 0,
+    });
   }
 
   @Post('reschedule/:id')
@@ -76,6 +81,7 @@ class ProbeController {
       reservationId: id,
       adminUserId: 'no-existe',
       coverage: 'ANTICIPO',
+      amount: 25,
     });
   }
 

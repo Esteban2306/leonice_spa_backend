@@ -171,6 +171,9 @@ describe('Reservation lifecycle (e2e)', () => {
       categorySecondaryId,
       categoryLowCapId,
     ];
+    const ofCategories = { reservation: { categoryId: { in: categoryIds } } };
+    await prisma.client.siigoSync.deleteMany({ where: ofCategories });
+    await prisma.client.reservationPayment.deleteMany({ where: ofCategories });
     await prisma.client.reservation.deleteMany({
       where: { categoryId: { in: categoryIds } },
     });
@@ -211,7 +214,13 @@ describe('Reservation lifecycle (e2e)', () => {
     );
     expect(afterCheckIn.status).toBe(ReservationStatus.CITA_EN_CURSO);
 
-    const afterComplete = await completeO.execute(reservation.id);
+    const admin = await prisma.client.user.findFirstOrThrow();
+    const afterComplete = await completeO.execute({
+      reservationId: reservation.id,
+      adminUserId: admin.id,
+      cashAmount: reservation.finalPrice.toNumber(),
+      transferAmount: 0,
+    });
     expect(afterComplete.status).toBe(ReservationStatus.COMPLETADA);
     expect(afterComplete.completedAt).not.toBeNull();
   });

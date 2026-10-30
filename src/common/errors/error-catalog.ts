@@ -187,6 +187,21 @@ const RESERVATION = {
     message:
       'El adelanto de esta reserva ya respalda otra reserva. No se puede atender sin descontarlo allí.',
   },
+  PAYMENT_AMOUNT_MISMATCH: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'Lo cobrado no coincide con el saldo pendiente. Revisa los montos antes de completar la cita.',
+  },
+  PAYMENT_ADVANCE_REQUIRED: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'El anticipo de esta cita es compartido con otras reservas. Indica cuánto del anticipo corresponde a esta cita.',
+  },
+  PAYMENT_ADVANCE_NOT_EDITABLE: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'El anticipo de esta cita ya está registrado y no se puede modificar al completarla.',
+  },
   CREDIT_ALREADY_APPLIED: {
     status: HttpStatus.CONFLICT,
     message:

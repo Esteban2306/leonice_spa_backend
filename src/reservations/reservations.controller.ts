@@ -38,6 +38,8 @@ import { AdminCancelReservationDto } from './dto/admin-cancel-reservation.dto';
 import { ReviveReservationOrchestrator } from './orchestrators/revive-reservation.orchestrator';
 import { CancellationLinkService } from './service/cancellation-link.service';
 import { IssueCancellationLinkDto } from './dto/cancellation-link.dto';
+import { CompleteReservationDto } from './dto/complete-reservation.dto';
+import { ReservationSettlementService } from './service/reservation-settlement.service';
 
 @Controller({ path: 'reservations', version: '1' })
 export class ReservationsController {
@@ -53,6 +55,7 @@ export class ReservationsController {
     private readonly adminCancelOrchestrator: AdminCancelReservationOrchestrator,
     private readonly reviveOrchestrator: ReviveReservationOrchestrator,
     private readonly cancellationLinks: CancellationLinkService,
+    private readonly settlementService: ReservationSettlementService,
   ) {}
 
   @Get()
@@ -174,9 +177,24 @@ export class ReservationsController {
     return this.checkInOrchestrator.execute(id);
   }
 
+  @Get(':id/settlement')
+  settlement(@Param('id', ParseUUIDPipe) id: string) {
+    return this.settlementService.compute(id);
+  }
+
   @Patch(':id/complete')
-  complete(@Param('id', ParseUUIDPipe) id: string) {
-    return this.completeOrchestrator.execute(id);
+  complete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompleteReservationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.completeOrchestrator.execute({
+      reservationId: id,
+      adminUserId: user.id,
+      cashAmount: dto.cashAmount,
+      transferAmount: dto.transferAmount,
+      advanceAmount: dto.advanceAmount,
+    });
   }
 
   @Patch(':id/confirm-valoracion')

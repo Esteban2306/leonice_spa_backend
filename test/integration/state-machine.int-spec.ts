@@ -8,6 +8,7 @@ import { CreateReservationOrchestrator } from 'src/reservations/orchestrators/cr
 import { AdminCancelReservationOrchestrator } from 'src/reservations/orchestrators/admin-cancel-reservation.orchestrator';
 import { ConfirmDepositOrchestrator } from 'src/reservations/orchestrators/confirm-deposit.orchestrator';
 import { CheckInReservationOrchestrator } from 'src/reservations/orchestrators/check-in-reservation.orchestrator';
+import { ReservationSettlementService } from 'src/reservations/service/reservation-settlement.service';
 import { CompleteReservationOrchestrator } from 'src/reservations/orchestrators/complete-reservation.orchestrator';
 import { MarkNoShowOrchestrator } from 'src/reservations/orchestrators/mark-no-show.orchestrator';
 import { ConfirmValoracionOrchestrator } from 'src/reservations/orchestrators/confirm-valoracion.orchestrator';
@@ -175,7 +176,17 @@ describe('3. Transiciones de estado controladas', () => {
         name: 'completar',
         target: S.COMPLETADA,
         idempotentFrom: S.COMPLETADA,
-        run: (id) => moduleRef.get(CompleteReservationOrchestrator).execute(id),
+        run: async (id) => {
+          const settlement = await moduleRef
+            .get(ReservationSettlementService)
+            .compute(id);
+          return moduleRef.get(CompleteReservationOrchestrator).execute({
+            reservationId: id,
+            adminUserId: world.admin.id,
+            cashAmount: settlement.balanceDue ?? settlement.price,
+            transferAmount: 0,
+          });
+        },
       },
       {
         name: 'marcar no-show',

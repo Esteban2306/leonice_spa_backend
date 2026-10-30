@@ -23,6 +23,7 @@ import { OperatingScheduleRepository } from './repositories/operating-schedule.r
 import { OperatingScheduleService } from './service/operating-schedule.service';
 import { DepositDeadlineService } from './service/deposit-deadline.service';
 import { CancellationLinkService } from './service/cancellation-link.service';
+import { ReservationSettlementService } from './service/reservation-settlement.service';
 import { CancellationLinksController } from './cancellation-links.controller';
 
 @Module({
@@ -51,6 +52,7 @@ import { CancellationLinksController } from './cancellation-links.controller';
     ReservationRescheduler,
     ReviveReservationOrchestrator,
     DepositCreditService,
+    ReservationSettlementService,
   ],
   exports: [
     ReservationsService,

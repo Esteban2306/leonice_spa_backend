@@ -8,22 +8,23 @@ datasource db {
 }
 
 model User {
-  id                       String              @id @default(uuid())
-  email                    String              @unique
-  passwordHash             String              @map("password_hash")
-  role                     Role                @default(ADMIN)
-  isActive                 Boolean             @default(true) @map("is_active")
-  failedLoginAttempts      Int                 @default(0) @map("failed_login_attempts")
-  lastLoginAt              DateTime?           @map("last_login_at")
-  refreshTokenHash         String?             @map("refresh_token_hash")
-  previousRefreshTokenHash String?             @map("previous_refresh_token_hash")
-  refreshRotatedAt         DateTime?           @map("refresh_rotated_at")
-  sessionVersion           Int                 @default(0) @map("session_version")
-  createdAt                DateTime            @default(now()) @map("created_at")
-  updatedAt                DateTime            @updatedAt @map("updated_at")
-  lockedUntil              DateTime?           @map("locked_until")
+  id                       String               @id @default(uuid())
+  email                    String               @unique
+  passwordHash             String               @map("password_hash")
+  role                     Role                 @default(ADMIN)
+  isActive                 Boolean              @default(true) @map("is_active")
+  failedLoginAttempts      Int                  @default(0) @map("failed_login_attempts")
+  lastLoginAt              DateTime?            @map("last_login_at")
+  refreshTokenHash         String?              @map("refresh_token_hash")
+  previousRefreshTokenHash String?              @map("previous_refresh_token_hash")
+  refreshRotatedAt         DateTime?            @map("refresh_rotated_at")
+  sessionVersion           Int                  @default(0) @map("session_version")
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
+  lockedUntil              DateTime?            @map("locked_until")
   auditLog                 AuditLog[]
   verifiedDeposits         DepositRecord[]
+  recordedPayments         ReservationPayment[]
   scheduleExceptions       ScheduleException[]
 
   @@map("users")
@@ -218,6 +219,8 @@ model Reservation {
   coveredByDepositId       String?             @map("covered_by_deposit_id")
   deposit                  DepositRecord[]     @relation("DepositOfReservation")
   appliedDeposits          DepositRecord[]     @relation("DepositAppliedToReservation")
+  payment                  ReservationPayment?
+  siigoSync                SiigoSync?
   coveredByDeposit         DepositRecord?      @relation("DepositCoversReservation", fields: [coveredByDepositId], references: [id])
   category                 Category            @relation(fields: [categoryId], references: [id])
   client                   Client              @relation(fields: [clientId], references: [id])
@@ -257,6 +260,53 @@ model DepositRecord {
   @@index([reservationId, createdAt])
   @@index([appliedToReservationId])
   @@map("deposit_records")
+}
+
+model ReservationPayment {
+  id               String        @id @default(uuid())
+  reservationId    String        @unique @map("reservation_id")
+  totalAmount      Decimal       @map("total_amount") @db.Decimal(10, 2)
+  advanceAmount    Decimal       @map("advance_amount") @db.Decimal(10, 2)
+  cashAmount       Decimal       @map("cash_amount") @db.Decimal(10, 2)
+  transferAmount   Decimal       @map("transfer_amount") @db.Decimal(10, 2)
+  method           PaymentMethod
+  recordedByUserId String?       @map("recorded_by_user_id")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  reservation      Reservation   @relation(fields: [reservationId], references: [id])
+  recordedByUser   User?         @relation(fields: [recordedByUserId], references: [id])
+
+  @@map("reservation_payments")
+}
+
+model SiigoSync {
+  id              String          @id @default(uuid())
+  reservationId   String          @unique @map("reservation_id")
+  status          SiigoSyncStatus @default(PENDIENTE)
+  payload         Json
+  attempts        Int             @default(0)
+  lastError       String?         @map("last_error")
+  siigoDocumentId String?         @map("siigo_document_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  syncedAt        DateTime?       @map("synced_at")
+  reservation     Reservation     @relation(fields: [reservationId], references: [id])
+
+  @@index([status, createdAt])
+  @@map("siigo_syncs")
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TRANSFERENCIA
+  MIXTO
+}
+
+enum SiigoSyncStatus {
+  PENDIENTE
+  ENVIANDO
+  SINCRONIZADO
+  FALLIDO
+  BLOQUEADO
 }
 
 model AutomationRule {
@@ -602,6 +652,8 @@ enum AutomationExecutionType {
   ADMIN_CLIENT_CANCELLATION_NOTICE
   CLIENT_CANCELLATION_LINK_NOTICE
   ADMIN_HANDOFF_NOTICE
+  CLIENT_RESERVATION_CONFIRMED_NOTICE
+  CLIENT_CANCELLED_BY_ADMIN_NOTICE
 }
 
 enum AutomationExecutionResult {
