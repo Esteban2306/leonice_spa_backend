@@ -140,6 +140,24 @@ describe('4. Anticipos, vencimientos, rechazos, créditos y devoluciones', () =>
       expect(confirmed).toHaveLength(1);
     });
 
+    it('sin comprobante y sin monto la administradora confirma la cita sin registrar dinero', async () => {
+      const { reservations } = await book([world.secondary.treatmentId]);
+      const id = reservations[0].id;
+
+      const result = await approve.execute({
+        reservationId: id,
+        adminUserId: world.admin.id,
+        coverage: DepositCoverage.ANTICIPO,
+      });
+
+      expect(result.approvedReservationIds).toEqual([id]);
+      expect(result.depositId).toBeNull();
+      expect((await reservationOf(id)).status).toBe(
+        ReservationStatus.CONFIRMADA,
+      );
+      expect(await depositsOf(id)).toHaveLength(0);
+    });
+
     it('sin monto responde DEPOSIT_AMOUNT_REQUIRED y no cambia nada (rollback)', async () => {
       const { client, reservations } = await book([
         world.secondary.treatmentId,

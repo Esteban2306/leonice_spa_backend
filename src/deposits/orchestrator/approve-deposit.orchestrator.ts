@@ -83,13 +83,18 @@ export class ApproveDepositOrchestrator {
           return { confirmed: confirmedRows, depositId: null };
         }
 
-        const amount = this.requireAmount(command.amount);
         const payer =
           needsPayment.find((r) => r.id === anchor.id) ?? needsPayment[0];
         const latest = await this.repository.findLatestByReservationId(
           payer.id,
           tx,
         );
+        const hasProof =
+          latest !== null && latest.status !== DepositStatus.RECHAZADO;
+        if (!hasProof && command.amount === undefined) {
+          return { confirmed: confirmedRows, depositId: null };
+        }
+        const amount = this.requireAmount(command.amount);
         const deposit = await this.resolveConfirmedDeposit(
           latest,
           payer.id,

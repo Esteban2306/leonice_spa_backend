@@ -169,8 +169,23 @@ describe('ApproveDepositOrchestrator', () => {
       expect(calls.created).toEqual([{ reservationId: 'a', amount: 5 }]);
     });
 
-    it('exige el monto cuando hay que registrar dinero', async () => {
-      const { orchestrator } = buildFixture({ anchor: reservation('a') });
+    it('sin comprobante y sin monto confirma la cita sin registrar dinero', async () => {
+      const { orchestrator, calls } = buildFixture({
+        anchor: reservation('a'),
+      });
+
+      const result = await orchestrator.execute(command({ amount: undefined }));
+
+      expect(result.depositId).toBeNull();
+      expect(calls.confirmed).toEqual(['a']);
+      expect(calls.created).toEqual([]);
+    });
+
+    it('con comprobante pendiente exige el monto verificado', async () => {
+      const { orchestrator } = buildFixture({
+        anchor: reservation('a'),
+        latestByReservation: { a: deposit('d1', 'PENDIENTE') },
+      });
 
       await expectCode(
         orchestrator.execute(command({ amount: undefined })),
