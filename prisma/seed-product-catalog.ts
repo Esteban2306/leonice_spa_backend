@@ -110,7 +110,19 @@ const LINE_LABELS: Record<string, string> = {
   'AGAIN MIST': 'Perfect Again Mist',
 };
 
-const FEATURED_NAME = 'Shampoo Detox MAIS';
+const FEATURED_NAMES = new Set([
+  'Shampoo Detox MAIS',
+  'Mascarilla Hair Therapy Amazônica',
+  'Salerm 21 Silk Protein',
+  'Sérum Silk Oil Alter Ego',
+  'Sérum Cristalli Liquidi Alfaparf Milano',
+  'Sérum Nutri Care Oil Benvoleo',
+  'Sérum Oil Argan Anva',
+  'Shampoo Post-keratina Valems',
+  "Shampoo Semillas de Lino L'Mar",
+  'Sérum Rejuvenol Arganía Otras marcas',
+  'Cepillo Ergonómico',
+]);
 
 const titleCase = (value: string) =>
   value
@@ -403,7 +415,7 @@ async function seed(prisma: PrismaClient) {
       precautions: content.precautions,
       contentNeedsReview: true,
       isActive: active,
-      isFeatured: name === FEATURED_NAME,
+      isFeatured: FEATURED_NAMES.has(name),
       displayOrder: order,
     };
 
