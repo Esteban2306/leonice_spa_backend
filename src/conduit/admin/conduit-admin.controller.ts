@@ -22,6 +22,7 @@ import type { AdminQuery } from '../client/conduit-api.client';
 import { ConduitOutboxRepository } from '../repositories/conduit-outbox.repository';
 import { ConduitOutboxService } from '../service/conduit-outbox.service';
 import {
+  ConduitIntentKeyParam,
   ConduitPromptTypeParam,
   FindOutboxQueryDto,
 } from './conduit-admin.dto';
@@ -274,6 +275,53 @@ export class ConduitAdminController {
   @Delete('bot/tools/:toolId')
   removeTool(@Param('toolId', ParseUUIDPipe) toolId: string) {
     return this.call('DELETE', `bots/${this.botId()}/tools/${toolId}`);
+  }
+
+  // Intenciones: Conduit protege las reglas de salud y queja (no se apagan).
+
+  @Get('bot/intents')
+  intents() {
+    return this.call('GET', `bots/${this.botId()}/intents`);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('bot/intents/test')
+  testIntent(@Body() body: ConduitPayload) {
+    return this.call('POST', `bots/${this.botId()}/intents/test`, { body });
+  }
+
+  @Get('bot/intents/:key')
+  intent(@Param() params: ConduitIntentKeyParam) {
+    return this.call('GET', `bots/${this.botId()}/intents/${params.key}`);
+  }
+
+  @Put('bot/intents/:key')
+  upsertIntent(
+    @Param() params: ConduitIntentKeyParam,
+    @Body() body: ConduitPayload,
+  ) {
+    return this.call('PUT', `bots/${this.botId()}/intents/${params.key}`, {
+      body: { ...body, key: params.key },
+    });
+  }
+
+  @Patch('bot/intents/:key/mode')
+  setIntentMode(
+    @Param() params: ConduitIntentKeyParam,
+    @Body() body: ConduitPayload,
+  ) {
+    return this.call(
+      'PATCH',
+      `bots/${this.botId()}/intents/${params.key}/mode`,
+      {
+        body,
+      },
+    );
+  }
+
+  @Delete('bot/intents/:key')
+  removeIntent(@Param() params: ConduitIntentKeyParam) {
+    return this.call('DELETE', `bots/${this.botId()}/intents/${params.key}`);
   }
 
   @Get('bot/escalation-contacts')

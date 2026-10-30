@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
 
 export const PROMPT_TYPES = [
   'CONVERSATION',
@@ -32,4 +32,9 @@ export class FindOutboxQueryDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+}
+
+export class ConduitIntentKeyParam {
+  @Matches(/^[a-z][a-z0-9_.-]{1,62}$/)
+  key!: string;
 }

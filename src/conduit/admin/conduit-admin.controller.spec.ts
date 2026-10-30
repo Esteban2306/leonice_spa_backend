@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum';
 import { ConduitAdminController } from './conduit-admin.controller';
+import { ConduitIntentKeyParam } from './conduit-admin.dto';
 
 const pipe = new ValidationPipe({
   whitelist: true,
@@ -50,6 +51,25 @@ describe('ConduitAdminController — cuerpos hacia Conduit', () => {
       await expect(
         pipe.transform(body, { type: 'body', metatype: metatype as never }),
       ).resolves.toEqual(body);
+    },
+  );
+});
+
+describe('ConduitAdminController — claves de intención', () => {
+  const param = (key: string) =>
+    pipe.transform(
+      { key },
+      { type: 'param', metatype: ConduitIntentKeyParam as never },
+    );
+
+  it.each(['saludo', 'rule.health', 'precios_v2'])('acepta %s', async (key) => {
+    await expect(param(key)).resolves.toEqual({ key });
+  });
+
+  it.each(['../bots', 'Saludo', 'a', 'x y', 'a/b'])(
+    'rechaza %s',
+    async (key) => {
+      await expect(param(key)).rejects.toBeDefined();
     },
   );
 });
