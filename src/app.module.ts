@@ -28,6 +28,7 @@ import { AutomationModule } from './automation/automation.module';
 import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
 import { GlobalGuardChain } from './common/guards/global-guard-chain.guard';
 import { PromotionsModule } from './promotions/promotions.module';
+import { AudiencesModule } from './audiences/audiences.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { DepositsModule } from './deposits/deposits.module';
@@ -70,6 +71,7 @@ import { AdminModule } from './admin/admin.module';
     QueueModule,
     AutomationModule,
     PromotionsModule,
+    AudiencesModule,
     IdempotencyModule,
     AuditModule,
     MonitoringModule,
