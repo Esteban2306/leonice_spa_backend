@@ -1,5 +1,6 @@
 import { OPERATIONAL_TEMPLATE_ENV_KEYS } from '../../automation/domain/operational-notifications.constants';
 import {
+  BROADCAST_TEMPLATES,
   CONDUIT_TEMPLATE_CATALOG,
   templateChannel,
   templatePlaceholders,
@@ -19,6 +20,17 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
     const envKeys = CONDUIT_TEMPLATE_CATALOG.map((t) => t.envKey);
     for (const envKey of Object.values(OPERATIONAL_TEMPLATE_ENV_KEYS)) {
       expect(envKeys).toContain(envKey);
+    }
+  });
+
+  it('las plantillas difundibles solo usan datos que se conocen sin una reserva y las de marketing están marcadas', () => {
+    expect(BROADCAST_TEMPLATES.map((t) => t.code).sort()).toEqual([
+      'PROMOTION_BROADCAST',
+      'REACTIVATION',
+      'REACTIVATION_PROMO',
+    ]);
+    for (const template of BROADCAST_TEMPLATES) {
+      expect(template.marketing).toBe(true);
     }
   });
 
@@ -69,6 +81,7 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
   it('los mensajes proactivos a muchas clientas tienen variantes con las mismas variables', () => {
     const withVariants = CONDUIT_TEMPLATE_CATALOG.filter((t) => t.variants);
     expect(withVariants.map((t) => t.code).sort()).toEqual([
+      'PROMOTION_BROADCAST',
       'REACTIVATION',
       'REACTIVATION_PROMO',
       'RESERVATION_REMINDER',

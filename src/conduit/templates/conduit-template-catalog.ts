@@ -11,6 +11,7 @@ export interface ConduitTemplateDefinition {
   channel?: ConduitTemplateChannel;
   subject?: string;
   variables: readonly string[];
+  marketing?: boolean;
   body: string;
   variants?: readonly string[];
 }
@@ -64,6 +65,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
   },
   {
     code: 'REACTIVATION',
+    marketing: true,
     envKey: 'CONDUIT_TEMPLATE_REACTIVATION',
     name: 'leonice_reactivacion',
     description:
@@ -96,6 +98,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
   },
   {
     code: 'REACTIVATION_PROMO',
+    marketing: true,
     envKey: 'CONDUIT_TEMPLATE_REACTIVATION_PROMO',
     name: 'leonice_reactivacion_promocion',
     description:
@@ -123,6 +126,39 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
         'Desde tu última visita pasaron {{dias}} días, y por eso tenemos para ti *{{promocion}}* con *{{descuento}}% de descuento*.',
         '',
         'Si te interesa, escríbenos por aquí y reservamos tu horario.',
+      ].join('\n'),
+    ],
+  },
+  {
+    code: 'PROMOTION_BROADCAST',
+    marketing: true,
+    envKey: 'CONDUIT_TEMPLATE_PROMOTION_BROADCAST',
+    name: 'leonice_promocion',
+    description:
+      'Anuncio de una promoción vigente para las clientas elegidas en una campaña (solo con consentimiento de marketing).',
+    audience: 'CLIENT',
+    variables: ['nombre', 'promocion', 'descuento', 'vigencia'],
+    body: [
+      'Hola {{nombre}} 🌿',
+      '',
+      'En Leonice Arenas Spa Capilar tenemos *{{promocion}}* con *{{descuento}}% de descuento* {{vigencia}}.',
+      '',
+      '¿Te gustaría aprovecharla? Respóndenos por aquí y te mostramos los horarios disponibles.',
+    ].join('\n'),
+    variants: [
+      [
+        '{{nombre}}, ¡tenemos algo para ti! 🌿',
+        '',
+        'Leonice Arenas Spa Capilar tiene *{{promocion}}* con *{{descuento}}% de descuento* {{vigencia}}.',
+        '',
+        'Si te interesa, escríbenos por aquí y reservamos tu horario.',
+      ].join('\n'),
+      [
+        'Hola {{nombre}} 🌿',
+        '',
+        'Te cuento que ahora puedes disfrutar *{{promocion}}* con *{{descuento}}% de descuento* {{vigencia}}.',
+        '',
+        'Respóndenos por aquí y te ayudamos a agendar con gusto.',
       ].join('\n'),
     ],
   },
@@ -402,3 +438,27 @@ const PLACEHOLDER = /{{\s*([a-zA-Z_][\w]*)\s*}}/g;
 export function templatePlaceholders(body: string): string[] {
   return [...new Set([...body.matchAll(PLACEHOLDER)].map((match) => match[1]))];
 }
+
+export const BROADCAST_VARIABLES = [
+  'nombre',
+  'dias',
+  'promocion',
+  'descuento',
+  'vigencia',
+] as const;
+
+export function isBroadcastTemplate(
+  template: ConduitTemplateDefinition,
+): boolean {
+  return (
+    template.marketing === true &&
+    template.audience === 'CLIENT' &&
+    templateChannel(template) === 'WHATSAPP' &&
+    template.variables.every((variable) =>
+      (BROADCAST_VARIABLES as readonly string[]).includes(variable),
+    )
+  );
+}
+
+export const BROADCAST_TEMPLATES: readonly ConduitTemplateDefinition[] =
+  CONDUIT_TEMPLATE_CATALOG.filter(isBroadcastTemplate);
