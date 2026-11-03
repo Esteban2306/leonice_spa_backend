@@ -35,6 +35,7 @@ interface BotTreatmentSource {
     id: string;
     name: string;
     discountPercentage: string;
+    endsAt?: Date | string;
   } | null;
   effectiveBasePriceMin?: number | null;
   effectiveBasePriceMax?: number | null;
@@ -113,6 +114,15 @@ function personalizedPricing(
   }
 }
 
+const PROMOTION_END_FORMAT = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota',
+  day: 'numeric',
+  month: 'long',
+});
+
+const formatPromotionEnd = (endsAt: Date | string): string =>
+  PROMOTION_END_FORMAT.format(new Date(endsAt));
+
 export function toBotTreatment(
   treatment: BotTreatmentSource,
   client?: BotPricingClient | null,
@@ -158,6 +168,9 @@ export function toBotTreatment(
         name: promotion.name,
         discount: `${promotion.discountPercentage} %`,
         ...(promotionPrice && { price: promotionPrice }),
+        ...(promotion.endsAt && {
+          validUntil: formatPromotionEnd(promotion.endsAt),
+        }),
       },
     }),
   };

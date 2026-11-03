@@ -336,6 +336,7 @@ export class TreatmentsService {
         id: promo.id,
         name: promo.name,
         discountPercentage: promo.discountPercentage.toString(),
+        endsAt: promo.endsAt,
       },
       effectiveBasePriceMin: applyDiscount(treatment.basePriceMin),
       effectiveBasePriceMax: applyDiscount(treatment.basePriceMax),

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -31,6 +32,12 @@ export class PromotionsService {
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
     this.assertValidDateRange(startsAt, endsAt);
+    await this.assertNoOverlap({
+      treatmentId: dto.treatmentId,
+      categoryId: dto.categoryId,
+      startsAt,
+      endsAt,
+    });
 
     return this.repository.create({
       name: dto.name,
@@ -60,6 +67,24 @@ export class PromotionsService {
     const startsAt = dto.startsAt ? new Date(dto.startsAt) : current.startsAt;
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : current.endsAt;
     this.assertValidDateRange(startsAt, endsAt);
+
+    if (dto.isActive ?? current.isActive) {
+      const treatmentId =
+        dto.treatmentId !== undefined
+          ? dto.treatmentId || null
+          : current.treatmentId;
+      const categoryId =
+        dto.categoryId !== undefined
+          ? dto.categoryId || null
+          : current.categoryId;
+      await this.assertNoOverlap({
+        treatmentId,
+        categoryId,
+        startsAt,
+        endsAt,
+        excludeId: id,
+      });
+    }
 
     return this.repository.update(id, {
       ...(dto.name !== undefined && { name: dto.name }),
@@ -96,6 +121,21 @@ export class PromotionsService {
       throw new BadRequestException(
         'La promoción debe apuntar a uno de los dos, no a ambos',
       );
+  }
+
+  private async assertNoOverlap(params: {
+    treatmentId?: string | null;
+    categoryId?: string | null;
+    startsAt: Date;
+    endsAt: Date;
+    excludeId?: string;
+  }) {
+    const overlapping = await this.repository.findOverlapping(params);
+    if (overlapping) {
+      throw new ConflictException(
+        `Ya hay una promoción activa en esas fechas para el mismo servicio o categoría: "${overlapping.name}"`,
+      );
+    }
   }
 
   private assertValidDateRange(startsAt: Date, endsAt: Date) {

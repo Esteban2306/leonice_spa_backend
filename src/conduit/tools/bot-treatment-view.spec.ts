@@ -75,6 +75,21 @@ describe('toBotTreatment', () => {
     });
   });
 
+  it('indica hasta cuándo dura la promoción cuando se conoce la fecha de fin', () => {
+    const view = toBotTreatment({
+      ...base,
+      activePromotion: {
+        id: 'p1',
+        name: 'Octubre',
+        discountPercentage: '10',
+        endsAt: '2026-11-17T23:59:59-05:00',
+      },
+      effectiveBasePriceMin: 225,
+      effectiveBasePriceMax: 342,
+    });
+    expect(view.promotion?.validUntil).toBe('17 de noviembre');
+  });
+
   describe('precio según el perfil capilar', () => {
     const variable = {
       ...base,

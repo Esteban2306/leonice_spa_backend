@@ -87,6 +87,27 @@ export class PromotionsRepository {
     });
   }
 
+  findOverlapping(params: {
+    treatmentId?: string | null;
+    categoryId?: string | null;
+    startsAt: Date;
+    endsAt: Date;
+    excludeId?: string;
+  }) {
+    return this.prisma.client.promotion.findFirst({
+      where: {
+        isActive: true,
+        startsAt: { lt: params.endsAt },
+        endsAt: { gt: params.startsAt },
+        ...(params.excludeId ? { id: { not: params.excludeId } } : {}),
+        ...(params.treatmentId
+          ? { treatmentId: params.treatmentId }
+          : { categoryId: params.categoryId ?? undefined, treatmentId: null }),
+      },
+      select: { id: true, name: true },
+    });
+  }
+
   findById(id: string) {
     return this.prisma.client.promotion.findUnique({
       where: { id },
