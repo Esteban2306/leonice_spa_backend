@@ -7,9 +7,9 @@ import {
 import { SafeCacheService } from '../../infrastructure/redis/safe-cache.service';
 import { ClientTagsService } from './client-tags.service';
 
-const REFRESH_EVERY_MS = 60 * 60 * 1000;
+const REFRESH_EVERY_MS = 15 * 60 * 1000;
 const LOCK_KEY = 'lock:client-tags-refresh';
-const LOCK_TTL_SECONDS = 55 * 60;
+const LOCK_TTL_SECONDS = 14 * 60;
 
 @Injectable()
 export class ClientTagsScheduler
