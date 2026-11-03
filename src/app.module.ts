@@ -29,6 +29,7 @@ import { ClientThrottlerGuard } from './reservations/guards/client-throttler.gua
 import { GlobalGuardChain } from './common/guards/global-guard-chain.guard';
 import { PromotionsModule } from './promotions/promotions.module';
 import { AudiencesModule } from './audiences/audiences.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { DepositsModule } from './deposits/deposits.module';
@@ -72,6 +73,7 @@ import { AdminModule } from './admin/admin.module';
     AutomationModule,
     PromotionsModule,
     AudiencesModule,
+    CampaignsModule,
     IdempotencyModule,
     AuditModule,
     MonitoringModule,

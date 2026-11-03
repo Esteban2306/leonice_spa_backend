@@ -207,4 +207,7 @@ export function seededRng(seed: number): Rng {
   };
 }
 
+export const bogotaDayStart = (utcMs: number): number =>
+  dayStartUtc(dayIndex(utcMs));
+
 export { minuteOfDay as bogotaMinuteOfDay, dayIndex as bogotaDayIndex };

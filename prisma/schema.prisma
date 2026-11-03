@@ -751,3 +751,66 @@ model ScheduleException {
   @@index([date])
   @@map("schedule_exceptions")
 }
+
+enum CampaignStatus {
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Campaign {
+  id              String              @id @default(uuid())
+  name            String
+  templateCode    String              @map("template_code")
+  promotionId     String?             @map("promotion_id")
+  audience        Json
+  marketing       Boolean             @default(true)
+  pace            String
+  status          CampaignStatus      @default(RUNNING)
+  pausedReason    String?             @map("paused_reason")
+  totalRecipients Int                 @map("total_recipients")
+  startsAt        DateTime            @map("starts_at")
+  finishedAt      DateTime?           @map("finished_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  recipients      CampaignRecipient[]
+
+  @@index([status])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id           String                  @id @default(uuid())
+  campaignId   String                  @map("campaign_id")
+  clientId     String                  @map("client_id")
+  status       CampaignRecipientStatus @default(PENDING)
+  scheduledAt  DateTime                @map("scheduled_at")
+  sentAt       DateTime?               @map("sent_at")
+  errorMessage String?                 @map("error_message")
+  attempts     Int                     @default(0)
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+  campaign     Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, clientId])
+  @@index([campaignId, status, scheduledAt])
+  @@index([status, scheduledAt])
+  @@index([sentAt])
+  @@map("campaign_recipients")
+}
+
+model CampaignSettings {
+  id          String   @id @default("default")
+  sendWindows Json     @map("send_windows")
+  maxPerDay   Int      @default(90) @map("max_per_day")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("campaign_settings")
+}
