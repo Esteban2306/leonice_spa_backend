@@ -378,7 +378,9 @@ async function seed(prisma: PrismaClient) {
       where: { name: { notIn: BRANDS.map((brand) => brand.name) } },
     }),
   ]);
-  console.log(`[catálogo] Productos de prueba eliminados: ${staleIds.length}`);
+  console.log(
+    `[catálogo] Productos fuera del catálogo eliminados: ${staleIds.length}`,
+  );
 
   const report: ReportRow[] = [];
   let order = 0;

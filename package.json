@@ -27,9 +27,7 @@
   "prisma": {
     "seed": "ts-node prisma/seed.ts",
     "seed:treatment-content": "ts-node prisma/seed-treatment-content.ts",
-    "seed:product-content": "ts-node prisma/seed-product-content.ts",
-    "seed:product-catalog": "ts-node prisma/seed-product-catalog.ts",
-    "seed:featured-products": "ts-node prisma/seed-featured-products.ts"
+    "seed:product-catalog": "ts-node prisma/seed-product-catalog.ts"
   },
   "dependencies": {
     "@nest-lab/throttler-storage-redis": "^1.2.0",

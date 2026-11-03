@@ -952,15 +952,6 @@ const CONTENT: CategoryContent[] = [
       },
     ],
   },
-  {
-    slug: 'fase-de-prueba-qa',
-    displayOrder: 99,
-    showOnWebsite: false,
-    iconKey: null,
-    tagline: null,
-    description: null,
-    treatments: [],
-  },
 ];
 
 async function applyContent(prisma: PrismaClient) {
