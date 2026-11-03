@@ -22,11 +22,7 @@ import {
 } from './common/errors/normalize-exception';
 import { parseCorsOrigins } from './config/cors';
 
-const DEFAULT_CORS_ORIGINS = [
-  'https://leonicespa.com',
-  'https://admin.leonicespa.com',
-  'http://localhost:3000',
-];
+const DEVELOPMENT_CORS_ORIGINS = ['http://localhost:3000'];
 
 const CORRELATION_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const DEFAULT_BODY_LIMIT = '256kb';
@@ -36,7 +32,10 @@ const IMAGE_BASE64_ROUTES =
 
 function configuredCorsOrigins(): string[] {
   const origins = parseCorsOrigins(process.env.CORS_ORIGIN);
-  return origins.length > 0 ? origins : DEFAULT_CORS_ORIGINS;
+  if (origins.length > 0 || process.env.NODE_ENV === 'production') {
+    return origins;
+  }
+  return DEVELOPMENT_CORS_ORIGINS;
 }
 
 function trustReverseProxy(app: INestApplication): void {

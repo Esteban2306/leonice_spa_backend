@@ -9,7 +9,9 @@ const config = {
   get: (key: string, fallback?: string) =>
     ({ CONDUIT_BASE_URL: 'http://conduit.test', CONDUIT_API_KEY: 'k' })[key] ??
     fallback,
-  getOrThrow: () => 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e',
+  getOrThrow: (key: string) =>
+    ({ CONDUIT_BASE_URL: 'http://conduit.test', CONDUIT_API_KEY: 'k' })[key] ??
+    'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e',
 } as unknown as ConfigService;
 
 const params = {

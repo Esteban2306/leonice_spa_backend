@@ -66,14 +66,8 @@ export class ConduitApiClient {
   private readonly apiKey: string;
 
   constructor(private readonly config: ConfigService) {
-    this.baseUrl = this.config.get<string>(
-      'CONDUIT_BASE_URL',
-      'http://localhost:4123',
-    );
-    this.apiKey = this.config.get<string>(
-      'CONDUIT_API_KEY',
-      'pendiente-configurar',
-    );
+    this.baseUrl = this.config.getOrThrow<string>('CONDUIT_BASE_URL');
+    this.apiKey = this.config.getOrThrow<string>('CONDUIT_API_KEY');
   }
 
   async sendWhatsappMessage(

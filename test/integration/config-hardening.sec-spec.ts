@@ -8,7 +8,9 @@ const base = (): Record<string, unknown> => ({
   REDIS_URL: 'redis://redis:6379',
   JWT_SECRET: 'a'.repeat(64),
   JWT_REFRESH_SECRET: 'b'.repeat(64),
-  CORS_ORIGIN: 'https://leonicespa.com,https://admin.leonicespa.com',
+  CORS_ORIGIN: 'https://leonicespa.com,https://www.leonicespa.com',
+  CONDUIT_BASE_URL: 'https://conduit.leonicespa.com',
+  CONDUIT_API_KEY: 'k'.repeat(64),
   CONDUIT_TOOL_API_KEY: 'c'.repeat(64),
   CONDUIT_WEBHOOK_SECRET: 'd'.repeat(64),
   ENCRYPTION_KEY: 'e'.repeat(64),
@@ -25,10 +27,28 @@ describe('S4/S6. Configuración de producción: el arranque falla ante configura
     ['JWT_SECRET'],
     ['CORS_ORIGIN'],
     ['ENCRYPTION_KEY'],
+    ['CONDUIT_BASE_URL'],
+    ['CONDUIT_API_KEY'],
   ])('falta %s: el arranque falla', (name) => {
     const env = base();
     delete env[name];
     expect(() => validateEnv(env)).toThrow();
+  });
+
+  it('en producción CORS_ORIGIN vacío falla y no se cae a una lista por defecto', () => {
+    expect(() => validateEnv({ ...base(), CORS_ORIGIN: '' })).toThrow();
+  });
+
+  it('en producción CONDUIT_BASE_URL exige https y no puede ser localhost', () => {
+    expect(() =>
+      validateEnv({
+        ...base(),
+        CONDUIT_BASE_URL: 'http://conduit.example.org',
+      }),
+    ).toThrow();
+    expect(() =>
+      validateEnv({ ...base(), CONDUIT_BASE_URL: 'https://localhost:4123' }),
+    ).toThrow();
   });
 
   it('ENCRYPTION_KEY debe tener exactamente 64 caracteres hexadecimales', () => {

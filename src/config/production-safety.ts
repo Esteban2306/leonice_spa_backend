@@ -11,6 +11,7 @@ const REQUIRED_SECRETS = [
   'JWT_REFRESH_SECRET',
   'CONDUIT_TOOL_API_KEY',
   'CONDUIT_WEBHOOK_SECRET',
+  'CONDUIT_API_KEY',
 ] as const;
 
 type RawEnv = Record<string, unknown>;
@@ -30,9 +31,33 @@ export function encryptionKeyIssues(env: RawEnv): string[] {
   return [];
 }
 
+function conduitIssues(env: RawEnv): string[] {
+  const raw = text(env, 'CONDUIT_BASE_URL');
+  if (raw === undefined) {
+    return ['CONDUIT_BASE_URL es obligatoria en producción'];
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return [`CONDUIT_BASE_URL no es una URL válida: ${raw}`];
+  }
+  const issues: string[] = [];
+  if (url.protocol !== 'https:') {
+    issues.push('CONDUIT_BASE_URL debe usar https en producción');
+  }
+  if (LOCAL_HOSTS.has(url.hostname)) {
+    issues.push('CONDUIT_BASE_URL no puede apuntar a localhost en producción');
+  }
+  return issues;
+}
+
 function corsIssues(env: RawEnv): string[] {
   const origins = parseCorsOrigins(text(env, 'CORS_ORIGIN'));
   const issues: string[] = [];
+  if (origins.length === 0) {
+    issues.push('CORS_ORIGIN debe indicar al menos un origen en producción');
+  }
   for (const origin of origins) {
     let url: URL;
     try {
@@ -77,7 +102,11 @@ function secretIssues(env: RawEnv): string[] {
 
 export function productionIssues(env: RawEnv): string[] {
   if (env.NODE_ENV !== 'production') return [];
-  const issues = [...secretIssues(env), ...corsIssues(env)];
+  const issues = [
+    ...secretIssues(env),
+    ...corsIssues(env),
+    ...conduitIssues(env),
+  ];
   if (text(env, 'CONDUIT_WEBHOOK_ALLOW_LEGACY_SIGNATURE') === 'true') {
     issues.push(
       'CONDUIT_WEBHOOK_ALLOW_LEGACY_SIGNATURE no se permite en producción',
