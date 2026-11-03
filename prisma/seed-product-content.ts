@@ -231,7 +231,7 @@ async function applyContent(prisma: PrismaClient) {
     }
     await prisma.product.update({
       where: { id: product.id },
-      data: { ...data, contentNeedsReview: true },
+      data,
     });
     console.log(`[productos] ${slug} actualizado.`);
   }

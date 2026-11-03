@@ -413,7 +413,6 @@ async function seed(prisma: PrismaClient) {
       idealFor: content.idealFor,
       usageFrequency: content.usageFrequency,
       precautions: content.precautions,
-      contentNeedsReview: true,
       isActive: active,
       isFeatured: FEATURED_NAMES.has(name),
       displayOrder: order,

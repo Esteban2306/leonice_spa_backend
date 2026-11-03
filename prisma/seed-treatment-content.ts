@@ -1010,7 +1010,6 @@ async function applyContent(prisma: PrismaClient) {
             aftercare: content.aftercare,
             considerations: content.considerations,
             recommendedFrequency: content.recommendedFrequency,
-            contentNeedsReview: true,
           },
         }),
         prisma.treatmentStep.deleteMany({
