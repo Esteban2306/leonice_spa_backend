@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { ClientTagKey } from '@prisma/client';
 import { ClientsRepository } from './repositories/clients.repository';
+import { ClientTagsService } from './tags/client-tags.service';
 import { ResolveClientDto } from './dto/resolve-client.dto';
 import { normalizePhone } from './utils/normalize-phone.util';
 import { UpdateClientDto } from './dto/update-client.dto';
@@ -37,6 +39,7 @@ export class ClientsService {
     private readonly repository: ClientsRepository,
     private readonly historyRepository: clientsHistoryRepository,
     private readonly consentService: ConsentService,
+    private readonly tagsService: ClientTagsService,
   ) {}
 
   async resolveOrCreateForBooking(
@@ -106,7 +109,7 @@ export class ClientsService {
     });
   }
 
-  async search(query?: string, page = 1, pageSize = 20) {
+  async search(query?: string, page = 1, pageSize = 20, tags?: ClientTagKey[]) {
     const term = query?.trim() ?? '';
     const phoneDigits = term.replace(/\D/g, '');
     const searchesPhone = phoneDigits.length >= MIN_PHONE_DIGITS;
@@ -120,12 +123,16 @@ export class ClientsService {
       {
         name: searchesName ? term : undefined,
         phoneDigits: searchesPhone ? phoneDigits : undefined,
+        tags,
       },
       page,
       pageSize,
     );
 
     const now = new Date();
+    const tagsByClient = await this.tagsService.tagsFor(
+      result.data.map((client) => client.id),
+    );
     return {
       data: result.data.map((client) => ({
         id: client.id,
@@ -135,6 +142,10 @@ export class ClientsService {
         reservationCount: client._count.reservations,
         lastReservation: client.reservations[0] ?? null,
         hairProfileStatus: getHairProfileStatus(client, now),
+        tags: (tagsByClient.get(client.id) ?? []).map(({ key, detail }) => ({
+          key,
+          detail,
+        })),
       })),
       pagination: result.pagination,
     };
@@ -184,12 +195,16 @@ export class ClientsService {
   async getDetail(id: string): Promise<ClientDetailView> {
     const client = await this.requireClient(id);
     const now = new Date();
-    const history = await this.historyRepository.getReservationHistory(id, now);
+    const [history, tags] = await Promise.all([
+      this.historyRepository.getReservationHistory(id, now),
+      this.tagsService.refreshClient(id, now),
+    ]);
     return {
       ...toClientView(client, now),
       stats: computeReservationStats(history.statusCounts, history.upcoming),
       reservations: history.reservations.map(toClientReservationSummary),
       consents: history.consentRecords,
+      tags,
     };
   }
 

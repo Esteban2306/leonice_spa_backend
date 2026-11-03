@@ -12,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ClientsService } from './clients.service';
+import { ClientTagsService } from './tags/client-tags.service';
 import { ResolveClientDto } from './dto/resolve-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { FindClientsQueryDto } from './dto/find-clients-query.dto';
@@ -22,7 +23,10 @@ import { FindPendingHairProfilesQueryDto } from './dto/find-pending-hair-profile
 
 @Controller({ path: 'clients', version: '1' })
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) {}
+  constructor(
+    private readonly clientsService: ClientsService,
+    private readonly clientTags: ClientTagsService,
+  ) {}
 
   @Post('resolve')
   async resolve(@Body() dto: ResolveClientDto) {
@@ -52,7 +56,23 @@ export class ClientsController {
 
   @Get()
   async search(@Query() query: FindClientsQueryDto) {
-    return this.clientsService.search(query.q, query.page, query.pageSize);
+    return this.clientsService.search(
+      query.q,
+      query.page,
+      query.pageSize,
+      query.tags,
+    );
+  }
+
+  @Get('tags/catalog')
+  async tagCatalog() {
+    return this.clientTags.catalog();
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('tags/refresh')
+  async refreshTags() {
+    return this.clientTags.refreshAll();
   }
 
   @Get('hair-profiles/pending')

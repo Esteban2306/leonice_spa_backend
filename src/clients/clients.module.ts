@@ -7,6 +7,8 @@ import { ConsentService } from './consent/consent.service';
 import { ConsentRecordRepository } from './consent/consent-record.repository';
 import { EncryptionModule } from '../infrastructure/encryption/encryption.module';
 import { ConfigService } from '@nestjs/config';
+import { ClientTagsService } from './tags/client-tags.service';
+import { ClientTagsScheduler } from './tags/client-tags.scheduler';
 
 @Module({
   imports: [EncryptionModule],
@@ -18,7 +20,14 @@ import { ConfigService } from '@nestjs/config';
     ConsentService,
     ConsentRecordRepository,
     ConfigService,
+    ClientTagsService,
+    ClientTagsScheduler,
   ],
-  exports: [ClientsService, ClientsRepository, ConsentService],
+  exports: [
+    ClientsService,
+    ClientsRepository,
+    ConsentService,
+    ClientTagsService,
+  ],
 })
 export class ClientsModule {}

@@ -48,9 +48,38 @@ model Client {
   consentRecords       ConsentRecord[]
   productViewLogs      ProductViewLog[]
   reservations         Reservation[]
+  tags                 ClientTag[]
 
   @@index([createdAt])
   @@map("clients")
+}
+
+model ClientTag {
+  id         String       @id @default(uuid())
+  clientId   String       @map("client_id")
+  key        ClientTagKey
+  detail     String       @default("")
+  assignedAt DateTime     @default(now()) @map("assigned_at")
+  client     Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, key, detail])
+  @@index([key])
+  @@map("client_tags")
+}
+
+enum ClientTagKey {
+  SIN_VISITAS
+  NUEVA
+  RECURRENTE
+  EN_PAUSA
+  INACTIVA
+  CON_CITA_PROXIMA
+  RESERVA_PENDIENTE
+  NO_SHOW_REITERADO
+  CUMPLE_PRONTO
+  FRECUENTA
+  REPITE_SERVICIO
+  APTA_PROMOCION
 }
 
 model ConsentRecord {

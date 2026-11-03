@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { utcMidnightToCalendarDate } from '../../common/validation/date-input.validators';
 import { HairProfileView, toHairProfileView } from './hair-profile.util';
+import type { ClientTagView } from '../tags/client-tags.service';
 
 export interface ClientView {
   id: string;
@@ -48,6 +49,7 @@ export interface ClientDetailView extends ClientView {
   stats: ClientReservationStats;
   reservations: ClientReservationSummary[];
   consents: ClientConsentSummary[];
+  tags: ClientTagView[];
 }
 
 export function toClientView(client: Client, now = new Date()): ClientView {

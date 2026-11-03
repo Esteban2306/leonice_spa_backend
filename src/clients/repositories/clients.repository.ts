@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {
   Client,
+  ClientTagKey,
   HairColor,
   HairDensity,
   HairLength,
@@ -64,7 +65,11 @@ export class ClientsRepository {
   }
 
   async search(
-    params: { name?: string; phoneDigits?: string },
+    params: {
+      name?: string;
+      phoneDigits?: string;
+      tags?: ClientTagKey[];
+    },
     page = 1,
     pageSize = 20,
   ) {
@@ -76,8 +81,14 @@ export class ClientsRepository {
         ? [{ phone: { contains: params.phoneDigits } }]
         : []),
     ];
-    const where: Prisma.ClientWhereInput =
-      conditions.length > 0 ? { OR: conditions } : {};
+    const where: Prisma.ClientWhereInput = {
+      ...(conditions.length > 0 ? { OR: conditions } : {}),
+      ...(params.tags && params.tags.length > 0
+        ? {
+            AND: params.tags.map((key) => ({ tags: { some: { key } } })),
+          }
+        : {}),
+    };
 
     const skip = (page - 1) * pageSize;
 

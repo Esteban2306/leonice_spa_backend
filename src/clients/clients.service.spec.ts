@@ -1,3 +1,4 @@
+import { ClientTagsService } from './tags/client-tags.service';
 import { ClientsService } from './clients.service';
 import { ClientsRepository } from './repositories/clients.repository';
 import { clientsHistoryRepository } from './repositories/client-history.repository';
@@ -44,6 +45,7 @@ const build = () => {
     repository as unknown as ClientsRepository,
     {} as clientsHistoryRepository,
     consent as unknown as ConsentService,
+    {} as ClientTagsService,
   );
   return { service, repository, consent, calls };
 };
