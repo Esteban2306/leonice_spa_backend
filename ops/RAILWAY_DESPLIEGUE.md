@@ -10,6 +10,8 @@ Dominios: sitio público `https://leonicespa.com` y `https://www.leonicespa.com`
 
 Rama a desplegar: `main`, que ya incluye todo el trabajo de operaciones, campañas y mensajes automáticos.
 
+Si el servicio muestra «The Dockerfile failed validation»: Railway no acepta `RUN --mount=type=cache` sin un prefijo propio, así que el dockerfile ya no lo usa. En los servicios que se construyen desde una subcarpeta (Conduit: `messaging-service`) hay que indicarlo en Settings → Source → Root Directory.
+
 ## 2. Variables del servicio API
 
 | Variable                                                                                                           | Valor                                                                                                                                                         |
