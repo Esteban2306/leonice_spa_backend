@@ -1,3 +1,5 @@
+import { BROADCAST_CATALOG } from './conduit-broadcast-templates';
+
 export type ConduitTemplateAudience = 'CLIENT' | 'ADMIN';
 
 export type ConduitTemplateChannel = 'WHATSAPP' | 'EMAIL';
@@ -162,6 +164,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       ].join('\n'),
     ],
   },
+  ...BROADCAST_CATALOG,
   {
     code: 'CLIENT_DEPOSIT_REJECTED',
     envKey: 'CONDUIT_TEMPLATE_CLIENT_DEPOSIT_REJECTED',

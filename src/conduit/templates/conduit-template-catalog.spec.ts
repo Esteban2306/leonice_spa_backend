@@ -25,9 +25,22 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
 
   it('las plantillas difundibles solo usan datos que se conocen sin una reserva y las de marketing están marcadas', () => {
     expect(BROADCAST_TEMPLATES.map((t) => t.code).sort()).toEqual([
+      'BIRTHDAY_GREETING',
+      'BIRTHDAY_PROMO',
+      'BLACK_FRIDAY',
+      'BONUS_SEASON',
+      'BOOK_AHEAD',
+      'CARE_REMINDER',
+      'HOME_CARE',
+      'LAST_DAYS',
+      'LOVE_FRIENDSHIP',
+      'MOTHERS_DAY',
       'PROMOTION_BROADCAST',
       'REACTIVATION',
       'REACTIVATION_PROMO',
+      'REFERRAL',
+      'WOMENS_DAY',
+      'YEAR_END',
     ]);
     for (const template of BROADCAST_TEMPLATES) {
       expect(template.marketing).toBe(true);
@@ -80,12 +93,12 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
 
   it('los mensajes proactivos a muchas clientas tienen variantes con las mismas variables', () => {
     const withVariants = CONDUIT_TEMPLATE_CATALOG.filter((t) => t.variants);
-    expect(withVariants.map((t) => t.code).sort()).toEqual([
-      'PROMOTION_BROADCAST',
-      'REACTIVATION',
-      'REACTIVATION_PROMO',
-      'RESERVATION_REMINDER',
-    ]);
+    expect(withVariants.map((t) => t.code).sort()).toEqual(
+      [
+        'RESERVATION_REMINDER',
+        ...BROADCAST_TEMPLATES.map((t) => t.code),
+      ].sort(),
+    );
     for (const template of withVariants) {
       const variants = template.variants ?? [];
       expect(variants.length).toBeGreaterThanOrEqual(2);
