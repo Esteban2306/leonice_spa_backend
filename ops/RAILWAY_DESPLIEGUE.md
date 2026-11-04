@@ -1,6 +1,6 @@
 # Despliegue del backend en Railway
 
-Dominios: frontend `https://leonicespa.com` y `https://www.leonicespa.com`; API `https://api.leonicespa.com`.
+Dominios: sitio público `https://leonicespa.com` y `https://www.leonicespa.com`; panel de administración `https://admin.leonicespa.com`; API `https://api.leonicespa.com`.
 
 ## 1. Servicios en Railway
 
@@ -8,35 +8,38 @@ Dominios: frontend `https://leonicespa.com` y `https://www.leonicespa.com`; API 
 2. **Redis** (plugin de Railway). BullMQ necesita `maxmemory-policy noeviction`; verifícalo en la configuración del Redis.
 3. **API**: servicio desde este repositorio. `railway.json` ya indica el `dockerfile`, el healthcheck `/api/v1/health` y el comando previo `prisma migrate deploy`, que se ejecuta en cada despliegue antes de arrancar.
 
-Rama a desplegar: la que tenga el sistema más reciente (hoy `feat/whatsapp-operations`, que va por delante de `main`). Decide si se hace merge a `main` y se despliega desde ahí.
+Rama a desplegar: la que tenga el sistema más reciente (hoy `feat/whatsapp-campaigns`, que incluye las ramas anteriores y va por delante de `main`). Decide si se hace merge a `main` y se despliega desde ahí.
 
 ## 2. Variables del servicio API
 
-| Variable                                                                                                           | Valor                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                                                                                                         | `production`                                                                                                                     |
-| `PORT`                                                                                                             | `3000`                                                                                                                           |
-| `DATABASE_URL`                                                                                                     | referencia al plugin: `${{Postgres.DATABASE_URL}}`                                                                               |
-| `REDIS_URL`                                                                                                        | referencia al plugin: `${{Redis.REDIS_URL}}`                                                                                     |
-| `JWT_SECRET`, `JWT_REFRESH_SECRET`                                                                                 | `openssl rand -hex 32`, distintos entre sí                                                                                       |
-| `ENCRYPTION_KEY`                                                                                                   | `openssl rand -hex 32` (64 caracteres hexadecimales)                                                                             |
-| `CANCELLATION_LINK_SECRET`                                                                                         | `openssl rand -hex 32`                                                                                                           |
-| `CORS_ORIGIN`                                                                                                      | `https://leonicespa.com,https://www.leonicespa.com` (el primero debe ser el sitio público: de ahí sale el enlace de cancelación) |
-| `FRONTEND_ADMIN_URL`                                                                                               | `https://leonicespa.com/admin`                                                                                                   |
-| `SPA_PUBLIC_URL`                                                                                                   | `https://api.leonicespa.com`                                                                                                     |
-| `CLIENT_CANCELLATION_URL`                                                                                          | `https://leonicespa.com/cancelar`                                                                                                |
-| `TRUST_PROXY_HOPS`                                                                                                 | `1` con DNS only; `2` si `api` va con proxy de Cloudflare                                                                        |
-| `THROTTLE_LIMIT`                                                                                                   | `100`                                                                                                                            |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                                         | de la consola de Google                                                                                                          |
-| `GOOGLE_CALLBACK_URL`                                                                                              | `https://api.leonicespa.com/api/v1/auth/google/callback`                                                                         |
-| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`                                             | de Cloudinary                                                                                                                    |
-| `CONDUIT_BASE_URL`                                                                                                 | `https://…` (obligatoria, no puede ser localhost)                                                                                |
-| `CONDUIT_API_KEY`, `CONDUIT_TOOL_API_KEY`, `CONDUIT_WEBHOOK_SECRET`                                                | obligatorias en producción                                                                                                       |
-| `CONDUIT_WHATSAPP_CONNECTION_ID`, `CONDUIT_INTEGRATION_ID`, `CONDUIT_INTEGRATION_SECRET`, `CONDUIT_DEFAULT_BOT_ID` | de Conduit                                                                                                                       |
-| `CONDUIT_TEMPLATE_*`                                                                                               | los ids de plantilla que correspondan en el Conduit de producción                                                                |
-| `SIIGO_ENABLED`                                                                                                    | `false` hasta tener credenciales                                                                                                 |
+| Variable                                                                                                           | Valor                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                                                                                         | `production`                                                                                                                                                  |
+| `PORT`                                                                                                             | `3000`                                                                                                                                                        |
+| `DATABASE_URL`                                                                                                     | referencia al plugin: `${{Postgres.DATABASE_URL}}`                                                                                                            |
+| `REDIS_URL`                                                                                                        | referencia al plugin: `${{Redis.REDIS_URL}}`                                                                                                                  |
+| `JWT_SECRET`, `JWT_REFRESH_SECRET`                                                                                 | `openssl rand -hex 32`, distintos entre sí                                                                                                                    |
+| `ENCRYPTION_KEY`                                                                                                   | `openssl rand -hex 32` (64 caracteres hexadecimales)                                                                                                          |
+| `CANCELLATION_LINK_SECRET`                                                                                         | `openssl rand -hex 32`                                                                                                                                        |
+| `CORS_ORIGIN`                                                                                                      | `https://leonicespa.com,https://www.leonicespa.com,https://admin.leonicespa.com` (el primero debe ser el sitio público: de ahí sale el enlace de cancelación) |
+| `COOKIE_DOMAIN`                                                                                                    | `.leonicespa.com` (con punto inicial; obligatoria en producción, ver nota)                                                                                    |
+| `FRONTEND_ADMIN_URL`                                                                                               | `https://admin.leonicespa.com/admin`                                                                                                                          |
+| `SPA_PUBLIC_URL`                                                                                                   | `https://api.leonicespa.com`                                                                                                                                  |
+| `CLIENT_CANCELLATION_URL`                                                                                          | `https://leonicespa.com/cancelar`                                                                                                                             |
+| `TRUST_PROXY_HOPS`                                                                                                 | `1` con DNS only; `2` si `api` va con proxy de Cloudflare                                                                                                     |
+| `THROTTLE_LIMIT`                                                                                                   | `100`                                                                                                                                                         |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                                         | de la consola de Google                                                                                                                                       |
+| `GOOGLE_CALLBACK_URL`                                                                                              | `https://api.leonicespa.com/api/v1/auth/google/callback`                                                                                                      |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`                                             | de Cloudinary                                                                                                                                                 |
+| `CONDUIT_BASE_URL`                                                                                                 | `https://…` (obligatoria, no puede ser localhost)                                                                                                             |
+| `CONDUIT_API_KEY`, `CONDUIT_TOOL_API_KEY`, `CONDUIT_WEBHOOK_SECRET`                                                | obligatorias en producción                                                                                                                                    |
+| `CONDUIT_WHATSAPP_CONNECTION_ID`, `CONDUIT_INTEGRATION_ID`, `CONDUIT_INTEGRATION_SECRET`, `CONDUIT_DEFAULT_BOT_ID` | de Conduit                                                                                                                                                    |
+| `CONDUIT_TEMPLATE_*`                                                                                               | los ids de plantilla que correspondan en el Conduit de producción                                                                                             |
+| `SIIGO_ENABLED`                                                                                                    | `false` hasta tener credenciales                                                                                                                              |
 
-La API no arranca en producción si falta alguna de las obligatorias o si `CORS_ORIGIN` o `CONDUIT_BASE_URL` no son válidos: el error aparece en los logs de Railway.
+La API no arranca en producción si falta alguna de las obligatorias o si `CORS_ORIGIN`, `COOKIE_DOMAIN` o `CONDUIT_BASE_URL` no son válidos: el error aparece en los logs de Railway.
+
+**Por qué `COOKIE_DOMAIN`.** El inicio de sesión guarda las cookies de acceso solo para `api.leonicespa.com`, pero el token CSRF debe poder leerlo el JavaScript del panel y del sitio, que viven en otros subdominios. Con `COOKIE_DOMAIN=.leonicespa.com` esa cookie se comparte entre `admin.`, `www.` y `api.`; sin ella el panel entra, pero todas las acciones que modifican datos fallan con `CSRF_INVALID`. Las cookies de sesión siguen siendo solo de la API (`HttpOnly`, `Secure`, `SameSite=Lax`) y, al ser el mismo sitio registrable, el navegador las envía en las peticiones del panel. La API valida al arrancar que todos los orígenes de `CORS_ORIGIN` pertenezcan a ese dominio.
 
 ## 3. Migrar los datos reales (productos, tratamientos, ajustes)
 
@@ -83,11 +86,22 @@ La caché de productos y tratamientos expira sola en 5 minutos.
 ## 4. Verificación posterior
 
 - `https://api.leonicespa.com/api/v1/health` responde 200 con base de datos y Redis en `true`.
-- Entrar a `https://leonicespa.com/admin` con el administrador del seed.
+- Entrar a `https://admin.leonicespa.com/admin` con el administrador del seed y hacer una acción que modifique datos (por ejemplo, editar una nota): confirma que la cookie `csrf_token` aparece en el dominio `.leonicespa.com` y que no hay errores `CSRF_INVALID`.
+- Desde `https://leonicespa.com` y `https://www.leonicespa.com` el catálogo carga sin errores de CORS.
 - Catálogo público con productos e imágenes; reservar una cita de prueba, cancelarla desde el enlace y borrarla.
 - Registrar en Conduit el webhook `https://api.leonicespa.com/api/v1/integrations/conduit/message-events`.
-- En la consola de Google: origen `https://leonicespa.com` y la URI de redirección anterior.
+- En la consola de Google: orígenes `https://admin.leonicespa.com` y `https://leonicespa.com`, y la URI de redirección anterior.
 
-## 5. Promociones
+## 5. Promociones y campañas
 
-No hay pantalla de promociones en el panel: se crean con la API, con sesión de administrador (`POST /api/v1/promotions`). Cada promoción apunta a **un** tratamiento o a **una** categoría, nunca a ambos.
+Las promociones se crean en el panel (`/admin/promotions`). Cada una apunta a **un** tratamiento o a **una** categoría, nunca a ambos.
+
+Las campañas de WhatsApp (`/admin/campaigns`) usan plantillas que deben existir en Conduit: el seed del paso 3.4 las crea todas (operativas y de difusión). Si añades plantillas nuevas al catálogo, vuelve a ejecutar `pnpm prisma db seed` con `CONDUIT_BASE_URL` y `CONDUIT_API_KEY`; no sobrescribe las que ya existen salvo que pongas `CONDUIT_TEMPLATES_OVERWRITE=true`.
+
+## 6. Panel en `admin.leonicespa.com` (Cloudflare)
+
+El panel y el sitio público son el mismo Worker; el subdominio solo cambia la dirección de entrada. En Cloudflare, sección Rules:
+
+1. **Rewrite URL** — si el host es `admin.leonicespa.com` y la ruta es exactamente `/`, reescribir a `/admin` (así `https://admin.leonicespa.com` abre el panel).
+2. **Redirect Rule** — si el host es `leonicespa.com` o `www.leonicespa.com` y la ruta empieza por `/admin`, redirigir (301) a `https://admin.leonicespa.com` conservando la ruta (el panel deja de ser accesible desde el sitio público).
+3. Opcional: **Cloudflare Access** sobre `admin.leonicespa.com` (Zero Trust → Access → Applications) para pedir un acceso extra antes de llegar al inicio de sesión. La API (`api.`) queda fuera de Access.

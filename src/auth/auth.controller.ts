@@ -24,6 +24,7 @@ import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
 } from './constants/auth.constants';
+import { csrfCookieScope } from './csrf-cookie-scope';
 import { SkipCsrf } from './decorators/skip-csrf.decorator';
 import { GoogleProfileResult } from './types/google-profile.type';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
@@ -145,12 +146,13 @@ export class AuthController {
       sameSite: 'lax' as const,
       maxAge: REFRESH_TOKEN_TTL_SECONDS * 1000,
       path: '/',
+      ...csrfCookieScope(),
     });
   }
 
   private clearAuthCookies(res: Response) {
     res.clearCookie(ACCESS_TOKEN_COOKIE, { path: '/' });
     res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth/refresh' });
-    res.clearCookie(CSRF_TOKEN_COOKIE, { path: '/' });
+    res.clearCookie(CSRF_TOKEN_COOKIE, { path: '/', ...csrfCookieScope() });
   }
 }

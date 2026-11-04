@@ -76,6 +76,43 @@ function corsIssues(env: RawEnv): string[] {
   return issues;
 }
 
+const COOKIE_DOMAIN_PATTERN = /^\.[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+
+const hostBelongsTo = (host: string, cookieDomain: string): boolean => {
+  const root = cookieDomain.slice(1).toLowerCase();
+  const name = host.toLowerCase();
+  return name === root || name.endsWith(`.${root}`);
+};
+
+function cookieIssues(env: RawEnv): string[] {
+  const domain = text(env, 'COOKIE_DOMAIN');
+  if (domain === undefined) {
+    return [
+      'COOKIE_DOMAIN es obligatoria en producción (por ejemplo .leonicespa.com): sin ella el panel no puede leer la cookie CSRF de la API y todas las acciones fallan',
+    ];
+  }
+  if (!COOKIE_DOMAIN_PATTERN.test(domain)) {
+    return [
+      `COOKIE_DOMAIN debe empezar con punto y ser un dominio válido: ${domain}`,
+    ];
+  }
+  const hosts = parseCorsOrigins(text(env, 'CORS_ORIGIN'));
+  const issues: string[] = [];
+  for (const value of hosts) {
+    try {
+      const { hostname } = new URL(value);
+      if (!hostBelongsTo(hostname, domain)) {
+        issues.push(
+          `${value} no pertenece a COOKIE_DOMAIN ${domain}: el navegador no compartiría la cookie CSRF`,
+        );
+      }
+    } catch {
+      continue;
+    }
+  }
+  return issues;
+}
+
 function secretIssues(env: RawEnv): string[] {
   const issues: string[] = [];
   for (const name of REQUIRED_SECRETS) {
@@ -105,6 +142,7 @@ export function productionIssues(env: RawEnv): string[] {
   const issues = [
     ...secretIssues(env),
     ...corsIssues(env),
+    ...cookieIssues(env),
     ...conduitIssues(env),
   ];
   if (text(env, 'CONDUIT_WEBHOOK_ALLOW_LEGACY_SIGNATURE') === 'true') {

@@ -42,6 +42,10 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  COOKIE_DOMAIN?: string;
+
+  @IsString()
+  @IsOptional()
   CONDUIT_TOOL_API_KEY?: string;
 
   @IsString()
