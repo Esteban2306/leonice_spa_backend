@@ -24,6 +24,12 @@ export type FollowUpMessage =
   | { template: ConduitTemplateDefinition; variables: Record<string, string> }
   | { skip: string };
 
+export const FOLLOW_UP_LABELS: Record<string, string> = {
+  MAINTENANCE_REMINDER: 'Recordatorio de mantenimiento',
+  REACTIVATION: 'Te extrañamos: invitación a volver',
+  REACTIVATION_PROMO: 'Te extrañamos con una promoción',
+};
+
 export const templateNeedsFollowUpPromotion = (
   template: Pick<ConduitTemplateDefinition, 'variables'>,
 ): boolean => template.variables.includes('promocion');

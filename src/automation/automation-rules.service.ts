@@ -6,12 +6,25 @@ import {
 import { AutomationRulesRepository } from './repositories/automation-rules.repository';
 import { CreateAutomationRuleDto } from './dto/create-automation-rule.dto';
 import { FOLLOW_UP_TEMPLATES } from '../conduit/templates/conduit-template-catalog';
-import { templateNeedsFollowUpPromotion } from './domain/follow-up-message';
+import {
+  FOLLOW_UP_LABELS,
+  templateNeedsFollowUpPromotion,
+} from './domain/follow-up-message';
 import { UpdateAutomationRuleDto } from './dto/update-automation-rule.dto';
 
 @Injectable()
 export class AutomationRulesService {
   constructor(private readonly repository: AutomationRulesRepository) {}
+
+  followUpTemplates() {
+    return FOLLOW_UP_TEMPLATES.map((template) => ({
+      code: template.code,
+      label: FOLLOW_UP_LABELS[template.code] ?? template.code,
+      description: template.description,
+      body: template.body,
+      needsPromotion: templateNeedsFollowUpPromotion(template),
+    }));
+  }
 
   async create(dto: CreateAutomationRuleDto) {
     if (!dto.treatmentId && !dto.categoryId)

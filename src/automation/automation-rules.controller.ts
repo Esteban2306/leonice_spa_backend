@@ -17,6 +17,11 @@ import { UpdateAutomationRuleDto } from './dto/update-automation-rule.dto';
 export class AutomationRulesController {
   constructor(private readonly service: AutomationRulesService) {}
 
+  @Get('templates')
+  templates() {
+    return this.service.followUpTemplates();
+  }
+
   @Get()
   findMany(
     @Query('treatmentId') treatmentId?: string,
