@@ -30,6 +30,7 @@ import {
   planSchedule,
   SendWindow,
 } from './domain/pacing';
+import { DEFAULT_MARKETING_COOLDOWN_DAYS } from '../marketing/marketing-frequency';
 import {
   CreateCampaignDto,
   EstimateCampaignDto,
@@ -40,6 +41,7 @@ import {
 export interface CampaignSettingsView {
   sendWindows: SendWindow[];
   maxPerDay: number;
+  marketingCooldownDays: number;
 }
 
 export interface BroadcastTemplateView {
@@ -72,6 +74,8 @@ export class CampaignsService {
           DEFAULT_SEND_WINDOWS,
       ),
       maxPerDay: row?.maxPerDay ?? DEFAULT_MAX_PER_DAY,
+      marketingCooldownDays:
+        row?.marketingCooldownDays ?? DEFAULT_MARKETING_COOLDOWN_DAYS,
     };
   }
 
@@ -85,13 +89,19 @@ export class CampaignsService {
         id: SETTINGS_ID,
         sendWindows: sendWindows as unknown as Prisma.InputJsonValue,
         maxPerDay: dto.maxPerDay,
+        marketingCooldownDays: dto.marketingCooldownDays,
       },
       update: {
         sendWindows: sendWindows as unknown as Prisma.InputJsonValue,
         maxPerDay: dto.maxPerDay,
+        marketingCooldownDays: dto.marketingCooldownDays,
       },
     });
-    return { sendWindows, maxPerDay: dto.maxPerDay };
+    return {
+      sendWindows,
+      maxPerDay: dto.maxPerDay,
+      marketingCooldownDays: dto.marketingCooldownDays,
+    };
   }
 
   async listTemplates(): Promise<BroadcastTemplateView[]> {

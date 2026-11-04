@@ -18,6 +18,8 @@ import {
 import { conduitIdempotencyKey } from '../../conduit/client/conduit-idempotency-key';
 import { formatNotificationDateTime } from '../utils/format-notification-date';
 import { AutomationExecutionRepository } from '../repositories/automation-execution.repository';
+import { MarketingFrequencyService } from '../../marketing/marketing-frequency.service';
+import { cooldownReason } from '../../marketing/marketing-frequency';
 import { buildFollowUpMessage } from '../domain/follow-up-message';
 import { assertMessageDelivered } from '../utils/assert-message-delivered';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
@@ -70,6 +72,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     private readonly notifications: OperationalNotificationsService,
     private readonly templates: ConduitTemplateResolver,
     private readonly retention: ClientRetentionService,
+    private readonly frequency: MarketingFrequencyService,
   ) {
     super();
   }
@@ -297,8 +300,18 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       return;
     }
 
-    const promo = rule.promotion;
     const now = new Date();
+    const waitUntil = await this.frequency.blockedUntil(data.clientId, now);
+    if (waitUntil) {
+      await this.executions.log({
+        ...base,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: cooldownReason(waitUntil),
+      });
+      return;
+    }
+
+    const promo = rule.promotion;
     const validPromo =
       promo?.isActive && promo.startsAt <= now && now <= promo.endsAt
         ? promo

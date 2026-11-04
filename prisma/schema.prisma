@@ -808,10 +808,11 @@ model CampaignRecipient {
 }
 
 model CampaignSettings {
-  id          String   @id @default("default")
-  sendWindows Json     @map("send_windows")
-  maxPerDay   Int      @default(90) @map("max_per_day")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default("default")
+  sendWindows           Json     @map("send_windows")
+  maxPerDay             Int      @default(90) @map("max_per_day")
+  marketingCooldownDays Int      @default(30) @map("marketing_cooldown_days")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("campaign_settings")
 }

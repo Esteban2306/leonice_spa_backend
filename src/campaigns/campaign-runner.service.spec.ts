@@ -4,6 +4,7 @@ import { ConduitTemplateResolver } from '../conduit/templates/conduit-template-r
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { SafeCacheService } from '../infrastructure/redis/safe-cache.service';
 import { CampaignRunnerService } from './campaign-runner.service';
+import type { MarketingFrequencyService } from '../marketing/marketing-frequency.service';
 import { CampaignsService } from './campaigns.service';
 
 const objectContaining = (value: object): unknown =>
@@ -45,6 +46,7 @@ function build(
     send?: jest.Mock;
     templateId?: string | null;
     breaker?: Array<{ status: CampaignRecipientStatus }>;
+    blockedUntil?: Date | null;
   } = {},
 ) {
   const update = jest.fn().mockResolvedValue({});
@@ -103,12 +105,16 @@ function build(
       ),
   };
   const cache = { setIfAbsent: jest.fn() };
+  const frequency = {
+    blockedUntil: jest.fn().mockResolvedValue(overrides.blockedUntil ?? null),
+  };
   const runner = new CampaignRunnerService(
     prisma as unknown as PrismaService,
     campaigns as unknown as CampaignsService,
     conduit as unknown as ConduitApiClient,
     templates as unknown as ConduitTemplateResolver,
     cache as unknown as SafeCacheService,
+    frequency as unknown as MarketingFrequencyService,
   );
   return { runner, prisma, campaigns, send, update };
 }
@@ -175,6 +181,21 @@ describe('CampaignRunnerService.tick', () => {
       data: objectContaining({
         status: CampaignRecipientStatus.SKIPPED,
         errorMessage: 'Sin consentimiento de marketing',
+      }),
+    });
+  });
+
+  it('omite a quien ya recibió otro mensaje de marketing dentro del plazo', async () => {
+    const { runner, send, update } = build({
+      blockedUntil: new Date('2026-11-30T12:00:00Z'),
+    });
+    await runner.tick(MONDAY_10AM);
+    expect(send).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'rec' },
+      data: objectContaining({
+        status: CampaignRecipientStatus.SKIPPED,
+        errorMessage: expect.stringContaining('30 de noviembre') as string,
       }),
     });
   });

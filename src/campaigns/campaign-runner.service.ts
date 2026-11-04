@@ -17,6 +17,8 @@ import { BROADCAST_TEMPLATES } from '../conduit/templates/conduit-template-catal
 import { ConduitTemplateResolver } from '../conduit/templates/conduit-template-resolver';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { SafeCacheService } from '../infrastructure/redis/safe-cache.service';
+import { cooldownReason } from '../marketing/marketing-frequency';
+import { MarketingFrequencyService } from '../marketing/marketing-frequency.service';
 import { CampaignsService } from './campaigns.service';
 import {
   buildCampaignVariables,
@@ -51,6 +53,7 @@ export class CampaignRunnerService
     private readonly conduit: ConduitApiClient,
     private readonly templates: ConduitTemplateResolver,
     private readonly cache: SafeCacheService,
+    private readonly frequency: MarketingFrequencyService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -209,6 +212,17 @@ export class CampaignRunnerService
       });
       await this.closeIfDone(campaign.id, now);
       return;
+    }
+
+    if (campaign.marketing) {
+      const until = await this.frequency.blockedUntil(recipient.clientId, now);
+      if (until) {
+        await this.finish(recipient.id, CampaignRecipientStatus.SKIPPED, {
+          errorMessage: cooldownReason(until),
+        });
+        await this.closeIfDone(campaign.id, now);
+        return;
+      }
     }
 
     const built = buildCampaignVariables(

@@ -1,4 +1,5 @@
 import { ClientTagKey } from '@prisma/client';
+import type { MarketingFrequencyService } from '../marketing/marketing-frequency.service';
 import { AudiencesService, buildAudienceWhere } from './audiences.service';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 
@@ -55,18 +56,21 @@ describe('buildAudienceWhere', () => {
 });
 
 describe('AudiencesService.preview', () => {
-  function build() {
-    const count = jest
-      .fn()
-      .mockResolvedValueOnce(4)
-      .mockResolvedValueOnce(7)
-      .mockResolvedValueOnce(30);
+  function build(recent: string[] = []) {
+    const count = jest.fn().mockResolvedValueOnce(4).mockResolvedValueOnce(7);
+    if (recent.length > 0) count.mockResolvedValueOnce(3);
+    count.mockResolvedValue(30);
     const findMany = jest
       .fn()
       .mockResolvedValue([{ id: 'a', name: 'Ana', phone: '+57300' }]);
     const prisma = { client: { client: { count, findMany } } };
     return {
-      service: new AudiencesService(prisma as unknown as PrismaService),
+      service: new AudiencesService(
+        prisma as unknown as PrismaService,
+        {
+          recentlyContactedIds: jest.fn().mockResolvedValue(recent),
+        } as unknown as MarketingFrequencyService,
+      ),
       count,
     };
   }
@@ -76,9 +80,17 @@ describe('AudiencesService.preview', () => {
     const result = await service.preview({}, true, NOW);
     expect(result).toEqual({
       total: 30,
-      excluded: { withoutWhatsapp: 4, withoutConsent: 7 },
+      excluded: { withoutWhatsapp: 4, withoutConsent: 7, recentlyMessaged: 0 },
       sample: [{ id: 'a', name: 'Ana', phone: '+57300' }],
     });
+  });
+
+  it('descuenta a quienes recibieron otro mensaje de marketing hace poco', async () => {
+    const { service, count } = build(['c1', 'c2', 'c3']);
+    const result = await service.preview({}, true, NOW);
+    expect(result.excluded.recentlyMessaged).toBe(3);
+    expect(result.total).toBe(30);
+    expect(count).toHaveBeenCalledTimes(4);
   });
 
   it('si el mensaje no es de marketing no exige consentimiento', async () => {

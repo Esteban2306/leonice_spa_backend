@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConsentType, Prisma, ReservationStatus } from '@prisma/client';
 import { ANONYMIZED_PHONE_PREFIX } from '../client-privacy/anonymized-client';
 import { PrismaService } from '../infrastructure/database/prisma.service';
+import { MarketingFrequencyService } from '../marketing/marketing-frequency.service';
 import { AudienceFilterDto } from './dto/audience-filter.dto';
 
 const DAY_MS = 86_400_000;
@@ -16,7 +17,11 @@ export interface AudienceMember {
 
 export interface AudiencePreview {
   total: number;
-  excluded: { withoutWhatsapp: number; withoutConsent: number };
+  excluded: {
+    withoutWhatsapp: number;
+    withoutConsent: number;
+    recentlyMessaged: number;
+  };
   sample: Array<{ id: string; name: string; phone: string }>;
 }
 
@@ -82,7 +87,10 @@ export function buildAudienceWhere(
 
 @Injectable()
 export class AudiencesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly frequency: MarketingFrequencyService,
+  ) {}
 
   async preview(
     filter: AudienceFilterDto,
@@ -91,29 +99,48 @@ export class AudiencesService {
   ): Promise<AudiencePreview> {
     const base = buildAudienceWhere(filter, now);
     const reachable = this.reachableWhere(base);
-    const eligible = this.eligibleWhere(base, marketing);
+    const recent = marketing
+      ? await this.frequency.recentlyContactedIds(now)
+      : [];
+    const consented: Prisma.ClientWhereInput = {
+      AND: [reachable, { consentRecords: { some: this.consent() } }],
+    };
+    const eligible = this.withoutRecent(
+      this.eligibleWhere(base, marketing),
+      recent,
+    );
 
-    const [withoutWhatsapp, withoutConsent, total, sample] = await Promise.all([
-      this.prisma.client.client.count({
-        where: { AND: [base, { whatsappJid: null }] },
-      }),
-      marketing
-        ? this.prisma.client.client.count({
-            where: {
-              AND: [reachable, { consentRecords: { none: this.consent() } }],
-            },
-          })
-        : Promise.resolve(0),
-      this.prisma.client.client.count({ where: eligible }),
-      this.prisma.client.client.findMany({
-        where: eligible,
-        select: { id: true, name: true, phone: true },
-        orderBy: { name: 'asc' },
-        take: SAMPLE_SIZE,
-      }),
-    ]);
+    const [withoutWhatsapp, withoutConsent, recentlyMessaged, total, sample] =
+      await Promise.all([
+        this.prisma.client.client.count({
+          where: { AND: [base, { whatsappJid: null }] },
+        }),
+        marketing
+          ? this.prisma.client.client.count({
+              where: {
+                AND: [reachable, { consentRecords: { none: this.consent() } }],
+              },
+            })
+          : Promise.resolve(0),
+        recent.length > 0
+          ? this.prisma.client.client.count({
+              where: { AND: [consented, { id: { in: recent } }] },
+            })
+          : Promise.resolve(0),
+        this.prisma.client.client.count({ where: eligible }),
+        this.prisma.client.client.findMany({
+          where: eligible,
+          select: { id: true, name: true, phone: true },
+          orderBy: { name: 'asc' },
+          take: SAMPLE_SIZE,
+        }),
+      ]);
 
-    return { total, excluded: { withoutWhatsapp, withoutConsent }, sample };
+    return {
+      total,
+      excluded: { withoutWhatsapp, withoutConsent, recentlyMessaged },
+      sample,
+    };
   }
 
   async members(
@@ -121,8 +148,14 @@ export class AudiencesService {
     marketing: boolean,
     now: Date = new Date(),
   ): Promise<AudienceMember[]> {
+    const recent = marketing
+      ? await this.frequency.recentlyContactedIds(now)
+      : [];
     const rows = await this.prisma.client.client.findMany({
-      where: this.eligibleWhere(buildAudienceWhere(filter, now), marketing),
+      where: this.withoutRecent(
+        this.eligibleWhere(buildAudienceWhere(filter, now), marketing),
+        recent,
+      ),
       select: {
         id: true,
         name: true,
@@ -142,6 +175,15 @@ export class AudiencesService {
       phone: row.phone,
       lastVisitAt: row.reservations[0]?.completedAt ?? null,
     }));
+  }
+
+  private withoutRecent(
+    where: Prisma.ClientWhereInput,
+    recent: readonly string[],
+  ): Prisma.ClientWhereInput {
+    return recent.length > 0
+      ? { AND: [where, { id: { notIn: [...recent] } }] }
+      : where;
   }
 
   private consent(): Prisma.ConsentRecordWhereInput {

@@ -1,3 +1,6 @@
+import { AutomaticMessagesController } from './automatic-messages.controller';
+import { AutomaticMessagesService } from './automatic-messages.service';
+import { MarketingFrequencyModule } from '../marketing/marketing-frequency.module';
 import { Module } from '@nestjs/common';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { ConduitModule } from '../conduit/conduit.module';
@@ -24,9 +27,11 @@ import { ReservationSweepsScheduler } from './reservation-sweeps.scheduler';
     ClientsModule,
     ClientPrivacyModule,
     AdminNotificationsModule,
+    MarketingFrequencyModule,
   ],
-  controllers: [AutomationRulesController],
+  controllers: [AutomationRulesController, AutomaticMessagesController],
   providers: [
+    AutomaticMessagesService,
     ReservationTimeoutsProcessor,
     AutomationCommunicationsProcessor,
     ReservationEventsListener,

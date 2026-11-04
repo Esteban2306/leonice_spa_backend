@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { AudienceFilterDto } from '../../audiences/dto/audience-filter.dto';
 import { IsZonedDateTime } from '../../common/validation/date-input.validators';
+import { MAX_MARKETING_COOLDOWN_DAYS } from '../../marketing/marketing-frequency';
 import { MAX_PER_DAY_LIMIT } from '../domain/pacing';
 import type { PaceProfile } from '../domain/pacing';
 
@@ -74,6 +75,11 @@ export class UpdateCampaignSettingsDto {
   @Min(10)
   @Max(MAX_PER_DAY_LIMIT)
   maxPerDay: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(MAX_MARKETING_COOLDOWN_DAYS)
+  marketingCooldownDays: number;
 }
 
 export class ListCampaignRecipientsQueryDto {
