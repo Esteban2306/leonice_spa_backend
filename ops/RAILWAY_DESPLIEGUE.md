@@ -8,7 +8,7 @@ Dominios: sitio público `https://leonicespa.com` y `https://www.leonicespa.com`
 2. **Redis** (plugin de Railway). BullMQ necesita `maxmemory-policy noeviction`; verifícalo en la configuración del Redis.
 3. **API**: servicio desde este repositorio. `railway.json` ya indica el `dockerfile`, el healthcheck `/api/v1/health` y el comando previo `prisma migrate deploy`, que se ejecuta en cada despliegue antes de arrancar.
 
-Rama a desplegar: la que tenga el sistema más reciente (hoy `feat/whatsapp-campaigns`, que incluye las ramas anteriores y va por delante de `main`). Decide si se hace merge a `main` y se despliega desde ahí.
+Rama a desplegar: `main`, que ya incluye todo el trabajo de operaciones, campañas y mensajes automáticos.
 
 ## 2. Variables del servicio API
 
@@ -121,3 +121,18 @@ El panel y el sitio público son el mismo Worker; el subdominio solo cambia la d
 | `NEXT_PUBLIC_DEV_AUTH_BYPASS` | `false`                                |
 
 `NEXT_PUBLIC_*` se incrustan al construir: cambiarlas exige volver a desplegar. 5. **Cloudflare Rules** (sección 6) y verificación posterior (sección 4). 6. Registrar el webhook en Conduit y revisar en `/admin/campaigns` que las plantillas de difusión aparezcan como creadas.
+
+## 8. Lista de comprobación antes de publicar
+
+- [ ] `main` publicado en GitHub en los dos repositorios.
+- [ ] Variables de la sección 2 cargadas en Railway, incluidas `CORS_ORIGIN` con los tres orígenes y `COOKIE_DOMAIN=.leonicespa.com`.
+- [ ] Redis de Railway con `maxmemory-policy noeviction`.
+- [ ] Primer despliegue verde: `prisma migrate deploy` aplica las 48 migraciones y `/api/v1/health` responde 200.
+- [ ] Datos reales restaurados (sección 3) y seed ejecutado: crea el administrador y las 33 plantillas de Conduit.
+- [ ] Registro DNS `api` creado en Cloudflare con el destino que da Railway.
+- [ ] Frontend construido con las variables de la sección 7 y desplegado después de que la API responda.
+- [ ] Reglas de Cloudflare de la sección 6.
+- [ ] Webhook de Conduit y orígenes de Google actualizados.
+- [ ] Prueba final: iniciar sesión en `admin.leonicespa.com`, editar algo, crear una promoción y revisar `/admin/campaigns/new` con las plantillas en estado «creada».
+
+Antes del primer envío real de una campaña: confirmar en Conduit el nivel de calentamiento del número y la política `INBOUND_ONLY`, y ajustar en «Ajustes de envío» las franjas según la hora pico del asistente.
