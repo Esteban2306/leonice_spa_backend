@@ -4,6 +4,7 @@ import { ConduitApiClient } from '../client/conduit-api.client';
 import {
   CONDUIT_TEMPLATE_CATALOG,
   templateChannel,
+  type ConduitTemplateAudience,
   type ConduitTemplateChannel,
 } from './conduit-template-catalog';
 
@@ -19,6 +20,9 @@ export interface TemplateUsage {
   channel: ConduitTemplateChannel;
   description: string;
   suggestedBody: string;
+  audience: ConduitTemplateAudience;
+  variables: readonly string[];
+  marketing: boolean;
 }
 
 interface RemoteTemplate {
@@ -72,6 +76,9 @@ export class ConduitTemplateResolver {
         channel: templateChannel(entry),
         description: entry.description,
         suggestedBody: entry.body,
+        audience: entry.audience,
+        variables: entry.variables,
+        marketing: entry.marketing === true,
       };
     });
   }
