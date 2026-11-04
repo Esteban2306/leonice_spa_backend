@@ -105,3 +105,19 @@ El panel y el sitio público son el mismo Worker; el subdominio solo cambia la d
 1. **Rewrite URL** — si el host es `admin.leonicespa.com` y la ruta es exactamente `/`, reescribir a `/admin` (así `https://admin.leonicespa.com` abre el panel).
 2. **Redirect Rule** — si el host es `leonicespa.com` o `www.leonicespa.com` y la ruta empieza por `/admin`, redirigir (301) a `https://admin.leonicespa.com` conservando la ruta (el panel deja de ser accesible desde el sitio público).
 3. Opcional: **Cloudflare Access** sobre `admin.leonicespa.com` (Zero Trust → Access → Applications) para pedir un acceso extra antes de llegar al inicio de sesión. La API (`api.`) queda fuera de Access.
+
+## 7. Orden del despliegue completo
+
+1. **Railway**: crear Postgres y Redis, cargar las variables de la sección 2 y desplegar la API. Comprobar `https://api.leonicespa.com/api/v1/health`.
+2. **Cloudflare DNS**: registro `api` apuntando al destino que da Railway (con el valor de `TRUST_PROXY_HOPS` que corresponda).
+3. **Datos y seed** (sección 3): migrar productos y tratamientos, crear el administrador y las plantillas de Conduit.
+4. **Frontend**: construir y desplegar el Worker **después** de que la API responda. El build prerenderiza páginas del catálogo (`/tratamientos`, productos) llamando a la API; si `api.leonicespa.com` no resuelve, `next build` falla. Variables de build del frontend:
+
+| Variable                      | Valor                                  |
+| ----------------------------- | -------------------------------------- |
+| `NEXT_PUBLIC_API_URL`         | `https://api.leonicespa.com/api/v1`    |
+| `NEXT_PUBLIC_SITE_URL`        | `https://leonicespa.com`               |
+| `NEXT_PUBLIC_SPA_WHATSAPP`    | número del spa con indicativo, sin `+` |
+| `NEXT_PUBLIC_DEV_AUTH_BYPASS` | `false`                                |
+
+`NEXT_PUBLIC_*` se incrustan al construir: cambiarlas exige volver a desplegar. 5. **Cloudflare Rules** (sección 6) y verificación posterior (sección 4). 6. Registrar el webhook en Conduit y revisar en `/admin/campaigns` que las plantillas de difusión aparezcan como creadas.
