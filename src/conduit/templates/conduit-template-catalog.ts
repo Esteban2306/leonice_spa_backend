@@ -14,6 +14,7 @@ export interface ConduitTemplateDefinition {
   subject?: string;
   variables: readonly string[];
   marketing?: boolean;
+  followUp?: boolean;
   body: string;
   variants?: readonly string[];
 }
@@ -68,6 +69,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
   {
     code: 'REACTIVATION',
     marketing: true,
+    followUp: true,
     envKey: 'CONDUIT_TEMPLATE_REACTIVATION',
     name: 'leonice_reactivacion',
     description:
@@ -101,6 +103,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
   {
     code: 'REACTIVATION_PROMO',
     marketing: true,
+    followUp: true,
     envKey: 'CONDUIT_TEMPLATE_REACTIVATION_PROMO',
     name: 'leonice_reactivacion_promocion',
     description:
@@ -128,6 +131,40 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
         'Desde tu última visita pasaron {{dias}} días, y por eso tenemos para ti *{{promocion}}* con *{{descuento}}% de descuento*.',
         '',
         'Si te interesa, escríbenos por aquí y reservamos tu horario.',
+      ].join('\n'),
+    ],
+  },
+  {
+    code: 'MAINTENANCE_REMINDER',
+    marketing: true,
+    followUp: true,
+    envKey: 'CONDUIT_TEMPLATE_MAINTENANCE_REMINDER',
+    name: 'leonice_recordatorio_mantenimiento',
+    description:
+      'Recordatorio de mantenimiento días después de un tratamiento concreto (solo con consentimiento de marketing).',
+    audience: 'CLIENT',
+    variables: ['nombre', 'tratamiento', 'dias'],
+    body: [
+      'Hola {{nombre}} 🌿',
+      '',
+      'Ya van {{dias}} días desde tu {{tratamiento}} en Leonice Arenas Spa Capilar y se acerca el momento de tu mantenimiento.',
+      '',
+      '¿Te ayudamos a agendar? Respóndenos por aquí y te mostramos los horarios disponibles.',
+    ].join('\n'),
+    variants: [
+      [
+        '{{nombre}}, ¿cómo te ha ido con tu {{tratamiento}}? 🌿',
+        '',
+        'Han pasado {{dias}} días y es un buen momento para tu sesión de mantenimiento: así los resultados duran más.',
+        '',
+        'Si quieres, escríbenos por aquí y reservamos tu horario.',
+      ].join('\n'),
+      [
+        'Hola {{nombre}} 🌿',
+        '',
+        'Para mantener los resultados de tu {{tratamiento}}, te recomendamos agendar tu próxima sesión: ya pasaron {{dias}} días.',
+        '',
+        'Respóndenos por aquí y te ayudamos a escoger tu día.',
       ].join('\n'),
     ],
   },
@@ -462,6 +499,9 @@ export function isBroadcastTemplate(
     )
   );
 }
+
+export const FOLLOW_UP_TEMPLATES: readonly ConduitTemplateDefinition[] =
+  CONDUIT_TEMPLATE_CATALOG.filter((template) => template.followUp === true);
 
 export const BROADCAST_TEMPLATES: readonly ConduitTemplateDefinition[] =
   CONDUIT_TEMPLATE_CATALOG.filter(isBroadcastTemplate);

@@ -39,14 +39,14 @@ describe('ConduitTemplateResolver', () => {
     ).resolves.toBeNull();
   });
 
-  it('describe las 32 plantillas e indica de dónde salió cada ID', async () => {
+  it('describe las 33 plantillas e indica de dónde salió cada ID', async () => {
     const { resolver } = setup({ CONDUIT_TEMPLATE_REACTIVATION: 'env-id' }, [
       { id: 'tpl-1', name: 'leonice_recordatorio_cita' },
     ]);
 
     const usage = await resolver.describe();
 
-    expect(usage).toHaveLength(32);
+    expect(usage).toHaveLength(33);
     expect(usage.find((u) => u.name === 'RESERVATION_REMINDER')).toMatchObject({
       templateId: 'tpl-1',
       configured: true,

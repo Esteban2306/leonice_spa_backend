@@ -2,6 +2,7 @@ import { OPERATIONAL_TEMPLATE_ENV_KEYS } from '../../automation/domain/operation
 import {
   BROADCAST_TEMPLATES,
   CONDUIT_TEMPLATE_CATALOG,
+  FOLLOW_UP_TEMPLATES,
   templateChannel,
   templatePlaceholders,
 } from './conduit-template-catalog';
@@ -44,6 +45,18 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
     ]);
     for (const template of BROADCAST_TEMPLATES) {
       expect(template.marketing).toBe(true);
+    }
+  });
+
+  it('las plantillas de seguimiento por regla son de marketing y de la clienta', () => {
+    expect(FOLLOW_UP_TEMPLATES.map((t) => t.code).sort()).toEqual([
+      'MAINTENANCE_REMINDER',
+      'REACTIVATION',
+      'REACTIVATION_PROMO',
+    ]);
+    for (const template of FOLLOW_UP_TEMPLATES) {
+      expect(template.marketing).toBe(true);
+      expect(template.audience).toBe('CLIENT');
     }
   });
 
@@ -95,6 +108,7 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
     const withVariants = CONDUIT_TEMPLATE_CATALOG.filter((t) => t.variants);
     expect(withVariants.map((t) => t.code).sort()).toEqual(
       [
+        'MAINTENANCE_REMINDER',
         'RESERVATION_REMINDER',
         ...BROADCAST_TEMPLATES.map((t) => t.code),
       ].sort(),
