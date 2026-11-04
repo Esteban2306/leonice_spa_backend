@@ -12,6 +12,7 @@ import {
   JOB_NAMES,
 } from '../../infrastructure/queue/queue.constants';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { alignToDaytime } from '../utils/align-to-daytime';
 
 export interface ReactivationJobData {
   clientId: string;
@@ -38,26 +39,35 @@ export class ScheduleReactivationListener {
     );
 
     for (const rule of rules) {
+      if (rule.reactivationDays === null) continue;
       const data: ReactivationJobData = {
         clientId: event.payload.clientId,
         categoryId: event.payload.categoryId,
         automationRuleId: rule.id,
         triggeringReservationId: event.payload.reservationId,
       };
+      const dueAt = alignToDaytime(
+        new Date(Date.now() + rule.reactivationDays * 24 * 60 * 60 * 1000),
+      );
       await this.queue.add(JOB_NAMES.REACTIVATION_CHECK, data, {
-        delay: rule.reactivationDays * 24 * 60 * 60 * 1000,
+        delay: dueAt.getTime() - Date.now(),
       });
     }
   }
 
   private async findApplicableRules(treatmentId: string, categoryId: string) {
     const treatmentRules = await this.prisma.client.automationRule.findMany({
-      where: { isActive: true, treatmentId },
+      where: { isActive: true, treatmentId, reactivationDays: { not: null } },
     });
     if (treatmentRules.length > 0) return treatmentRules;
 
     return this.prisma.client.automationRule.findMany({
-      where: { isActive: true, categoryId, treatmentId: null },
+      where: {
+        isActive: true,
+        categoryId,
+        treatmentId: null,
+        reactivationDays: { not: null },
+      },
     });
   }
 }

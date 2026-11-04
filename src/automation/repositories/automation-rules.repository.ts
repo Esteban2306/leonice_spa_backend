@@ -22,6 +22,12 @@ export class AutomationRulesRepository {
   findById(id: string) {
     return this.prisma.client.automationRule.findUnique({ where: { id } });
   }
+  findPromotion(id: string) {
+    return this.prisma.client.promotion.findUnique({ where: { id } });
+  }
+  delete(id: string) {
+    return this.prisma.client.automationRule.delete({ where: { id } });
+  }
   create(dto: CreateAutomationRuleDto) {
     return this.prisma.client.automationRule.create({ data: dto });
   }

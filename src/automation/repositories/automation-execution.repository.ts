@@ -44,6 +44,7 @@ export class AutomationExecutionRepository {
     type: AutomationExecutionType,
     clientId: string,
     automationRuleId: string,
+    since?: Date,
   ): Promise<boolean> {
     const count = await this.prisma.client.automationExecution.count({
       where: {
@@ -51,6 +52,7 @@ export class AutomationExecutionRepository {
         clientId,
         automationRuleId,
         result: AutomationExecutionResult.EXECUTED,
+        ...(since && { executedAt: { gte: since } }),
       },
     });
     return count > 0;

@@ -18,6 +18,7 @@ import {
 import { conduitIdempotencyKey } from '../../conduit/client/conduit-idempotency-key';
 import { formatNotificationDateTime } from '../utils/format-notification-date';
 import { AutomationExecutionRepository } from '../repositories/automation-execution.repository';
+import { buildFollowUpMessage } from '../domain/follow-up-message';
 import { assertMessageDelivered } from '../utils/assert-message-delivered';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { ReactivationJobData } from '../listeners/schedule-reactivation.listener';
@@ -228,7 +229,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       include: { promotion: true },
     });
 
-    if (!rule || !rule.isActive) {
+    if (!rule || !rule.isActive || rule.reactivationDays === null) {
       await this.executions.log({
         ...base,
         result: AutomationExecutionResult.SKIPPED,
@@ -273,6 +274,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         type,
         data.clientId,
         data.automationRuleId,
+        since,
       )
     ) {
       await this.executions.log({
@@ -297,25 +299,42 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
 
     const promo = rule.promotion;
     const now = new Date();
-    const hasValidPromo =
-      promo?.isActive && promo.startsAt <= now && now <= promo.endsAt;
+    const validPromo =
+      promo?.isActive && promo.startsAt <= now && now <= promo.endsAt
+        ? promo
+        : null;
+    const treatment = triggering
+      ? await this.prisma.client.treatment.findUnique({
+          where: { id: triggering.treatmentId },
+          select: { name: true },
+        })
+      : null;
+
+    const message = buildFollowUpMessage(
+      {
+        templateCode: rule.templateCode,
+        reactivationDays: rule.reactivationDays,
+      },
+      {
+        clientName: client.name,
+        treatmentName: treatment?.name ?? 'tratamiento',
+        promotion: validPromo,
+      },
+    );
+    if ('skip' in message) {
+      await this.executions.log({
+        ...base,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: message.skip,
+      });
+      return;
+    }
 
     const result = await this.conduitApiClient.sendWhatsappMessage({
       ...ctx,
       phone: client.phone,
-      templateId: await this.requireTemplate(
-        hasValidPromo
-          ? 'CONDUIT_TEMPLATE_REACTIVATION_PROMO'
-          : 'CONDUIT_TEMPLATE_REACTIVATION',
-      ),
-      variables: hasValidPromo
-        ? {
-            nombre: client.name,
-            dias: String(rule.reactivationDays),
-            promocion: promo.name,
-            descuento: promo.discountPercentage.toString(),
-          }
-        : { nombre: client.name, dias: String(rule.reactivationDays) },
+      templateId: await this.requireTemplate(message.template.envKey),
+      variables: message.variables,
     });
 
     try {
@@ -334,7 +353,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     await this.executions.log({
       ...base,
       result: AutomationExecutionResult.EXECUTED,
-      promotionId: hasValidPromo ? promo.id : undefined,
+      promotionId: validPromo?.id,
     });
   }
 
