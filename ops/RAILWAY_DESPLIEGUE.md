@@ -6,11 +6,11 @@ Dominios: sitio público `https://leonicespa.com` y `https://www.leonicespa.com`
 
 1. **PostgreSQL** (plugin de Railway).
 2. **Redis** (plugin de Railway). BullMQ necesita `maxmemory-policy noeviction`; verifícalo en la configuración del Redis.
-3. **API**: servicio desde este repositorio. `railway.json` ya indica el `dockerfile`, el healthcheck `/api/v1/health` y el comando previo `prisma migrate deploy`, que se ejecuta en cada despliegue antes de arrancar.
+3. **API**: servicio desde este repositorio. `railway.json` ya indica el `Dockerfile`, el healthcheck `/api/v1/health` y el comando previo `prisma migrate deploy`, que se ejecuta en cada despliegue antes de arrancar.
 
 Rama a desplegar: `main`, que ya incluye todo el trabajo de operaciones, campañas y mensajes automáticos.
 
-Si el servicio muestra «The Dockerfile failed validation»: Railway no acepta `RUN --mount=type=cache` sin un prefijo propio, así que el dockerfile ya no lo usa. En los servicios que se construyen desde una subcarpeta (Conduit: `messaging-service`) hay que indicarlo en Settings → Source → Root Directory.
+Si el servicio muestra «The Dockerfile failed validation»: Railway no acepta `RUN --mount=type=cache` sin un prefijo propio, así que el Dockerfile ya no lo usa. En los servicios que se construyen desde una subcarpeta (Conduit: `messaging-service`) hay que indicarlo en Settings → Source → Root Directory.
 
 ## 2. Variables del servicio API
 

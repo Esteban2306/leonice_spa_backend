@@ -106,7 +106,7 @@ services:
   migrate:
     build:
       context: ..
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
       target: migrate
     image: leonice-spa-migrate:${APP_VERSION:-local}
     depends_on:
@@ -140,7 +140,7 @@ services:
   api:
     build:
       context: ..
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
       target: production
     image: leonice-spa-api:${APP_VERSION:-local}
     restart: unless-stopped
