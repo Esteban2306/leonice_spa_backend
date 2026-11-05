@@ -77,7 +77,7 @@ Este procedimiento se ensayó en una base nueva: 130 productos, 125 imágenes, 2
 
 ```bash
 DATABASE_URL="<url pública de Railway>" NODE_ENV=production \
-SEED_ADMIN_PASSWORD="<contraseña fuerte de 14+ caracteres>" \
+SEED_ADMIN_PASSWORD="<contraseña de 8+ caracteres>" \
 CONDUIT_BASE_URL=… CONDUIT_API_KEY=… pnpm prisma db seed
 ```
 

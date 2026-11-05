@@ -67,7 +67,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d api b
 Notas:
 
 - El `seed` crea el administrador con `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`
-  (en producción exige 14+ caracteres con mayúscula, minúscula, número y símbolo),
+  (exige 8+ caracteres),
   el horario de atención y el catálogo. **No** carga productos de prueba: esos scripts
   se niegan a ejecutarse con `NODE_ENV=production`.
 - Tras el seed, inicia sesión y **cambia la contraseña del administrador**.

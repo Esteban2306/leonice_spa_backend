@@ -11,7 +11,7 @@ import { slugify } from '../src/catalog/common/slugify';
 const prisma = new PrismaClient();
 
 const DEFAULT_ADMIN_EMAIL = 'spacapilarleonicearenas@gmail.com';
-const MIN_PRODUCTION_PASSWORD_LENGTH = 14;
+const MIN_PASSWORD_LENGTH = 8;
 
 function resolveAdminCredentials() {
   const email = process.env.SEED_ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL;
@@ -21,18 +21,10 @@ function resolveAdminCredentials() {
       'SEED_ADMIN_PASSWORD es obligatoria para crear el administrador',
     );
   }
-  if (process.env.NODE_ENV === 'production') {
-    const strong =
-      password.length >= MIN_PRODUCTION_PASSWORD_LENGTH &&
-      /[a-z]/.test(password) &&
-      /[A-Z]/.test(password) &&
-      /\d/.test(password) &&
-      /[^A-Za-z0-9]/.test(password);
-    if (!strong) {
-      throw new Error(
-        `En producción SEED_ADMIN_PASSWORD debe tener al menos ${MIN_PRODUCTION_PASSWORD_LENGTH} caracteres con mayúscula, minúscula, número y símbolo`,
-      );
-    }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(
+      `SEED_ADMIN_PASSWORD debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`,
+    );
   }
   return { email, password };
 }
