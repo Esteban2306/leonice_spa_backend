@@ -73,12 +73,6 @@ async function main() {
     create: { name: 'Spa Coreano', slug: slugify('Spa Coreano') },
   });
 
-  const unas = await prisma.category.upsert({
-    where: { name: 'Uñas' },
-    update: {},
-    create: { name: 'Uñas', slug: slugify('Uñas') },
-  });
-
   await prisma.capacityPool.upsert({
     where: {
       categoryId_name: {
@@ -104,14 +98,6 @@ async function main() {
       name: 'Sala spa coreano',
       maxConcurrent: 1,
     },
-  });
-
-  await prisma.capacityPool.upsert({
-    where: {
-      categoryId_name: { categoryId: unas.id, name: 'Estación de uñas' },
-    },
-    update: {},
-    create: { categoryId: unas.id, name: 'Estación de uñas', maxConcurrent: 1 },
   });
 
   const spaCapilarTreatments = [
@@ -230,36 +216,8 @@ async function main() {
     },
   });
 
-  const unasTreatments = [
-    { name: 'Pedespa tradicional', price: 35, minutes: 90 },
-    { name: 'Pedespa semipermanente', price: 55, minutes: 90 },
-    { name: 'Permanente', price: 60, minutes: 90 },
-    { name: 'Tradicional', price: 35, minutes: 90 },
-    { name: 'Uñas Press On soft gel', price: 75, minutes: 150 },
-    { name: 'Nivelación con base rubber', price: 65, minutes: 150 },
-    { name: 'Uñas Dipping', price: 65, minutes: 150 },
-    { name: 'Uñas Acrílicas', price: 100, minutes: 180 },
-  ];
-
-  for (const t of unasTreatments) {
-    await prisma.treatment.upsert({
-      where: { categoryId_name: { categoryId: unas.id, name: t.name } },
-      update: {},
-      create: {
-        categoryId: unas.id,
-        name: t.name,
-        slug: slugify(t.name),
-        requiresPriorAssessment: false,
-        basePriceMin: t.price,
-        basePriceMax: t.price,
-        baseDurationMinMinutes: t.minutes,
-        baseDurationMaxMinutes: t.minutes,
-      },
-    });
-  }
-
   console.log(
-    'Seed completado: 3 categorías, 3 capacity pools, 20 tratamientos.',
+    'Seed completado: 2 categorías, 2 capacity pools, 12 tratamientos.',
   );
 
   try {
