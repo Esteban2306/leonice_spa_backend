@@ -15,6 +15,7 @@ import { ANONYMIZED_PHONE_PREFIX } from '../client-privacy/anonymized-client';
 import { ConduitApiClient } from '../conduit/client/conduit-api.client';
 import { BROADCAST_TEMPLATES } from '../conduit/templates/conduit-template-catalog';
 import { ConduitTemplateResolver } from '../conduit/templates/conduit-template-resolver';
+import { ConduitSystemPauseService } from '../conduit/pause/conduit-system-pause.service';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { SafeCacheService } from '../infrastructure/redis/safe-cache.service';
 import { cooldownReason } from '../marketing/marketing-frequency';
@@ -54,6 +55,7 @@ export class CampaignRunnerService
     private readonly templates: ConduitTemplateResolver,
     private readonly cache: SafeCacheService,
     private readonly frequency: MarketingFrequencyService,
+    private readonly systemPause: ConduitSystemPauseService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -89,6 +91,8 @@ export class CampaignRunnerService
   }
 
   async tick(now: Date = new Date()): Promise<'idle' | 'sent' | 'blocked'> {
+    if (await this.systemPause.isPaused()) return 'blocked';
+
     const settings = await this.campaigns.getSettings();
     const minute = bogotaMinuteOfDay(now.getTime());
     const windows = normalizeWindows(settings.sendWindows);

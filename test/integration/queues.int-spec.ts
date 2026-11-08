@@ -783,6 +783,7 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
         { resolve: () => Promise.resolve('tpl-1') } as never,
         {} as never,
         {} as never,
+        { isPaused: () => Promise.resolve(false) } as never,
       );
       const reminder = job(
         JOB_NAMES.RESERVATION_REMINDER_CHECK,

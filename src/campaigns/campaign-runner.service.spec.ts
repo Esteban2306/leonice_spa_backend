@@ -5,6 +5,7 @@ import { PrismaService } from '../infrastructure/database/prisma.service';
 import { SafeCacheService } from '../infrastructure/redis/safe-cache.service';
 import { CampaignRunnerService } from './campaign-runner.service';
 import type { MarketingFrequencyService } from '../marketing/marketing-frequency.service';
+import type { ConduitSystemPauseService } from '../conduit/pause/conduit-system-pause.service';
 import { CampaignsService } from './campaigns.service';
 
 const objectContaining = (value: object): unknown =>
@@ -47,6 +48,7 @@ function build(
     templateId?: string | null;
     breaker?: Array<{ status: CampaignRecipientStatus }>;
     blockedUntil?: Date | null;
+    paused?: boolean;
   } = {},
 ) {
   const update = jest.fn().mockResolvedValue({});
@@ -115,11 +117,21 @@ function build(
     templates as unknown as ConduitTemplateResolver,
     cache as unknown as SafeCacheService,
     frequency as unknown as MarketingFrequencyService,
+    {
+      isPaused: jest.fn().mockResolvedValue(overrides.paused ?? false),
+    } as unknown as ConduitSystemPauseService,
   );
   return { runner, prisma, campaigns, send, update };
 }
 
 describe('CampaignRunnerService.tick', () => {
+  it('con el sistema en pausa no envía nada y deja la campaña como está', async () => {
+    const { runner, send, update } = build({ paused: true });
+    expect(await runner.tick(MONDAY_10AM)).toBe('blocked');
+    expect(send).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('fuera de las franjas de envío no manda nada', async () => {
     const { runner, send } = build();
     expect(await runner.tick(MONDAY_9PM)).toBe('idle');

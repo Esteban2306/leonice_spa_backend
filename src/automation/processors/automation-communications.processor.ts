@@ -26,6 +26,7 @@ import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { ReactivationJobData } from '../listeners/schedule-reactivation.listener';
 import { ConsentService } from 'src/clients/consent/consent.service';
 import { ConduitTemplateResolver } from '../../conduit/templates/conduit-template-resolver';
+import { ConduitSystemPauseService } from '../../conduit/pause/conduit-system-pause.service';
 import {
   AdminDepositTimeoutNoticeJobData,
   AdminClientCancellationNoticeJobData,
@@ -59,6 +60,20 @@ type AutomationJobData =
   | AdminClientCancellationNoticeJobData
   | CancellationLinkNoticeJobData
   | AdminHandoffNoticeJobData;
+
+const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
+  JOB_NAMES.RESERVATION_REMINDER_CHECK,
+  JOB_NAMES.REACTIVATION_CHECK,
+  JOB_NAMES.NOTIFY_CLIENT_DEPOSIT_REJECTED,
+  JOB_NAMES.NOTIFY_CLIENT_RESERVATION_CONFIRMED,
+  JOB_NAMES.NOTIFY_CLIENT_CANCELLED_BY_ADMIN,
+  JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED,
+  JOB_NAMES.NOTIFY_CLIENT_CANCELLATION_CONFIRMED,
+  JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK,
+]);
+
+const PAUSED_REASON = 'Sistema en pausa: no se envió el mensaje';
+
 @Processor(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS)
 export class AutomationCommunicationsProcessor extends WorkerHost {
   private readonly logger = new Logger(AutomationCommunicationsProcessor.name);
@@ -73,6 +88,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     private readonly templates: ConduitTemplateResolver,
     private readonly retention: ClientRetentionService,
     private readonly frequency: MarketingFrequencyService,
+    private readonly systemPause: ConduitSystemPauseService,
   ) {
     super();
   }
@@ -82,6 +98,14 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       idempotencyKey: conduitIdempotencyKey(job),
       companyEventId: `${job.name}:${job.id}`,
     };
+
+    if (
+      CLIENT_FACING_JOBS.has(job.name) &&
+      (await this.systemPause.isPaused())
+    ) {
+      await this.skipWhilePaused(job);
+      return;
+    }
 
     switch (job.name) {
       case JOB_NAMES.RESERVATION_REMINDER_CHECK:
@@ -149,6 +173,19 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       default:
         this.logger.warn(`Job desconocido recibido: ${job.name}`);
     }
+  }
+
+  private async skipWhilePaused(job: Job<AutomationJobData>): Promise<void> {
+    const type = this.resolveExecutionType(job.name);
+    if (!type) return;
+    const data = job.data as { reservationId?: string; clientId?: string };
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.SKIPPED,
+      reservationId: data.reservationId,
+      clientId: data.clientId,
+      reason: PAUSED_REASON,
+    });
   }
 
   @OnWorkerEvent('failed')
