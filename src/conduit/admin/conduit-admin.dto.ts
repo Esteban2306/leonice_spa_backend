@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 
 export const PROMPT_TYPES = [
   'CONVERSATION',
@@ -37,4 +45,9 @@ export class FindOutboxQueryDto {
 export class ConduitIntentKeyParam {
   @Matches(/^[a-z][a-z0-9_.-]{1,62}$/)
   key!: string;
+}
+
+export class SetSystemPauseDto {
+  @IsBoolean()
+  paused!: boolean;
 }

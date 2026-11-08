@@ -25,7 +25,9 @@ import {
   ConduitIntentKeyParam,
   ConduitPromptTypeParam,
   FindOutboxQueryDto,
+  SetSystemPauseDto,
 } from './conduit-admin.dto';
+import { ConduitSystemPauseService } from '../pause/conduit-system-pause.service';
 import { ConduitTemplateResolver } from '../templates/conduit-template-resolver';
 import {
   maskSecrets,
@@ -56,6 +58,7 @@ export class ConduitAdminController {
     private readonly templateResolver: ConduitTemplateResolver,
     private readonly outboxRepository: ConduitOutboxRepository,
     private readonly outbox: ConduitOutboxService,
+    private readonly systemPause: ConduitSystemPauseService,
   ) {}
 
   // ── Resumen ──────────────────────────────────────────────────────────
@@ -63,7 +66,7 @@ export class ConduitAdminController {
   /** Estado general para la portada del módulo WhatsApp. Tolera fallos parciales. */
   @Get('overview')
   async overview() {
-    const [health, connection, connectionHealth, bot, templates] =
+    const [health, connection, connectionHealth, bot, templates, pause] =
       await Promise.allSettled([
         this.adminScrubbed('GET', 'health'),
         this.adminScrubbed(
@@ -76,6 +79,7 @@ export class ConduitAdminController {
         ),
         this.adminScrubbed('GET', `bot/config/${this.botId()}`),
         this.templateResolver.describe(),
+        this.systemPause.get(),
       ]);
 
     const value = (r: PromiseSettledResult<unknown>) =>
@@ -95,7 +99,21 @@ export class ConduitAdminController {
         bot: error(bot),
       },
       templates: value(templates),
+      systemPause: value(pause),
     };
+  }
+
+  // ── Pausa del sistema ───────────────────────────────────────────────
+
+  @Get('system-pause')
+  getSystemPause() {
+    return this.systemPause.get();
+  }
+
+  /** Silencia bot, avisos y envíos automáticos sin desconectar WhatsApp. */
+  @Put('system-pause')
+  setSystemPause(@Body() body: SetSystemPauseDto) {
+    return this.systemPause.set(body.paused);
   }
 
   // ── Conexión de WhatsApp ────────────────────────────────────────────

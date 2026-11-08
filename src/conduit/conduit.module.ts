@@ -19,6 +19,7 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { ConduitSupportToolsController } from './conduit-support-tools.controller';
 import { ConduitAdminController } from './admin/conduit-admin.controller';
 import { BusinessSettingsModule } from '../business-settings/business-settings.module';
+import { ConduitSystemPauseService } from './pause/conduit-system-pause.service';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { BusinessSettingsModule } from '../business-settings/business-settings.m
   ],
   providers: [
     ConduitApiClient,
+    ConduitSystemPauseService,
     ConduitTemplateResolver,
     HmacSignatureGuard,
     ConduitMessageDeliveryLogRepository,
@@ -47,6 +49,11 @@ import { BusinessSettingsModule } from '../business-settings/business-settings.m
     ConduitOutboxProcessor,
     ConduitOutboxSweepScheduler,
   ],
-  exports: [ConduitApiClient, ConduitTemplateResolver, HmacSignatureGuard],
+  exports: [
+    ConduitApiClient,
+    ConduitSystemPauseService,
+    ConduitTemplateResolver,
+    HmacSignatureGuard,
+  ],
 })
 export class ConduitModule {}

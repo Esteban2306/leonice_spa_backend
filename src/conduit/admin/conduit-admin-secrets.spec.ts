@@ -65,6 +65,7 @@ function controller(adminResult: unknown) {
     benign as never,
     benign as never,
     benign as never,
+    benign as never,
   );
   return { instance, admin };
 }
@@ -253,6 +254,7 @@ describe('ConduitAdminController: el panel nunca recibe secretos', () => {
     const instance = new ConduitAdminController(
       { admin } as never,
       config as never,
+      benign as never,
       benign as never,
       benign as never,
       benign as never,
