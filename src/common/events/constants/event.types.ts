@@ -21,6 +21,7 @@ export const EVENT_TYPES = {
   DEPOSIT_REJECTED: 'deposit.rejected',
   RESERVATION_CANCELLED_BY_TIMEOUT: 'reservation.cancelled_by_timeout',
   CONDUIT_HANDOFF_REQUESTED: 'conduit.handoff_requested',
+  CONDUIT_RECEIPT_ISSUE: 'conduit.receipt_issue',
   BUSINESS_INFO_CHANGED: 'business.info_changed',
 } as const;
 
@@ -117,6 +118,16 @@ export interface EventPayloadMap {
     reason: string;
     summary: string | null;
     requestId: string;
+  };
+
+  [EVENT_TYPES.CONDUIT_RECEIPT_ISSUE]: {
+    /** REVIEW: lo revisa una persona. RETRIES: varios rechazos seguidos. */
+    kind: 'REVIEW' | 'RETRIES';
+    phone: string | null;
+    clientName: string | null;
+    reason: string;
+    attempts: number;
+    verificationId: string;
   };
 
   [EVENT_TYPES.CANCELLATION_LINK_REQUESTED]: {

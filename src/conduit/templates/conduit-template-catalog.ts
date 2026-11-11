@@ -471,6 +471,84 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       'El asistente quedó en pausa en ese chat. Respóndele desde WhatsApp o desde el panel.',
     ),
   },
+  {
+    code: 'ADMIN_RECEIPT_REVIEW',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW',
+    name: 'leonice_aviso_comprobante_revision',
+    description:
+      'Aviso interno: el sistema no pudo validar un comprobante por sí solo y espera que una persona lo revise.',
+    audience: 'ADMIN',
+    variables: ['cliente', 'telefono', 'motivo'],
+    body: [
+      '🧾 *Un comprobante necesita tu revisión*',
+      '',
+      'Clienta: {{cliente}}',
+      'Teléfono: {{telefono}}',
+      'Motivo: {{motivo}}',
+      '',
+      'La reserva sigue pendiente de abono. Revisa la foto en el panel y apruébala o recházala.',
+    ].join('\n'),
+  },
+  {
+    code: 'ADMIN_RECEIPT_RETRIES',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES',
+    name: 'leonice_aviso_comprobante_reintentos',
+    description:
+      'Aviso interno: una clienta lleva varios comprobantes seguidos que no se pudieron validar.',
+    audience: 'ADMIN',
+    variables: ['cliente', 'telefono', 'intentos', 'motivo'],
+    body: [
+      '⚠️ *Comprobantes rechazados varias veces*',
+      '',
+      'Clienta: {{cliente}}',
+      'Teléfono: {{telefono}}',
+      'Intentos seguidos: {{intentos}}',
+      'Último motivo: {{motivo}}',
+      '',
+      'Escríbele para ayudarla. Puede ser un error al pagar o una foto que no se lee bien.',
+    ].join('\n'),
+  },
+  {
+    code: 'ADMIN_RECEIPT_REVIEW_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW_EMAIL',
+    name: 'leonice_correo_aviso_comprobante_revision',
+    description:
+      'Correo interno: un comprobante espera la revisión de una persona.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Un comprobante necesita tu revisión: {{cliente}}',
+    variables: ['cliente', 'telefono', 'motivo'],
+    body: emailLayout(
+      'Un comprobante necesita tu revisión',
+      [
+        '<strong>Clienta:</strong> {{cliente}}',
+        '<strong>Teléfono:</strong> {{telefono}}',
+        '<strong>Motivo:</strong> {{motivo}}',
+      ],
+      'La reserva sigue pendiente de abono. Revisa la foto en el panel y apruébala o recházala.',
+    ),
+  },
+  {
+    code: 'ADMIN_RECEIPT_RETRIES_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES_EMAIL',
+    name: 'leonice_correo_aviso_comprobante_reintentos',
+    description:
+      'Correo interno: una clienta lleva varios comprobantes seguidos que no se pudieron validar.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Comprobantes rechazados varias veces: {{cliente}}',
+    variables: ['cliente', 'telefono', 'intentos', 'motivo'],
+    body: emailLayout(
+      'Comprobantes rechazados varias veces',
+      [
+        '<strong>Clienta:</strong> {{cliente}}',
+        '<strong>Teléfono:</strong> {{telefono}}',
+        '<strong>Intentos seguidos:</strong> {{intentos}}',
+        '<strong>Último motivo:</strong> {{motivo}}',
+      ],
+      'Escríbele para ayudarla. Puede ser un error al pagar o una foto que no se lee bien.',
+    ),
+  },
 ];
 
 const PLACEHOLDER = /{{\s*([a-zA-Z_][\w]*)\s*}}/g;

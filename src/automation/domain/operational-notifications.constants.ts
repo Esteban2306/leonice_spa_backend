@@ -14,6 +14,8 @@ export const OPERATIONAL_TEMPLATE_ENV_KEYS = {
   ADMIN_CLIENT_CANCELLED: 'CONDUIT_TEMPLATE_ADMIN_CLIENT_CANCELLED',
   CLIENT_CANCELLATION_LINK: 'CONDUIT_TEMPLATE_CLIENT_CANCELLATION_LINK',
   ADMIN_HANDOFF: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF',
+  ADMIN_RECEIPT_REVIEW: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW',
+  ADMIN_RECEIPT_RETRIES: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES',
 } as const;
 
 export type OperationalTemplate = keyof typeof OPERATIONAL_TEMPLATE_ENV_KEYS;
@@ -25,6 +27,8 @@ export const OPERATIONAL_EMAIL_TEMPLATE_ENV_KEYS: Partial<
   ADMIN_RESCHEDULED: 'CONDUIT_TEMPLATE_ADMIN_RESCHEDULED_EMAIL',
   ADMIN_CLIENT_CANCELLED: 'CONDUIT_TEMPLATE_ADMIN_CLIENT_CANCELLED_EMAIL',
   ADMIN_HANDOFF: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF_EMAIL',
+  ADMIN_RECEIPT_REVIEW: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW_EMAIL',
+  ADMIN_RECEIPT_RETRIES: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES_EMAIL',
 };
 
 export const ADMIN_TIMEOUT_NOTICE_DELAY_MS = 60_000;
@@ -84,6 +88,15 @@ export interface AdminHandoffNoticeJobData {
   clientName: string | null;
   reason: string;
   summary: string | null;
+}
+
+export interface AdminReceiptNoticeJobData {
+  recipientId: string;
+  kind: 'REVIEW' | 'RETRIES';
+  phone: string | null;
+  clientName: string | null;
+  reason: string;
+  attempts: number;
 }
 
 export interface AdminRescheduleNoticeJobData extends RescheduleNoticeJobData {

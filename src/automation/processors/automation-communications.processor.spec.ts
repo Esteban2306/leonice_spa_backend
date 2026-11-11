@@ -9,6 +9,7 @@ function build(paused: boolean) {
     notifyClientRescheduled: jest.fn().mockResolvedValue(undefined),
     notifyClientReservationConfirmed: jest.fn().mockResolvedValue(undefined),
     notifyAdminHandoff: jest.fn().mockResolvedValue(undefined),
+    notifyAdminReceiptIssue: jest.fn().mockResolvedValue(undefined),
   };
   const conduit = { sendWhatsappMessage: jest.fn() };
   const processor = new AutomationCommunicationsProcessor(
@@ -67,6 +68,15 @@ describe('AutomationCommunicationsProcessor con el sistema en pausa', () => {
     await processor.process(job(JOB_NAMES.NOTIFY_ADMIN_HANDOFF));
 
     expect(notifications.notifyAdminHandoff).toHaveBeenCalledTimes(1);
+    expect(executions.log).not.toHaveBeenCalled();
+  });
+
+  it('el aviso de comprobante al equipo sigue saliendo con el sistema en pausa', async () => {
+    const { processor, executions, notifications } = build(true);
+
+    await processor.process(job(JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE));
+
+    expect(notifications.notifyAdminReceiptIssue).toHaveBeenCalledTimes(1);
     expect(executions.log).not.toHaveBeenCalled();
   });
 

@@ -6,6 +6,7 @@ import { ConduitWebhooksController } from './conduit.controller';
 import { ConduitMessageDeliveryLogRepository } from './repositories/conduit-message-delivery-log.repository';
 import { ConduitMessageEventsService } from './service/conduit-message-events.service';
 import { ConduitWebhookSignatureGuard } from './guards/conduit-webhook-signature.guard';
+import { ConduitVerificationWebhookSignatureGuard } from './guards/conduit-verification-webhook-signature.guard';
 import { ConduitToolsController } from './conduit-tools.controller';
 import { ClientsModule } from 'src/clients/clients.module';
 import { ConduitOutboxRepository } from './repositories/conduit-outbox.repository';
@@ -19,6 +20,8 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { ConduitSupportToolsController } from './conduit-support-tools.controller';
 import { ConduitAdminController } from './admin/conduit-admin.controller';
 import { ConduitSpecialistController } from './admin/conduit-specialist.controller';
+import { ConduitVerificationEventsController } from './conduit-verification-events.controller';
+import { ReceiptAlertsService } from './verification/receipt-alerts.service';
 import { BusinessSettingsModule } from '../business-settings/business-settings.module';
 import { ConduitSystemPauseService } from './pause/conduit-system-pause.service';
 
@@ -36,6 +39,7 @@ import { ConduitSystemPauseService } from './pause/conduit-system-pause.service'
     ConduitSupportToolsController,
     ConduitAdminController,
     ConduitSpecialistController,
+    ConduitVerificationEventsController,
   ],
   providers: [
     ConduitApiClient,
@@ -45,11 +49,13 @@ import { ConduitSystemPauseService } from './pause/conduit-system-pause.service'
     ConduitMessageDeliveryLogRepository,
     ConduitMessageEventsService,
     ConduitWebhookSignatureGuard,
+    ConduitVerificationWebhookSignatureGuard,
     ConduitOutboxRepository,
     ConduitOutboxService,
     ConduitOutboxListener,
     ConduitOutboxProcessor,
     ConduitOutboxSweepScheduler,
+    ReceiptAlertsService,
   ],
   exports: [
     ConduitApiClient,

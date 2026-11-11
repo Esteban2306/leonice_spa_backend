@@ -52,6 +52,10 @@ class EnvironmentVariables {
   @IsOptional()
   CONDUIT_WEBHOOK_SECRET?: string;
 
+  @IsString()
+  @IsOptional()
+  CONDUIT_VERIFICATION_WEBHOOK_SECRET?: string;
+
   @IsOptional()
   @IsString()
   SIIGO_ENABLED?: string;
