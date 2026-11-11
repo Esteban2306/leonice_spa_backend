@@ -19,6 +19,7 @@ import {
   type AdminClientCancellationNoticeJobData,
   type AdminRescheduleNoticeJobData,
   type AdminHandoffNoticeJobData,
+  type AdminReceiptNoticeJobData,
   type CancellationLinkNoticeJobData,
   type ClientCancellationNoticeJobData,
   type ClientCancelledByAdminNoticeJobData,
@@ -280,6 +281,32 @@ export class OperationalNotificationsListener {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`No se pudo encolar el aviso de traspaso: ${message}`);
+      return false;
+    }
+  }
+
+  @OnEvent(EVENT_TYPES.CONDUIT_RECEIPT_ISSUE)
+  async handleReceiptIssue(
+    event: EventOf<EventPayloadMap, typeof EVENT_TYPES.CONDUIT_RECEIPT_ISSUE>,
+  ): Promise<boolean> {
+    const { verificationId, ...payload } = event.payload;
+    try {
+      const queued = await this.enqueueForAdmins<AdminReceiptNoticeJobData>(
+        JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE,
+        'comprobante que requiere atención',
+        (recipientId) => ({
+          data: { ...payload, recipientId },
+          opts: {
+            jobId: `admin-receipt-${payload.kind}-${verificationId}-${recipientId}`,
+          },
+        }),
+      );
+      return queued > 0;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `No se pudo encolar el aviso de comprobante: ${message}`,
+      );
       return false;
     }
   }

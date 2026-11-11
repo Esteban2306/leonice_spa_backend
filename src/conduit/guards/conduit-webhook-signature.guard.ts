@@ -17,6 +17,9 @@ interface RawBodyRequest extends Request {
 
 @Injectable()
 export class ConduitWebhookSignatureGuard implements CanActivate {
+  /** Cada webhook de Conduit tiene su propio secreto. */
+  protected readonly secretKey: string = 'CONDUIT_WEBHOOK_SECRET';
+
   constructor(private readonly config: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -28,7 +31,10 @@ export class ConduitWebhookSignatureGuard implements CanActivate {
       );
     }
 
-    const secret = this.config.getOrThrow<string>('CONDUIT_WEBHOOK_SECRET');
+    const secret = this.config.get<string>(this.secretKey);
+    if (!secret) {
+      throw new UnauthorizedException(`Falta configurar ${this.secretKey}`);
+    }
     const signatureV2 = req.headers['x-conduit-signature-v2'] as
       string | undefined;
     const timestamp = req.headers['x-conduit-timestamp'] as string | undefined;

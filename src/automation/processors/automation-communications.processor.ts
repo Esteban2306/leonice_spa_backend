@@ -32,6 +32,7 @@ import {
   AdminClientCancellationNoticeJobData,
   AdminRescheduleNoticeJobData,
   AdminHandoffNoticeJobData,
+  AdminReceiptNoticeJobData,
   CancellationLinkNoticeJobData,
   ClientCancellationNoticeJobData,
   ClientCancelledByAdminNoticeJobData,
@@ -59,7 +60,8 @@ type AutomationJobData =
   | ClientCancellationNoticeJobData
   | AdminClientCancellationNoticeJobData
   | CancellationLinkNoticeJobData
-  | AdminHandoffNoticeJobData;
+  | AdminHandoffNoticeJobData
+  | AdminReceiptNoticeJobData;
 
 const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
   JOB_NAMES.RESERVATION_REMINDER_CHECK,
@@ -165,6 +167,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
           job.data as AdminHandoffNoticeJobData,
           ctx,
         );
+      case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
+        return this.notifications.notifyAdminReceiptIssue(
+          job.data as AdminReceiptNoticeJobData,
+          ctx,
+        );
       case JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK:
         return this.notifications.sendClientCancellationLink(
           job.data as CancellationLinkNoticeJobData,
@@ -248,6 +255,8 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.CLIENT_CANCELLATION_LINK_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_HANDOFF:
         return AutomationExecutionType.ADMIN_HANDOFF_NOTICE;
+      case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
+        return AutomationExecutionType.ADMIN_RECEIPT_NOTICE;
       default:
         return null;
     }

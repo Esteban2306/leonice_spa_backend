@@ -25,6 +25,7 @@ import {
   type AdminDepositTimeoutNoticeJobData,
   type AdminClientCancellationNoticeJobData,
   type AdminHandoffNoticeJobData,
+  type AdminReceiptNoticeJobData,
   type AdminRescheduleNoticeJobData,
   type CancellationChannel,
   type CancellationLinkNoticeJobData,
@@ -405,6 +406,42 @@ export class OperationalNotificationsService {
       motivo: data.reason,
       resumen: data.summary ?? 'Sin resumen',
     });
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.EXECUTED,
+      reason: `Destinatario ${recipient.id}`,
+    });
+  }
+
+  /** Un comprobante quedó en revisión o la clienta lleva varios rechazos. */
+  async notifyAdminReceiptIssue(
+    data: AdminReceiptNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.ADMIN_RECEIPT_NOTICE;
+    const recipient = await this.findActiveRecipient(data.recipientId);
+    if (!recipient) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: RECIPIENT_INACTIVE_REASON,
+      });
+      return;
+    }
+
+    const base = {
+      cliente: data.clientName ?? 'Cliente sin registrar',
+      telefono: data.phone ?? 'Número oculto por WhatsApp',
+      motivo: data.reason,
+    };
+    if (data.kind === 'RETRIES') {
+      await this.notifyRecipient(ctx, 'ADMIN_RECEIPT_RETRIES', recipient, {
+        ...base,
+        intentos: String(data.attempts),
+      });
+    } else {
+      await this.notifyRecipient(ctx, 'ADMIN_RECEIPT_REVIEW', recipient, base);
+    }
     await this.executions.log({
       type,
       result: AutomationExecutionResult.EXECUTED,
