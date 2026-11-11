@@ -4,6 +4,7 @@ import {
   CONDUIT_BOT_SETTINGS,
 } from './conduit-bot-prompt';
 import { seedConduitPrompt } from '../../../prisma/seed-conduit-prompt';
+import { SPECIALIST_DEFINITION } from '../../../prisma/seed-conduit-specialist';
 import {
   BUSINESS_INFO_EVENT,
   BUSINESS_INFO_MAPPING_RULES,
@@ -109,6 +110,87 @@ describe('prompt del asistente de Leonice', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
       'registrar_comprobante_automatico',
     );
+  });
+
+  it('el saludo no pide datos y el flujo va servicio, datos, cupos', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(/No pidas datos ahí/);
+    const servicio = t.indexOf('1. Servicio');
+    const datos = t.indexOf('2. Datos');
+    const cupos = t.indexOf('3. Cupos');
+    expect(servicio).toBeGreaterThan(-1);
+    expect(datos).toBeGreaterThan(servicio);
+    expect(cupos).toBeGreaterThan(datos);
+    expect(t).toMatch(/para brindarte una mejor atención/);
+  });
+
+  it('propone los cupos más cercanos sin pedir el día y da el anticipo en un solo mensaje', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(
+      /sin pedirle el día, consulta disponibilidad_combo desde hoy/,
+    );
+    expect(t).toMatch(/los 2 o 3 cupos más cercanos/);
+    expect(t).toMatch(/un solo mensaje ordenado/);
+    expect(t).toMatch(/envíe aquí la foto del comprobante/);
+  });
+
+  it('manda el menú de servicios completo y con formato, y ofrece el enlace de la web', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('Menú de servicios');
+    expect(t).toMatch(/sin preguntar antes cuál quiere/);
+    expect(t).toMatch(/enlace de la web/);
+    expect(t).toMatch(/✨ \*Nombre\*/);
+  });
+
+  it('actúa según el veredicto del verificador de comprobantes', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(
+      /\[imagen verificada por el sistema: VEREDICTO, CÓDIGOS\]/,
+    );
+    expect(t).toMatch(/INVALID: no llames registrar_comprobante_automatico/);
+    expect(t).toMatch(
+      /VALID, NEEDS_REVIEW, ERROR o sin esa línea: registrar_comprobante_automatico/,
+    );
+    expect(t).toMatch(/UNREADABLE/);
+    expect(t).toMatch(/NOT_APPLICABLE/);
+    expect(t).toMatch(/pasar_a_persona/);
+  });
+
+  it('los códigos de motivo del prompt son los que producen las reglas del especialista', () => {
+    const codes = SPECIALIST_DEFINITION.rules.rules.map((rule) =>
+      `${rule.field}_${rule.op}_FAILED`.toUpperCase(),
+    );
+    expect(codes).toEqual([
+      'AMOUNT_GTE_FAILED',
+      'DESTINATION_WITHIN_FAILED',
+      'DATE_WITHIN_DAYS_FAILED',
+    ]);
+    for (const code of codes) {
+      expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(code);
+    }
+  });
+
+  it('un comprobante viejo es un resultado inválido', () => {
+    const date = SPECIALIST_DEFINITION.rules.rules.find(
+      (rule) => rule.field === 'date',
+    );
+    expect(date).toMatchObject({
+      op: 'within_days',
+      ref: { literal: 2 },
+      onFail: 'INVALID',
+    });
+  });
+
+  it('una cuenta equivocada es un resultado inválido, no uno dudoso', () => {
+    const destination = SPECIALIST_DEFINITION.rules.rules.find(
+      (rule) => rule.field === 'destination',
+    );
+    expect(destination?.onFail).toBe('INVALID');
+  });
+
+  it('los ajustes piden mensajes breves y emojis con expresividad', () => {
+    expect(CONDUIT_BOT_SETTINGS.verbosity).toBe('SHORT');
+    expect(CONDUIT_BOT_SETTINGS.emojiLevel).toBe('MEDIUM');
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
