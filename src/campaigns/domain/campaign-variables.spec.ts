@@ -6,7 +6,7 @@ import {
 
 const NOW = new Date('2026-11-10T15:00:00Z');
 const promotion = {
-  name: 'Semana de uñas',
+  name: 'Semana del alisado',
   discountPercentage: '15.00',
   endsAt: new Date('2026-11-18T04:59:59Z'),
 };
@@ -22,7 +22,7 @@ describe('buildCampaignVariables', () => {
     expect(result).toEqual({
       variables: {
         nombre: 'Ana',
-        promocion: 'Semana de uñas',
+        promocion: 'Semana del alisado',
         descuento: '15',
         vigencia: 'hasta el 17 de noviembre',
       },

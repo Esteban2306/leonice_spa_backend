@@ -95,7 +95,7 @@ export class TreatmentsRepository {
 
   findAllActive() {
     return this.prisma.client.treatment.findMany({
-      where: { isActive: true },
+      where: { isActive: true, category: { isActive: true } },
       orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
       ...treatmentWithRelationsArgs,
     });

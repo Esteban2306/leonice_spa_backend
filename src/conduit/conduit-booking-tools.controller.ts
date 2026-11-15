@@ -21,6 +21,7 @@ import {
 import { RescheduleReservationOrchestrator } from '../reservations/orchestrators/reschedule-reservation.orchestrator';
 import { GetAvailabilityCalendarDto } from '../reservations/dto/get-availability-calendar.dto';
 import {
+  prioritizePromoted,
   toBotTreatmentListItem,
   toBotTreatmentDetail,
 } from './tools/bot-treatment-view';
@@ -70,8 +71,8 @@ export class ConduitBookingToolsController {
       this.treatmentsService.findAll(categoryId),
       phone ? this.clientsRepository.findByPhone(phone) : null,
     ]);
-    return treatments.map((treatment) =>
-      toBotTreatmentListItem(treatment, client),
+    return prioritizePromoted(
+      treatments.map((treatment) => toBotTreatmentListItem(treatment, client)),
     );
   }
 

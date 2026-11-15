@@ -61,12 +61,12 @@ describe('toClientReservationSummary', () => {
         comboGroupId: null,
         cancellationSource: null,
         treatment: { name: 'Pedespa' },
-        category: { name: 'Uñas' },
+        category: { name: 'Spa Coreano' },
       }),
     ).toMatchObject({
       reservationId: 'r1',
       treatment: 'Pedespa',
-      category: 'Uñas',
+      category: 'Spa Coreano',
       finalPrice: 85000,
     });
   });

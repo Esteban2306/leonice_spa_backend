@@ -7,8 +7,8 @@ const CATALOG = [
   T('3', 'Hidratación profunda'),
   T('4', 'Terapia de control'),
   T('5', 'Spa coreano'),
-  T('6', 'Manicure semipermanente'),
-  T('7', 'Manicure tradicional'),
+  T('6', 'Keratina intensiva'),
+  T('7', 'Keratina tradicional'),
 ];
 
 describe('matchTreatment', () => {
@@ -41,7 +41,7 @@ describe('matchTreatment', () => {
   });
 
   it('acepta singular/plural cercano', () => {
-    expect(matchTreatment('manicures tradicional', CATALOG)).toMatchObject({
+    expect(matchTreatment('keratinas tradicional', CATALOG)).toMatchObject({
       status: 'found',
       treatment: { id: '7' },
     });

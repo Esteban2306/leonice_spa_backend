@@ -22,12 +22,12 @@ jest.mock('../../infrastructure/cloudinary/cloudinary.service', () => ({
   CloudinaryService: class {},
 }));
 
-const NAILS = 'cat-nails';
+const COREANO = 'cat-coreano';
 
 function treatment(id: string, name: string, reservations = 0) {
   return {
     id,
-    categoryId: NAILS,
+    categoryId: COREANO,
     name,
     requiresPriorAssessment: false,
     hasHairVariablePricing: false,
@@ -38,7 +38,7 @@ function treatment(id: string, name: string, reservations = 0) {
     isActive: true,
     createdAt: new Date('2026-10-01T00:00:00Z'),
     updatedAt: new Date('2026-10-01T00:00:00Z'),
-    category: { id: NAILS, name: 'Uñas' },
+    category: { id: COREANO, name: 'Spa Coreano' },
     hairLengthPricing: [],
     hairColorSurcharges: [],
     _count: { reservations },
@@ -48,7 +48,7 @@ function treatment(id: string, name: string, reservations = 0) {
 function promotion(treatmentId: string): Promotion {
   return {
     id: 'promo-1',
-    name: 'Semana de uñas',
+    name: 'Semana del alisado',
     discountPercentage: new Decimal(20),
     startsAt: new Date('2026-10-01T00:00:00Z'),
     endsAt: new Date('2026-10-31T00:00:00Z'),
@@ -117,7 +117,7 @@ describe('TreatmentsService (admin)', () => {
   it('filtra por servicios con o sin promoción vigente', async () => {
     repository.findForAdmin.mockResolvedValue([
       treatment('t-1', 'Pedespa tradicional'),
-      treatment('t-2', 'Uñas Dipping'),
+      treatment('t-2', 'Keratina Intensiva'),
     ]);
     promotions.findAllCurrentlyValid.mockResolvedValue([promotion('t-1')]);
 
@@ -158,20 +158,20 @@ describe('TreatmentsService (admin)', () => {
   });
 
   it('genera un slug único dentro de la categoría al crear', async () => {
-    categories.findOne.mockResolvedValue({ id: NAILS });
+    categories.findOne.mockResolvedValue({ id: COREANO });
     repository.findByCategoryAndName.mockResolvedValue(null);
     repository.isSlugTaken.mockImplementation(
       (_category: string, slug: string) =>
-        Promise.resolve(slug === 'unas-dipping'),
+        Promise.resolve(slug === 'keratina-intensiva'),
     );
     repository.create.mockResolvedValue({ id: 't-9' });
 
-    await service.create({ categoryId: NAILS, name: 'Uñas Dipping' });
+    await service.create({ categoryId: COREANO, name: 'Keratina Intensiva' });
 
     expect(repository.create).toHaveBeenCalledWith({
-      categoryId: NAILS,
-      name: 'Uñas Dipping',
-      slug: 'unas-dipping-2',
+      categoryId: COREANO,
+      name: 'Keratina Intensiva',
+      slug: 'keratina-intensiva-2',
     });
   });
 

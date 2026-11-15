@@ -3,7 +3,7 @@ import { slugify, uniqueSlug } from './slugify';
 describe('slugify', () => {
   it('removes accents, ñ and symbols', () => {
     expect(slugify('Terapia baño de color')).toBe('terapia-bano-de-color');
-    expect(slugify('Uñas Press On soft gel')).toBe('unas-press-on-soft-gel');
+    expect(slugify('Cabello Teñido Suave')).toBe('cabello-tenido-suave');
     expect(slugify('  Terapia antiácida! ')).toBe('terapia-antiacida');
   });
 

@@ -1,7 +1,7 @@
 import { ReservationStatus } from '@prisma/client';
 import { buildDailyReport, type ScheduledReservationRow } from './daily-report';
 
-const nails = { id: 'cat-nails', name: 'Uñas' };
+const coreano = { id: 'cat-coreano', name: 'Spa Coreano' };
 const hair = { id: 'cat-hair', name: 'Spa Capilar' };
 const tradicional = { id: 't-trad', name: 'Tradicional' };
 const alisado = { id: 't-alis', name: 'Alisado' };
@@ -15,7 +15,7 @@ function row(
     cancellationSource: null,
     finalPrice: '35.00',
     treatment: tradicional,
-    category: nails,
+    category: coreano,
     ...overrides,
   };
 }
@@ -111,13 +111,13 @@ describe('buildDailyReport', () => {
     expect(report.topTreatments[0]).toEqual({
       treatmentId: 't-trad',
       name: 'Tradicional',
-      category: 'Uñas',
+      category: 'Spa Coreano',
       count: 3,
     });
     expect(
       report.categories.map((c) => [c.name, c.scheduled, c.completed]),
     ).toEqual([
-      ['Uñas', 3, 1],
+      ['Spa Coreano', 3, 1],
       ['Spa Capilar', 1, 1],
     ]);
   });

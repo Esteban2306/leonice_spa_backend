@@ -19,7 +19,7 @@ const hours = (windows: { start: Date; end: Date }[]) =>
 
 const THURSDAY = new Date(2026, 9, 22);
 const SPA = 'cat-spa';
-const NAILS = 'cat-nails';
+const COREANO = 'cat-coreano';
 
 const schedule = (exceptions: DayException[] = []): DaySchedule => ({
   base: DEFAULT_WEEKLY_WINDOWS,
@@ -85,7 +85,7 @@ describe('getOperatingWindowsForDate — bloqueos', () => {
   it('bloqueo por categoría solo cierra esa categoría', () => {
     const s = schedule([block(SPA)]);
     expect(getOperatingWindowsForDate(THURSDAY, s, SPA)).toEqual([]);
-    expect(hours(getOperatingWindowsForDate(THURSDAY, s, NAILS))).toEqual([
+    expect(hours(getOperatingWindowsForDate(THURSDAY, s, COREANO))).toEqual([
       [8, 12],
       [14, 16],
     ]);
@@ -120,7 +120,9 @@ describe('getOperatingWindowsForDate — aperturas (override)', () => {
     expect(
       hours(getOperatingWindowsForDate(sunday, closedSunday, SPA)),
     ).toEqual([[9, 13]]);
-    expect(getOperatingWindowsForDate(sunday, closedSunday, NAILS)).toEqual([]);
+    expect(getOperatingWindowsForDate(sunday, closedSunday, COREANO)).toEqual(
+      [],
+    );
   });
 
   it('el bloqueo gana sobre la apertura del mismo día', () => {
