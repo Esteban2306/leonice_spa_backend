@@ -16,6 +16,6 @@ import { ProductCatalogRepository } from './catalog/product-catalog.repository';
     ProductCatalogService,
     ProductCatalogRepository,
   ],
-  exports: [ProductsService],
+  exports: [ProductsService, ProductCatalogService],
 })
 export class ProductsModule {}

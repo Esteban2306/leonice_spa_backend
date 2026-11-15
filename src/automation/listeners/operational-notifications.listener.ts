@@ -19,6 +19,7 @@ import {
   type AdminClientCancellationNoticeJobData,
   type AdminRescheduleNoticeJobData,
   type AdminHandoffNoticeJobData,
+  type AdminProductPurchaseNoticeJobData,
   type AdminReceiptNoticeJobData,
   type CancellationLinkNoticeJobData,
   type ClientCancellationNoticeJobData,
@@ -281,6 +282,36 @@ export class OperationalNotificationsListener {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`No se pudo encolar el aviso de traspaso: ${message}`);
+      return false;
+    }
+  }
+
+  @OnEvent(EVENT_TYPES.CONDUIT_PRODUCT_PURCHASE_REQUESTED)
+  async handleProductPurchaseRequested(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.CONDUIT_PRODUCT_PURCHASE_REQUESTED
+    >,
+  ): Promise<boolean> {
+    const { requestId, ...payload } = event.payload;
+    try {
+      const queued =
+        await this.enqueueForAdmins<AdminProductPurchaseNoticeJobData>(
+          JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PURCHASE,
+          'solicitud de compra de producto',
+          (recipientId) => ({
+            data: { ...payload, recipientId },
+            opts: {
+              jobId: `admin-product-purchase-${requestId}-${recipientId}`,
+            },
+          }),
+        );
+      return queued > 0;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `No se pudo encolar el aviso de compra de producto: ${message}`,
+      );
       return false;
     }
   }

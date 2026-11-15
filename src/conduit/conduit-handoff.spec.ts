@@ -8,6 +8,7 @@ function build(results: boolean[]) {
     {} as never,
     { findByPhone: jest.fn(() => Promise.resolve({ name: 'Diana' })) } as never,
     { publishAsync } as never,
+    {} as never,
   );
   return { controller, publishAsync };
 }

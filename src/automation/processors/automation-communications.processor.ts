@@ -32,6 +32,7 @@ import {
   AdminClientCancellationNoticeJobData,
   AdminRescheduleNoticeJobData,
   AdminHandoffNoticeJobData,
+  AdminProductPurchaseNoticeJobData,
   AdminReceiptNoticeJobData,
   CancellationLinkNoticeJobData,
   ClientCancellationNoticeJobData,
@@ -61,6 +62,7 @@ type AutomationJobData =
   | AdminClientCancellationNoticeJobData
   | CancellationLinkNoticeJobData
   | AdminHandoffNoticeJobData
+  | AdminProductPurchaseNoticeJobData
   | AdminReceiptNoticeJobData;
 
 const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
@@ -167,6 +169,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
           job.data as AdminHandoffNoticeJobData,
           ctx,
         );
+      case JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PURCHASE:
+        return this.notifications.notifyAdminProductPurchase(
+          job.data as AdminProductPurchaseNoticeJobData,
+          ctx,
+        );
       case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
         return this.notifications.notifyAdminReceiptIssue(
           job.data as AdminReceiptNoticeJobData,
@@ -255,6 +262,8 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.CLIENT_CANCELLATION_LINK_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_HANDOFF:
         return AutomationExecutionType.ADMIN_HANDOFF_NOTICE;
+      case JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PURCHASE:
+        return AutomationExecutionType.ADMIN_PRODUCT_PURCHASE_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
         return AutomationExecutionType.ADMIN_RECEIPT_NOTICE;
       default:

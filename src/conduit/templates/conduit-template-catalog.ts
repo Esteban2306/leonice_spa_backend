@@ -366,6 +366,25 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     ].join('\n'),
   },
   {
+    code: 'ADMIN_PRODUCT_PURCHASE',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PURCHASE',
+    name: 'leonice_aviso_compra_producto',
+    description:
+      'Aviso interno: una clienta quiere comprar un producto de la tienda y hay que contactarla.',
+    audience: 'ADMIN',
+    variables: ['cliente', 'telefono', 'pedido', 'notas'],
+    body: [
+      '🛍️ *Una clienta quiere comprar un producto*',
+      '',
+      'Clienta: {{cliente}}',
+      'Teléfono: {{telefono}}',
+      'Quiere comprar: {{pedido}}',
+      'Notas: {{notas}}',
+      '',
+      'El asistente sigue activo en ese chat. Contáctala para coordinar la compra en la tienda.',
+    ].join('\n'),
+  },
+  {
     code: 'ADMIN_HANDOFF',
     envKey: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF',
     name: 'leonice_aviso_atencion_humana',
@@ -448,6 +467,27 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
         '<strong>Fecha:</strong> {{fecha}}',
       ],
       'El espacio quedó libre en la agenda.',
+    ),
+  },
+  {
+    code: 'ADMIN_PRODUCT_PURCHASE_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PURCHASE_EMAIL',
+    name: 'leonice_correo_compra_producto',
+    description:
+      'Correo interno: una clienta quiere comprar un producto de la tienda y hay que contactarla.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Solicitud de compra de producto: {{cliente}}',
+    variables: ['cliente', 'telefono', 'pedido', 'notas'],
+    body: emailLayout(
+      'Una clienta quiere comprar un producto',
+      [
+        '<strong>Clienta:</strong> {{cliente}}',
+        '<strong>Teléfono:</strong> {{telefono}}',
+        '<strong>Quiere comprar:</strong> {{pedido}}',
+        '<strong>Notas:</strong> {{notas}}',
+      ],
+      'El asistente sigue activo en ese chat. Contáctala para coordinar la compra en la tienda.',
     ),
   },
   {

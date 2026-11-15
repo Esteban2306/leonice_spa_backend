@@ -21,6 +21,7 @@ export const EVENT_TYPES = {
   DEPOSIT_REJECTED: 'deposit.rejected',
   RESERVATION_CANCELLED_BY_TIMEOUT: 'reservation.cancelled_by_timeout',
   CONDUIT_HANDOFF_REQUESTED: 'conduit.handoff_requested',
+  CONDUIT_PRODUCT_PURCHASE_REQUESTED: 'conduit.product_purchase_requested',
   CONDUIT_RECEIPT_ISSUE: 'conduit.receipt_issue',
   BUSINESS_INFO_CHANGED: 'business.info_changed',
 } as const;
@@ -117,6 +118,16 @@ export interface EventPayloadMap {
     clientName: string | null;
     reason: string;
     summary: string | null;
+    requestId: string;
+  };
+
+  [EVENT_TYPES.CONDUIT_PRODUCT_PURCHASE_REQUESTED]: {
+    phone: string | null;
+    lid: string | null;
+    clientName: string | null;
+    /** Lo que la clienta quiere comprar, en sus palabras. */
+    request: string;
+    notes: string | null;
     requestId: string;
   };
 
