@@ -193,8 +193,34 @@ describe('prompt del asistente de Leonice', () => {
     expect(CONDUIT_BOT_SETTINGS.emojiLevel).toBe('MEDIUM');
   });
 
+  it('productos: informa y recomienda sin avisar al equipo; solo avisa cuando quiere comprar', () => {
+    const section =
+      CONDUIT_BOT_PROMPT_TEMPLATE.split('Productos\n')[1].split('\n\n')[0];
+    expect(section).toContain('info_productos');
+    expect(section).toContain('cuál va con su tratamiento');
+    expect(section).toContain('Nunca prometas unidades');
+    expect(section).toContain('Solo si dice que quiere comprarlo');
+    expect(section).toContain('solicitar_compra_producto');
+    expect(section).toContain('Una consulta o un precio no es una compra');
+    expect(section).toContain('solo si la herramienta devolvió éxito');
+    expect(section).toContain('No cobras ni tomas pagos');
+  });
+
+  it('reconoce a Leo, la dueña: ahora el asistente lleva las citas y solo la pasa a ella si hace falta', () => {
+    const start = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Leo, la dueña');
+    const end = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Qué consultar');
+    const section = CONDUIT_BOT_PROMPT_TEMPLATE.slice(start, end);
+    expect(start).toBeGreaterThan(-1);
+    expect(section).toContain('dueña');
+    expect(section).toContain('ahora yo me encargo de tus citas');
+    expect(section).toContain('pasar_a_persona');
+    expect(section).toContain('Leo se comunicará');
+    expect(section).toContain('solo si la herramienta devolvió éxito');
+    expect(section).toContain('No hables en nombre de Leo');
+  });
+
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(7300);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(9400);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

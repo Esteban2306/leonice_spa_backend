@@ -46,7 +46,7 @@ describe('ConduitTemplateResolver', () => {
 
     const usage = await resolver.describe();
 
-    expect(usage).toHaveLength(37);
+    expect(usage).toHaveLength(39);
     expect(usage.find((u) => u.name === 'RESERVATION_REMINDER')).toMatchObject({
       templateId: 'tpl-1',
       configured: true,

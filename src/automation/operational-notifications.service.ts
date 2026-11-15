@@ -25,6 +25,7 @@ import {
   type AdminDepositTimeoutNoticeJobData,
   type AdminClientCancellationNoticeJobData,
   type AdminHandoffNoticeJobData,
+  type AdminProductPurchaseNoticeJobData,
   type AdminReceiptNoticeJobData,
   type AdminRescheduleNoticeJobData,
   type CancellationChannel,
@@ -405,6 +406,36 @@ export class OperationalNotificationsService {
         data.phone ?? `(número oculto por WhatsApp, LID ${data.lid ?? '?'})`,
       motivo: data.reason,
       resumen: data.summary ?? 'Sin resumen',
+    });
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.EXECUTED,
+      reason: `Destinatario ${recipient.id}`,
+    });
+  }
+
+  /** Una clienta pidió comprar un producto: el equipo la contacta. */
+  async notifyAdminProductPurchase(
+    data: AdminProductPurchaseNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.ADMIN_PRODUCT_PURCHASE_NOTICE;
+    const recipient = await this.findActiveRecipient(data.recipientId);
+    if (!recipient) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: RECIPIENT_INACTIVE_REASON,
+      });
+      return;
+    }
+
+    await this.notifyRecipient(ctx, 'ADMIN_PRODUCT_PURCHASE', recipient, {
+      cliente: data.clientName ?? 'Cliente sin registrar',
+      telefono:
+        data.phone ?? `(número oculto por WhatsApp, LID ${data.lid ?? '?'})`,
+      pedido: data.request,
+      notas: data.notes ?? 'Sin notas',
     });
     await this.executions.log({
       type,

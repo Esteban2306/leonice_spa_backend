@@ -26,6 +26,10 @@ export class ProductCatalogService {
     return queryCatalog(await this.load(), filters);
   }
 
+  listRecords(): Promise<CatalogProductRecord[]> {
+    return this.load();
+  }
+
   async detail(slug: string) {
     const catalog = await this.load();
     const product = catalog.find((candidate) => candidate.slug === slug);

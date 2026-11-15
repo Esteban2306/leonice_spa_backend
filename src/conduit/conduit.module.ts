@@ -23,6 +23,7 @@ import { ConduitSpecialistController } from './admin/conduit-specialist.controll
 import { ConduitVerificationEventsController } from './conduit-verification-events.controller';
 import { ReceiptAlertsService } from './verification/receipt-alerts.service';
 import { BusinessSettingsModule } from '../business-settings/business-settings.module';
+import { ProductsModule } from '../products/products.module';
 import { ConduitSystemPauseService } from './pause/conduit-system-pause.service';
 
 @Module({
@@ -31,6 +32,7 @@ import { ConduitSystemPauseService } from './pause/conduit-system-pause.service'
     ReservationsModule,
     CatalogModule,
     BusinessSettingsModule,
+    ProductsModule,
   ],
   controllers: [
     ConduitWebhooksController,

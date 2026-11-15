@@ -16,11 +16,13 @@ const schemaAt = (
     );
 
 describe('CONDUIT_TOOL_CATALOG', () => {
-  it('trae las 16 herramientas que revisa el panel', () => {
+  it('trae las 18 herramientas que revisa el panel', () => {
     expect(CONDUIT_TOOL_CATALOG.map((t) => t.name).sort()).toEqual(
       [
         'consultar_cliente',
         'info_negocio',
+        'info_productos',
+        'solicitar_compra_producto',
         'listar_tratamientos',
         'info_tratamiento',
         'consultar_disponibilidad',

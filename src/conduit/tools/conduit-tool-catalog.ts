@@ -66,6 +66,51 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     parametersSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'info_productos',
+    description:
+      'Productos de la tienda: precio por marca y presentación, para qué sirve, beneficios, modo de uso, precauciones y los tratamientos con los que se recomienda. Úsala cuando pregunten por un producto, su precio, si lo tienen o qué recomiendas para un tratamiento o necesidad; query es lo que pidió la clienta, o vacío para ver el catálogo. El sistema no lleva inventario: disponible significa que está en el catálogo, no que haya unidades.',
+    httpMethod: 'GET',
+    path: '/conduit/products',
+    parametersSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          maxLength: 80,
+          description:
+            'Producto o necesidad tal como la dijo la clienta, por ejemplo "shampoo para cabello seco"',
+        },
+      },
+    },
+  },
+  {
+    name: 'solicitar_compra_producto',
+    description:
+      'Avisa al equipo que la clienta quiere COMPRAR un producto, con su número y lo que pidió. Úsala solo cuando ella diga que lo quiere comprar o pida comprarlo, nunca por una simple consulta de información o precio. No pausa el asistente.',
+    httpMethod: 'POST',
+    path: '/conduit/products/purchase-request',
+    injectPhoneParamName: 'phone',
+    parametersSchema: {
+      type: 'object',
+      required: ['request'],
+      properties: {
+        phone: PHONE,
+        request: {
+          type: 'string',
+          minLength: 3,
+          maxLength: 400,
+          description:
+            'Producto, marca, presentación y cantidad que quiere comprar',
+        },
+        notes: {
+          type: 'string',
+          maxLength: 600,
+          description: 'Algo más que el equipo deba saber',
+        },
+      },
+    },
+  },
+  {
     name: 'listar_tratamientos',
     description:
       'Servicios activos con id, precio en pesos, duración y promoción vigente (promotion). Si la clienta tiene perfil capilar vigente el precio es el suyo (personalizedPrice); si no, es un rango (priceIsRange) y el precio final se confirma tras el diagnóstico en el spa. Úsala antes de ofrecer un servicio, cuando pregunten precios o promociones, o si hay ambigüedad.',
