@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProductKind } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
   CatalogStatusFilter,
@@ -26,9 +26,42 @@ export type ProductWithRelations = Prisma.ProductGetPayload<
   typeof productWithRelationsArgs
 >;
 
+const ritualItemsInclude = {
+  orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+  include: {
+    variant: {
+      select: {
+        id: true,
+        brand: true,
+        presentation: true,
+        price: true,
+        isActive: true,
+        imageUrl: true,
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            isActive: true,
+            category: { select: { isActive: true } },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.Product$comboItemsArgs;
+
 const adminProductArgs = {
   include: {
-    variants: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+    variants: {
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      include: {
+        comboItems: {
+          select: { combo: { select: { id: true, name: true, slug: true } } },
+        },
+      },
+    },
+    comboItems: ritualItemsInclude,
     category: { select: { id: true, name: true, isActive: true } },
     tagAssignments: {
       include: { tag: { select: { id: true, name: true, isActive: true } } },
@@ -56,6 +89,21 @@ export interface AdminProductsFilter {
   q?: string;
   productCategoryId?: string;
   status: CatalogStatusFilter;
+  kind?: ProductKind;
+}
+
+export type AdminProductRecord = Prisma.ProductGetPayload<
+  typeof adminProductArgs
+>;
+
+export interface RitualItemInput {
+  variantId: string;
+  quantity: number;
+}
+
+export interface RitualVariantLabels {
+  brand: string;
+  presentation: string;
 }
 
 @Injectable()
@@ -140,6 +188,7 @@ export class ProductsRepository {
   findAdminProducts(filter: AdminProductsFilter) {
     const where: Prisma.ProductWhereInput = {
       ...isActiveWhere(filter.status),
+      ...(filter.kind ? { kind: filter.kind } : {}),
       ...(filter.productCategoryId
         ? { productCategoryId: filter.productCategoryId }
         : {}),
@@ -248,6 +297,82 @@ export class ProductsRepository {
     });
   }
 
+  findCategoryBySlug(slug: string) {
+    return this.prisma.client.productCategory.findUnique({ where: { slug } });
+  }
+
+  findVariantsForRitual(variantIds: string[]) {
+    return this.prisma.client.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      select: {
+        id: true,
+        brand: true,
+        isActive: true,
+        product: { select: { id: true, kind: true, isActive: true } },
+      },
+    });
+  }
+
+  createRitual(
+    data: Omit<Prisma.ProductUncheckedCreateInput, 'kind'>,
+    variant: RitualVariantLabels & { price: number; imageUrl?: string },
+    items: RitualItemInput[],
+  ) {
+    return this.prisma.client.product.create({
+      data: {
+        ...data,
+        kind: ProductKind.COMBO,
+        variants: { create: variant },
+        comboItems: {
+          create: items.map((item, position) => ({ ...item, position })),
+        },
+      },
+      ...adminProductDetailArgs,
+    });
+  }
+
+  replaceRitualItems(
+    ritualId: string,
+    items: RitualItemInput[],
+    labels: RitualVariantLabels,
+  ) {
+    return this.prisma.client.$transaction(async (tx) => {
+      await tx.productComboItem.deleteMany({
+        where: { comboProductId: ritualId },
+      });
+      await tx.productComboItem.createMany({
+        data: items.map((item, position) => ({
+          ...item,
+          position,
+          comboProductId: ritualId,
+        })),
+      });
+      await tx.productVariant.updateMany({
+        where: { productId: ritualId },
+        data: labels,
+      });
+      return tx.product.findUniqueOrThrow({
+        where: { id: ritualId },
+        ...adminProductDetailArgs,
+      });
+    });
+  }
+
+  findRitualsIncluding(where: { productId?: string; variantId?: string }) {
+    return this.prisma.client.product.findMany({
+      where: {
+        kind: ProductKind.COMBO,
+        comboItems: {
+          some: where.variantId
+            ? { variantId: where.variantId }
+            : { variant: { productId: where.productId } },
+        },
+      },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   findVariantById(id: string) {
     return this.prisma.client.productVariant.findUnique({ where: { id } });
   }
@@ -303,9 +428,12 @@ export class ProductsRepository {
     });
   }
 
-  findTreatmentIdsRecommending(productId: string) {
+  findTreatmentIdsRecommending(productIds: string[]) {
     return this.prisma.client.treatmentProductRecommendation
-      .findMany({ where: { productId }, select: { treatmentId: true } })
+      .findMany({
+        where: { productId: { in: productIds } },
+        select: { treatmentId: true },
+      })
       .then((rows) => rows.map((row) => row.treatmentId));
   }
 

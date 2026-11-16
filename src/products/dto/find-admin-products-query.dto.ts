@@ -9,6 +9,7 @@ import {
   CatalogStatusFilter,
   TransformTrimmedQuery,
 } from '../../catalog/common/catalog-filters';
+import { ProductKind } from '@prisma/client';
 
 export class FindAdminProductsQueryDto {
   @IsOptional()
@@ -24,4 +25,8 @@ export class FindAdminProductsQueryDto {
   @IsOptional()
   @IsEnum(CatalogStatusFilter)
   status: CatalogStatusFilter = CatalogStatusFilter.ALL;
+
+  @IsOptional()
+  @IsEnum(ProductKind)
+  kind?: ProductKind;
 }

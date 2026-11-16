@@ -36,6 +36,7 @@ function product(
     name,
     slug: id,
     kind: 'SINGLE',
+    comboItems: [],
     description: null,
     isActive: true,
     createdAt: NOW,

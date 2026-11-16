@@ -11,6 +11,7 @@ import {
 } from './product-catalog.repository';
 import {
   CatalogFilters,
+  isPubliclyVisible,
   queryCatalog,
   toProductDetail,
 } from './product-catalog.mapper';
@@ -38,6 +39,11 @@ export class ProductCatalogService {
   }
 
   private async load(): Promise<CatalogProductRecord[]> {
+    const catalog = await this.loadAll();
+    return catalog.filter(isPubliclyVisible);
+  }
+
+  private async loadAll(): Promise<CatalogProductRecord[]> {
     const cached = await this.cache.get<CatalogProductRecord[]>(
       CATALOG_CACHE_KEYS.productCatalog,
     );

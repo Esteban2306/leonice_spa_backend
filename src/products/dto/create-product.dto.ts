@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 import { CollapseWhitespace } from './collapse-whitespace.transform';
 import { CreateProductVariantDto } from './create-product-variant.dto';
+import { ContentList, NullableTrimmed } from './product-content.decorators';
 
 export class CreateProductDto {
   @IsUUID()
@@ -31,6 +32,36 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(2000)
   description?: string | null;
+
+  @NullableTrimmed()
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  tagline?: string | null;
+
+  @NullableTrimmed()
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  purpose?: string | null;
+
+  @ContentList()
+  benefits?: string[];
+
+  @ContentList()
+  howToUse?: string[];
+
+  @ContentList()
+  idealFor?: string[];
+
+  @NullableTrimmed()
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  usageFrequency?: string | null;
+
+  @ContentList()
+  precautions?: string[];
 
   @IsOptional()
   @IsBoolean()

@@ -1,4 +1,9 @@
 import type { CatalogProductRecord } from './product-catalog.repository';
+import {
+  computeRitualPricing,
+  isRitualComplete,
+  RitualPricing,
+} from '../domain/ritual-pricing';
 
 export type CatalogSort = 'featured' | 'price-asc' | 'price-desc' | 'name';
 
@@ -27,10 +32,36 @@ export interface CatalogFacetOption {
   count: number;
 }
 
+export interface CatalogRitualSummary extends Omit<
+  RitualPricing,
+  'pricePesos'
+> {
+  itemCount: number;
+}
+
+export interface CatalogRitualItem {
+  productSlug: string;
+  productName: string;
+  brand: string;
+  presentation: string;
+  quantity: number;
+  unitPricePesos: number;
+  imageUrl: string | null;
+}
+
+export interface CatalogRitualReference {
+  slug: string;
+  name: string;
+  pricePesos: number | null;
+  savingsPercent: number;
+}
+
 export interface CatalogProductCard {
   id: string;
   slug: string;
   name: string;
+  kind: 'single' | 'ritual';
+  ritual: CatalogRitualSummary | null;
   tagline: string | null;
   purpose: string | null;
   category: { slug: string; name: string };
@@ -59,6 +90,8 @@ export interface CatalogProductDetail extends CatalogProductCard {
     categoryName: string;
   }[];
   related: CatalogProductCard[];
+  ritualItems: CatalogRitualItem[];
+  includedIn: CatalogRitualReference[];
 }
 
 export interface CatalogResult {
@@ -99,6 +132,22 @@ function maxPrice(product: CatalogProductRecord): number | null {
   return values.length > 0 ? Math.max(...values) : null;
 }
 
+export function isPubliclyVisible(product: CatalogProductRecord): boolean {
+  if (product.kind !== 'COMBO') return true;
+  return product.variants.length > 0 && isRitualComplete(product.comboItems);
+}
+
+function ritualPricing(product: CatalogProductRecord): RitualPricing | null {
+  if (product.kind !== 'COMBO') return null;
+  return computeRitualPricing(
+    minPrice(product) ?? 0,
+    product.comboItems.map(({ quantity, variant }) => ({
+      quantity,
+      unitPrice: Number(variant.price),
+    })),
+  );
+}
+
 function matchesQuery(product: CatalogProductRecord, q: string): boolean {
   const needle = normalize(q.trim());
   if (!needle) return true;
@@ -114,6 +163,7 @@ function matchesQuery(product: CatalogProductRecord, q: string): boolean {
       variant.brand,
       variant.presentation,
     ]),
+    ...product.comboItems.map(({ variant }) => variant.product.name),
   ]
     .filter((value): value is string => Boolean(value))
     .map(normalize)
@@ -185,10 +235,23 @@ function sortProducts(
 export function toProductCard(
   product: CatalogProductRecord,
 ): CatalogProductCard {
+  const pricing = ritualPricing(product);
   return {
     id: product.id,
     slug: product.slug,
     name: product.name,
+    kind: product.kind === 'COMBO' ? 'ritual' : 'single',
+    ritual: pricing
+      ? {
+          separatePricePesos: pricing.separatePricePesos,
+          savingsPesos: pricing.savingsPesos,
+          savingsPercent: pricing.savingsPercent,
+          itemCount: product.comboItems.reduce(
+            (total, item) => total + item.quantity,
+            0,
+          ),
+        }
+      : null,
     tagline: product.tagline,
     purpose: product.purpose,
     category: { slug: product.category.slug, name: product.category.name },
@@ -364,5 +427,28 @@ export function toProductDetail(
     related: scored
       .slice(0, RELATED_LIMIT)
       .map(({ other }) => toProductCard(other)),
+    ritualItems: product.comboItems.map(({ quantity, variant }) => ({
+      productSlug: variant.product.slug,
+      productName: variant.product.name,
+      brand: variant.brand,
+      presentation: variant.presentation,
+      quantity,
+      unitPricePesos: Number(variant.price),
+      imageUrl: variant.imageUrl,
+    })),
+    includedIn: catalog
+      .filter(
+        (other) =>
+          other.kind === 'COMBO' &&
+          other.comboItems.some(
+            ({ variant }) => variant.product.id === product.id,
+          ),
+      )
+      .map((ritual) => ({
+        slug: ritual.slug,
+        name: ritual.name,
+        pricePesos: minPrice(ritual),
+        savingsPercent: ritualPricing(ritual)?.savingsPercent ?? 0,
+      })),
   };
 }
