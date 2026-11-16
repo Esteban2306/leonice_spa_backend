@@ -194,11 +194,20 @@ describe('6. Errores coherentes que no exponen detalles internos', () => {
         'correlationId',
         'details',
         'message',
+        'nextStep',
         'path',
         'statusCode',
         'timestamp',
       ]).toContain(key);
     }
+    if ('nextStep' in body)
+      expect([
+        'OFFER_OTHER_SLOT',
+        'SHOW_UPCOMING',
+        'ASK_CLIENT_DATA',
+        'RETRY_LATER',
+        'HANDOFF',
+      ]).toContain((body as { nextStep: unknown }).nextStep);
     expect(body.statusCode).toBe(status);
     expect(typeof body.code).toBe('string');
     expect(typeof body.message).toBe('string');
