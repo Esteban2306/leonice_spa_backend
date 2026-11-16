@@ -6,6 +6,7 @@ import {
   isActiveWhere,
 } from '../../catalog/common/catalog-filters';
 import { CreateProductCategoryDto } from '../dto/create-product-category.dto';
+import { COMPLETE_RITUAL_OR_SINGLE } from '../constants/public-product.where';
 import { UpdateProductCategoryDto } from '../dto/update-product-category.dto';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
@@ -179,7 +180,7 @@ export class ProductsRepository {
 
   findAllActiveProducts() {
     return this.prisma.client.product.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...COMPLETE_RITUAL_OR_SINGLE },
       ...productWithRelationsArgs,
       orderBy: { name: 'asc' },
     });
@@ -421,7 +422,10 @@ export class ProductsRepository {
 
   findRecommendationsForTreatment(treatmentId: string) {
     return this.prisma.client.treatmentProductRecommendation.findMany({
-      where: { treatmentId, product: { isActive: true } },
+      where: {
+        treatmentId,
+        product: { isActive: true, ...COMPLETE_RITUAL_OR_SINGLE },
+      },
       include: {
         product: { include: { variants: { where: { isActive: true } } } },
       },
@@ -538,7 +542,7 @@ export class ProductsRepository {
       where: {
         tagId: { in: tagIds },
         productId: { not: productId },
-        product: { isActive: true },
+        product: { isActive: true, ...COMPLETE_RITUAL_OR_SINGLE },
       },
       _count: { tagId: true },
       orderBy: { _count: { tagId: 'desc' } },

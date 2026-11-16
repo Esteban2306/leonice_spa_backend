@@ -136,6 +136,13 @@ describe('Rituales de productos: armado en el admin y vista pública', () => {
     });
   });
 
+  it('el listado público antiguo incluye el Ritual completo', async () => {
+    const legacy = await request(server).get(`${API}/products`);
+    expect(
+      (legacy.body as { id: string }[]).map((product) => product.id),
+    ).toContain(ritualId);
+  });
+
   it('el catálogo público muestra el Ritual con su ahorro y la relación con cada producto', async () => {
     const list = await request(server).get(
       `${API}/catalog/products?category=combos`,
@@ -205,6 +212,10 @@ describe('Rituales de productos: armado en el admin y vista pública', () => {
       `${API}/catalog/products?category=combos`,
     );
     expect((list.body as { items: unknown[] }).items).toEqual([]);
+    const legacy = await request(server).get(`${API}/products`);
+    expect(
+      (legacy.body as { id: string }[]).map((product) => product.id),
+    ).not.toContain(ritualId);
     await asAdmin('patch', `/products/${product.mascarilla}/toggle`).expect(
       200,
     );
