@@ -1,4 +1,5 @@
 import type { CatalogProductRecord } from '../../products/catalog/product-catalog.repository';
+import { computeRitualPricing } from '../../products/domain/ritual-pricing';
 
 export const BOT_PRODUCTS_LIMIT = 5;
 const VARIANTS_PER_PRODUCT = 6;
@@ -41,7 +42,33 @@ export interface BotProductVariant {
   price: number;
 }
 
+export interface BotRitualInfo {
+  separatePrice: number;
+  savings: number;
+  savingsPercent: number;
+  includes: {
+    name: string;
+    presentation: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
+}
+
+export interface BotRitualOffer {
+  name: string;
+  price: number;
+  savings: number;
+  savingsPercent: number;
+}
+
+export const RITUAL_ITEM_HINT =
+  'Es un Ritual: un combo con precio especial. Cuéntale qué incluye y cuánto ahorra frente a comprar cada producto por separado.';
+
+export const ALSO_IN_RITUAL_HINT =
+  'Este producto también viene en un Ritual con precio especial. Después de responder lo que preguntó, menciónale una sola vez el Ritual, su precio y el ahorro; no insistas.';
+
 export interface BotProductItem {
+  type: 'producto' | 'ritual';
   name: string;
   category: string;
   tagline: string | null;
@@ -57,6 +84,9 @@ export interface BotProductItem {
   usageFrequency: string | null;
   precautions: string[];
   recommendedForTreatments: string[];
+  ritual: BotRitualInfo | null;
+  alsoInRituals: BotRitualOffer[];
+  hint: string | null;
 }
 
 export type BotProductsResult =
@@ -104,6 +134,7 @@ function haystackOf(product: CatalogProductRecord): string {
         variant.brand,
         variant.presentation,
       ]),
+      ...product.comboItems.map(({ variant }) => variant.product.name),
     ]
       .filter((value): value is string => Boolean(value))
       .join(' '),
@@ -114,9 +145,67 @@ function sellable(product: CatalogProductRecord): boolean {
   return product.variants.length > 0;
 }
 
-function toItem(product: CatalogProductRecord): BotProductItem {
-  const prices = product.variants.map((variant) => Number(variant.price));
+function pricingOf(ritual: CatalogProductRecord) {
+  return computeRitualPricing(
+    Math.min(...ritual.variants.map((variant) => Number(variant.price))),
+    ritual.comboItems.map(({ quantity, variant }) => ({
+      quantity,
+      unitPrice: Number(variant.price),
+    })),
+  );
+}
+
+function ritualInfo(product: CatalogProductRecord): BotRitualInfo | null {
+  if (product.kind !== 'COMBO') return null;
+  const pricing = pricingOf(product);
   return {
+    separatePrice: pricing.separatePricePesos,
+    savings: pricing.savingsPesos,
+    savingsPercent: pricing.savingsPercent,
+    includes: product.comboItems.map(({ quantity, variant }) => ({
+      name: variant.product.name,
+      presentation: variant.presentation,
+      quantity,
+      unitPrice: Number(variant.price),
+    })),
+  };
+}
+
+function ritualsIncluding(
+  product: CatalogProductRecord,
+  catalog: CatalogProductRecord[],
+): BotRitualOffer[] {
+  if (product.kind === 'COMBO') return [];
+  return catalog
+    .filter(
+      (other) =>
+        other.kind === 'COMBO' &&
+        sellable(other) &&
+        other.comboItems.some(
+          ({ variant }) => variant.product.id === product.id,
+        ),
+    )
+    .map((ritual) => {
+      const pricing = pricingOf(ritual);
+      return {
+        name: ritual.name,
+        price: pricing.pricePesos,
+        savings: pricing.savingsPesos,
+        savingsPercent: pricing.savingsPercent,
+      };
+    })
+    .filter((offer) => offer.savings > 0);
+}
+
+function toItem(
+  product: CatalogProductRecord,
+  catalog: CatalogProductRecord[],
+): BotProductItem {
+  const prices = product.variants.map((variant) => Number(variant.price));
+  const ritual = ritualInfo(product);
+  const alsoInRituals = ritualsIncluding(product, catalog);
+  return {
+    type: ritual ? 'ritual' : 'producto',
     name: product.name,
     category: product.category.name,
     tagline: product.tagline,
@@ -138,6 +227,13 @@ function toItem(product: CatalogProductRecord): BotProductItem {
     usageFrequency: product.usageFrequency,
     precautions: product.precautions.slice(0, LIST_ITEMS),
     recommendedForTreatments: treatmentNames(product),
+    ritual,
+    alsoInRituals,
+    hint: ritual
+      ? RITUAL_ITEM_HINT
+      : alsoInRituals.length > 0
+        ? ALSO_IN_RITUAL_HINT
+        : null,
   };
 }
 
@@ -173,7 +269,9 @@ export function toBotProducts(
   if (ranked.length === 0) {
     return { status: 'not_found', availabilityNote: PRODUCT_AVAILABILITY_NOTE };
   }
-  const products = ranked.slice(0, BOT_PRODUCTS_LIMIT).map(toItem);
+  const products = ranked
+    .slice(0, BOT_PRODUCTS_LIMIT)
+    .map((product) => toItem(product, available));
   return {
     status: 'found',
     total: ranked.length,

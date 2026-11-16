@@ -178,6 +178,47 @@ describe('Rituales de productos: armado en el admin y vista pública', () => {
     ]);
   });
 
+  it('el bot ofrece el Ritual al preguntar por un producto incluido y explica qué trae', async () => {
+    const ask = (query: string) =>
+      request(server)
+        .get(`${API}/conduit/products`)
+        .query({ query })
+        .set('X-API-Key', process.env.CONDUIT_TOOL_API_KEY as string);
+
+    const shampoo = await ask('shampoo hair therapy');
+    expect(shampoo.status).toBe(200);
+    const products = (
+      shampoo.body as {
+        products: {
+          name: string;
+          alsoInRituals: { name: string; savingsPercent: number }[];
+          hint: string | null;
+        }[];
+      }
+    ).products;
+    const single = products.find((p) => p.name === 'shampoo Hair Therapy');
+    expect(single?.alsoInRituals).toEqual([
+      expect.objectContaining({
+        name: 'Ritual Hair Therapy Amazônica',
+        savingsPercent: 14,
+      }),
+    ]);
+    expect(single?.hint).toContain('Ritual');
+
+    const ritual = await ask('ritual');
+    const [first] = (
+      ritual.body as {
+        products: {
+          type: string;
+          ritual: { separatePrice: number; includes: unknown[] } | null;
+        }[];
+      }
+    ).products;
+    expect(first.type).toBe('ritual');
+    expect(first.ritual?.separatePrice).toBe(250000);
+    expect(first.ritual?.includes).toHaveLength(3);
+  });
+
   it('el admin filtra por Rituales y cada producto incluido sabe en qué Ritual está', async () => {
     const rituals = await asAdmin('get', '/products/admin?kind=COMBO');
     expect((rituals.body as AdminProduct[]).map((p) => p.id)).toEqual([
