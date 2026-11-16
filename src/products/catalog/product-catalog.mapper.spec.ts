@@ -35,6 +35,7 @@ function product(
     productCategoryId: CATEGORIES[category].id,
     name,
     slug: id,
+    kind: 'SINGLE',
     description: null,
     isActive: true,
     createdAt: NOW,

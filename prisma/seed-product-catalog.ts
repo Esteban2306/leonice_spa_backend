@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import Redis from 'ioredis';
 import { CATALOG_CACHE_KEYS } from '../src/catalog/constants/catalog-cache.constants';
 import { slugify } from '../src/catalog/common/slugify';
+import { COMBO_CATEGORY_SLUG } from '../src/products/constants/product-combo.constants';
 import { CATALOG_ROWS, CatalogRow } from './seed-data/product-catalog-rows';
 import {
   LINES,
@@ -356,7 +357,7 @@ async function seed(prisma: PrismaClient) {
   }
 
   const stale = await prisma.product.findMany({
-    where: { slug: { notIn: [...slugs] } },
+    where: { slug: { notIn: [...slugs] }, kind: 'SINGLE' },
     select: { id: true },
   });
   const staleIds = stale.map((product) => product.id);
@@ -375,7 +376,10 @@ async function seed(prisma: PrismaClient) {
     }),
     prisma.product.deleteMany({ where: { id: { in: staleIds } } }),
     prisma.productCategory.deleteMany({
-      where: { name: { notIn: BRANDS.map((brand) => brand.name) } },
+      where: {
+        name: { notIn: BRANDS.map((brand) => brand.name) },
+        slug: { not: COMBO_CATEGORY_SLUG },
+      },
     }),
   ]);
   console.log(
