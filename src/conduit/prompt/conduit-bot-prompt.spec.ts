@@ -219,7 +219,8 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).not.toMatch(/\+57|\d{7,}/);
     expect(section).toContain('otro tema que no sea una cita');
     expect(section).toContain('pasar_a_persona solo por queja');
-    expect(section).toContain('No hables en nombre de Leo');
+    expect(section).toContain('No hables por Leo');
+    expect(section).toContain('responde las dos cosas');
   });
 
   it('con una clienta registrada nunca pide datos, ni al confirmar', () => {
