@@ -91,7 +91,7 @@ La caché de productos y tratamientos expira sola en 5 minutos.
 - Entrar a `https://admin.leonicespa.com/admin` con el administrador del seed y hacer una acción que modifique datos (por ejemplo, editar una nota): confirma que la cookie `csrf_token` aparece en el dominio `.leonicespa.com` y que no hay errores `CSRF_INVALID`.
 - Desde `https://leonicespa.com` y `https://www.leonicespa.com` el catálogo carga sin errores de CORS.
 - Catálogo público con productos e imágenes; reservar una cita de prueba, cancelarla desde el enlace y borrarla.
-- Registrar en Conduit el webhook `https://api.leonicespa.com/api/v1/integrations/conduit/message-events`.
+- Registrar en Conduit el webhook `https://api.leonicespa.com/api/v1/integrations/conduit/message-events` con los eventos `message.sent`, `message.failed`, `message.dead` y `ops.alert`. Los avisos `ops.alert` (WhatsApp desconectado, respuestas sin entregar, capacidad) quedan en el log de error de Leonice; para recibirlos por correo, configurar `OPS_ALERT_EMAILS` en Conduit. Los eventos `verification.*` van a su propio endpoint (`/integrations/conduit/verification-events`); si llegan a `message-events` se responden con 200 y se ignoran.
 - En la consola de Google: orígenes `https://admin.leonicespa.com` y `https://leonicespa.com`, y la URI de redirección anterior.
 
 ## 5. Promociones y campañas

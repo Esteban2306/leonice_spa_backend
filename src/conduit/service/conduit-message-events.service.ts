@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConduitMessageDeliveryLogRepository } from '../repositories/conduit-message-delivery-log.repository';
 import { ConduitMessageEventDto } from '../dto/conduit-message-event.dto';
+import { ConduitOpsAlertEventDto } from '../dto/conduit-ops-alert-event.dto';
 import { ConduitMessageStatus } from '@prisma/client';
 
 @Injectable()
@@ -26,5 +27,12 @@ export class ConduitMessageEventsService {
         `Mensaje ${dto.data.messageId} a ${dto.data.recipient} marcado DEAD por Conduit: ${dto.data.error ?? 'sin detalle'}`,
       );
     }
+  }
+
+  opsAlert(dto: ConduitOpsAlertEventDto): void {
+    const { kind, subject, lines } = dto.data;
+    this.logger.error(
+      `Aviso de Conduit (${kind}) ${subject}: ${lines.join(' | ') || 'sin detalle'}`,
+    );
   }
 }
