@@ -221,6 +221,12 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).not.toMatch(/\+57|\d{7,}/);
   });
 
+  it('una compra pedida se avisa al equipo enseguida, sin pedir confirmación', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
+      /solicitar_compra_producto enseguida, sin pedir confirmación/,
+    );
+  });
+
   it('una queja va a una persona en el mismo turno y lo que no existe se reemplaza por opciones reales', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toMatch(

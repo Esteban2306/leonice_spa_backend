@@ -742,6 +742,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     denyPatterns: [`\\b(?:${TOPICS_DENY}|y|pero)\\b`],
     maxTokens: 12,
     negationOk: true,
+    lockedMode: 'ACTIVE',
     config: {
       tool: 'pasar_a_persona',
       reason: 'La clienta pidió hablar con una persona',

@@ -127,12 +127,15 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(greeters).not.toContain('courtesy');
   });
 
-  it('las quejas y el aviso de Leo quedan activos siempre, sin depender de la IA', () => {
+  it('las quejas, pedir una persona y el aviso de Leo quedan activos siempre, sin depender de la IA', () => {
     const complaint = CONDUIT_INTENT_CATALOG.find(
       (i) => i.key === 'complaint',
     )!;
     const leo = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'leo_notice')!;
     expect(complaint.lockedMode).toBe('ACTIVE');
+    expect(
+      CONDUIT_INTENT_CATALOG.find((i) => i.key === 'human_request')!.lockedMode,
+    ).toBe('ACTIVE');
     expect(complaint.handler).toBe('HANDOFF');
     expect(leo.lockedMode).toBe('ACTIVE');
     expect(leo.config?.notice).toBe(true);

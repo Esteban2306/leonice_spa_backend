@@ -30,7 +30,7 @@ type Mode = (typeof MODES)[number];
  *   definido explícitamente.
  * - Las marcadas `lockedMode` quedan siempre en ese modo al crearse o
  *   actualizarse: medios de pago (texto genérico pendiente) en SOMBRA; las
- *   quejas y el aviso de Leo en ACTIVO, porque deben actuar sin depender de
+ *   quejas, pedir una persona y el aviso de Leo en ACTIVO, porque deben actuar sin depender de
  *   que la IA lo decida.
  */
 export async function seedConduitIntents(
