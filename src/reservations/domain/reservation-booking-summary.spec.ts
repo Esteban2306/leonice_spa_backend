@@ -17,7 +17,7 @@ describe('buildBookingSummary', () => {
   it('un tratamiento CON ajuste incluye el motivo', () => {
     const summary = buildBookingSummary([
       {
-        treatmentName: 'Uñas',
+        treatmentName: 'Alisado',
         scheduledStart: new Date('2026-01-01T11:00'),
         scheduledEnd: new Date('2026-01-01T12:00'),
         wasAdjusted: true,

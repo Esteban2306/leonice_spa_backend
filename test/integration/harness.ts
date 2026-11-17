@@ -56,6 +56,7 @@ export const fakeQueues = {
   timeouts: new FakeQueue(QUEUE_NAMES.RESERVATION_TIMEOUTS),
   communications: new FakeQueue(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS),
   outbox: new FakeQueue(QUEUE_NAMES.CONDUIT_OUTBOX),
+  siigo: new FakeQueue(QUEUE_NAMES.SIIGO_SYNC),
 };
 
 export class MemoryCache {
@@ -108,6 +109,10 @@ export class MemoryCache {
       provide: getQueueToken(QUEUE_NAMES.CONDUIT_OUTBOX),
       useValue: fakeQueues.outbox,
     },
+    {
+      provide: getQueueToken(QUEUE_NAMES.SIIGO_SYNC),
+      useValue: fakeQueues.siigo,
+    },
   ],
   exports: [
     SafeCacheService,
@@ -115,6 +120,7 @@ export class MemoryCache {
     getQueueToken(QUEUE_NAMES.RESERVATION_TIMEOUTS),
     getQueueToken(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS),
     getQueueToken(QUEUE_NAMES.CONDUIT_OUTBOX),
+    getQueueToken(QUEUE_NAMES.SIIGO_SYNC),
   ],
 })
 class FakeQueuesModule {}

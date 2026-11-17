@@ -2,6 +2,7 @@ import {
   formatCop,
   formatDurationRange,
   formatPriceRange,
+  prioritizePromoted,
   toBotTreatment,
   toBotTreatmentListItem,
 } from './bot-treatment-view';
@@ -227,5 +228,29 @@ describe('toBotTreatmentListItem', () => {
     expect(JSON.stringify(item).length).toBeLessThan(
       JSON.stringify(full).length,
     );
+  });
+});
+
+describe('prioritizePromoted', () => {
+  it('pone primero los servicios con promoción y conserva el orden dentro de cada grupo', () => {
+    const items = [
+      { id: 'a' },
+      { id: 'b', promotion: { name: 'Semana' } },
+      { id: 'c' },
+      { id: 'd', promotion: { name: 'Otoño' } },
+    ];
+    expect(prioritizePromoted(items).map((i) => i.id)).toEqual([
+      'b',
+      'd',
+      'a',
+      'c',
+    ]);
+  });
+
+  it('no altera la lista original ni falla sin promociones', () => {
+    const items = [{ id: 'a' }, { id: 'b' }];
+    expect(prioritizePromoted(items).map((i) => i.id)).toEqual(['a', 'b']);
+    expect(prioritizePromoted([])).toEqual([]);
+    expect(items.map((i) => i.id)).toEqual(['a', 'b']);
   });
 });

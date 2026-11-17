@@ -191,6 +191,15 @@ export function toBotTreatmentListItem(
   return full as Omit<ReturnType<typeof toBotTreatment>, 'tagline'>;
 }
 
+const hasPromotion = (item: object): boolean =>
+  'promotion' in item && Boolean(item.promotion);
+
+export function prioritizePromoted<T extends object>(items: readonly T[]): T[] {
+  return [...items].sort(
+    (a, b) => Number(hasPromotion(b)) - Number(hasPromotion(a)),
+  );
+}
+
 const PRICE_RANGE_NOTE =
   'El precio final se confirma después del diagnóstico en el spa.';
 const ASSESSMENT_NOTE = 'Antes de agendar se hace una valoración.';

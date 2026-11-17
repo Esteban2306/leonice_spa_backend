@@ -1,5 +1,10 @@
 import type { CatalogProductRecord } from '../../products/catalog/product-catalog.repository';
-import { BOT_PRODUCTS_LIMIT, toBotProducts } from './bot-product-view';
+import {
+  ALSO_IN_RITUAL_HINT,
+  BOT_PRODUCTS_LIMIT,
+  RITUAL_ITEM_HINT,
+  toBotProducts,
+} from './bot-product-view';
 
 const variant = (presentation: string, price: number) => ({
   id: `v-${presentation}`,
@@ -16,6 +21,8 @@ const variant = (presentation: string, price: number) => ({
 const record = (over: Record<string, unknown> = {}): CatalogProductRecord =>
   ({
     id: 'p1',
+    kind: 'SINGLE',
+    comboItems: [],
     slug: 'shampoo-hidratante',
     name: 'Shampoo hidratante',
     tagline: 'Para cabello seco',
@@ -103,5 +110,122 @@ describe('toBotProducts', () => {
 
   it('una consulta solo de relleno no devuelve productos al azar', () => {
     expect(toBotProducts([record()], 'que hay').status).toBe('not_found');
+  });
+
+  describe('Rituales', () => {
+    const shampoo = record();
+    const mascarilla = record({
+      id: 'p2',
+      slug: 'mascarilla',
+      name: 'Mascarilla hidratante',
+      variants: [variant('300 ml', 60000)],
+      recommendations: [],
+    });
+    const item = (product: CatalogProductRecord, quantity = 1) => ({
+      quantity,
+      variant: {
+        ...product.variants[0],
+        product: {
+          id: product.id,
+          slug: product.slug,
+          name: product.name,
+          isActive: true,
+          category: { isActive: true },
+        },
+      },
+    });
+    const ritual = record({
+      id: 'r1',
+      kind: 'COMBO',
+      slug: 'ritual-hidratante',
+      name: 'Ritual hidratante',
+      tagline: 'Rutina completa para cabello seco',
+      category: { id: 'c2', slug: 'combos', name: 'Combos' },
+      variants: [variant('Ritual de 2 productos', 85000)],
+      comboItems: [item(shampoo), item(mascarilla)],
+      recommendations: [],
+    });
+
+    it('describe el Ritual con lo que incluye y el ahorro', () => {
+      const result = toBotProducts([ritual, shampoo, mascarilla], 'ritual');
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products[0]).toMatchObject({
+        type: 'ritual',
+        name: 'Ritual hidratante',
+        priceFrom: 85000,
+        ritual: {
+          separatePrice: 100000,
+          savings: 15000,
+          savingsPercent: 15,
+          includes: [
+            {
+              name: 'Shampoo hidratante',
+              presentation: '250 ml',
+              quantity: 1,
+              unitPrice: 40000,
+            },
+            {
+              name: 'Mascarilla hidratante',
+              presentation: '300 ml',
+              quantity: 1,
+              unitPrice: 60000,
+            },
+          ],
+        },
+        hint: RITUAL_ITEM_HINT,
+      });
+    });
+
+    it('al preguntar por un producto incluido ofrece el Ritual una vez', () => {
+      const result = toBotProducts([ritual, shampoo, mascarilla], 'shampoo');
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products[0]).toMatchObject({
+        type: 'producto',
+        name: 'Shampoo hidratante',
+        alsoInRituals: [
+          {
+            name: 'Ritual hidratante',
+            price: 85000,
+            savings: 15000,
+            savingsPercent: 15,
+          },
+        ],
+        hint: ALSO_IN_RITUAL_HINT,
+      });
+    });
+
+    it('encuentra el Ritual por el nombre de sus productos', () => {
+      const result = toBotProducts([ritual, mascarilla], 'mascarilla');
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products.map((product) => product.name)).toEqual([
+        'Mascarilla hidratante',
+        'Ritual hidratante',
+      ]);
+    });
+
+    it('no ofrece un Ritual que no ahorra nada', () => {
+      const expensive = record({
+        ...ritual,
+        variants: [variant('Ritual de 2 productos', 100000)],
+      });
+      const result = toBotProducts([expensive, shampoo], 'shampoo');
+      if (result.status !== 'found') throw new Error('sin resultados');
+      const found = result.products.find(
+        (product) => product.name === 'Shampoo hidratante',
+      );
+      expect(found?.alsoInRituals).toEqual([]);
+      expect(found?.hint).toBeNull();
+    });
+
+    it('un producto sin Ritual no trae pista', () => {
+      const result = toBotProducts([shampoo], 'shampoo');
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products[0]).toMatchObject({
+        type: 'producto',
+        ritual: null,
+        alsoInRituals: [],
+        hint: null,
+      });
+    });
   });
 });

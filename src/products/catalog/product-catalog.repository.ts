@@ -25,6 +25,31 @@ const catalogProductArgs = {
       include: { tag: { select: { id: true, name: true, slug: true } } },
       orderBy: { tag: { name: 'asc' } },
     },
+    comboItems: {
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        quantity: true,
+        variant: {
+          select: {
+            id: true,
+            brand: true,
+            presentation: true,
+            price: true,
+            isActive: true,
+            imageUrl: true,
+            product: {
+              select: {
+                id: true,
+                slug: true,
+                name: true,
+                isActive: true,
+                category: { select: { isActive: true } },
+              },
+            },
+          },
+        },
+      },
+    },
     recommendations: {
       where: {
         treatment: {

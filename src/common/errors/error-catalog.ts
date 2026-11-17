@@ -384,6 +384,39 @@ const PRODUCT = {
     status: HttpStatus.NOT_FOUND,
     message: 'El servicio indicado no existe.',
   },
+  PRODUCT_RITUAL_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Ritual no encontrado.',
+  },
+  PRODUCT_RITUAL_INVALID_ITEMS: {
+    status: HttpStatus.BAD_REQUEST,
+    message:
+      'Un Ritual debe incluir entre 2 y 10 presentaciones distintas, cada una con cantidad de 1 a 10.',
+  },
+  PRODUCT_RITUAL_ITEM_UNAVAILABLE: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Alguna presentación elegida no existe, está inactiva o pertenece a otro Ritual.',
+  },
+  PRODUCT_RITUAL_CATEGORY: {
+    status: HttpStatus.BAD_REQUEST,
+    message:
+      'Los Rituales van solo en la categoría Combos y los productos normales no pueden ir en ella.',
+  },
+  PRODUCT_RITUAL_VARIANT_LOCKED: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Un Ritual tiene un único precio. Edítalo en lugar de agregar o borrar presentaciones.',
+  },
+  PRODUCT_COMBO_CATEGORY_MISSING: {
+    status: HttpStatus.CONFLICT,
+    message: 'No existe la categoría Combos. Créala con el nombre "Combos".',
+  },
+  PRODUCT_IN_RITUAL: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Este producto está incluido en un Ritual. Quítalo del Ritual o desactívalo en lugar de borrarlo.',
+  },
   PRODUCT_IMAGE_UPLOAD_FAILED: {
     status: HttpStatus.BAD_GATEWAY,
     message: 'No pudimos subir la imagen. Intenta de nuevo en unos minutos.',

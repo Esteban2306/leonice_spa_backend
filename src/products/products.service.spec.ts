@@ -14,6 +14,13 @@ interface VariantRow {
   imagePublicId: string | null;
 }
 
+const adminRecord = (id: string, kind: 'SINGLE' | 'COMBO') => ({
+  id,
+  kind,
+  variants: [],
+  comboItems: [],
+});
+
 const buildFixture = (
   overrides: Partial<Record<keyof ProductsRepository, unknown>> = {},
 ) => {
@@ -23,15 +30,53 @@ const buildFixture = (
 
   const repository = {
     findProductBasic: (id: string) =>
-      Promise.resolve(id === 'p1' ? { id: 'p1', isActive: true } : null),
+      Promise.resolve(
+        id === 'p1'
+          ? { id: 'p1', isActive: true, kind: 'SINGLE' }
+          : id === 'r1'
+            ? { id: 'r1', isActive: true, kind: 'COMBO' }
+            : null,
+      ),
     findCategoryById: (id: string) =>
-      Promise.resolve(id === 'cat1' ? { id: 'cat1' } : null),
+      Promise.resolve(
+        id === 'cat1'
+          ? { id: 'cat1', slug: 'mais' }
+          : id === 'combos'
+            ? { id: 'combos', slug: 'combos' }
+            : null,
+      ),
+    findCategoryBySlug: (slug: string) =>
+      Promise.resolve(slug === 'combos' ? { id: 'combos', slug } : null),
+    findRitualsIncluding: () => Promise.resolve([]),
+    findVariantsForRitual: (ids: string[]) =>
+      Promise.resolve(
+        ids
+          .filter((id) => id.startsWith('v'))
+          .map((id) => ({
+            id,
+            brand: 'Amazônica',
+            isActive: true,
+            product: { id: `p-${id}`, kind: 'SINGLE', isActive: true },
+          })),
+      ),
+    createRitual: (data: unknown, variant: unknown, items: unknown) => {
+      calls.push(`createRitual:${JSON.stringify({ data, variant, items })}`);
+      return Promise.resolve(adminRecord('r1', 'COMBO'));
+    },
+    replaceRitualItems: (_id: string, items: unknown, labels: unknown) => {
+      calls.push(`replaceRitualItems:${JSON.stringify({ items, labels })}`);
+      return Promise.resolve(adminRecord('r1', 'COMBO'));
+    },
+    updateProduct: () => {
+      calls.push('updateProduct');
+      return Promise.resolve(adminRecord('p1', 'SINGLE'));
+    },
     countTagsByIds: (ids: string[]) =>
       Promise.resolve(ids.filter((id) => id.startsWith('tag')).length),
     findTreatmentIdsRecommending: () => Promise.resolve(['t1']),
     createProduct: () => {
       calls.push('createProduct');
-      return Promise.resolve({ id: 'p1' });
+      return Promise.resolve(adminRecord('p1', 'SINGLE'));
     },
     countProductHistory: () =>
       Promise.resolve({ _count: { viewLogs: 0, recommendations: 0 } }),
@@ -324,5 +369,188 @@ describe('ProductsService', () => {
     const { service } = buildFixture();
 
     await expectCode(service.findOnePublic('p1'), 'PRODUCT_NOT_FOUND');
+  });
+
+  describe('rituales', () => {
+    const items = [
+      { variantId: 'v-shampoo', quantity: 1 },
+      { variantId: 'v-mascarilla', quantity: 2 },
+    ];
+    const ritualDto = {
+      name: 'Ritual Hair Therapy Amazônica',
+      price: 215000,
+      items,
+    };
+
+    it('crea el Ritual en Combos con precio fijo y etiquetas derivadas', async () => {
+      const fixture = buildFixture({ isProductSlugTaken: () => false });
+      await fixture.service.createRitual(ritualDto);
+      const call = fixture.calls.find((c) => c.startsWith('createRitual:'));
+      const payload = JSON.parse(call!.slice('createRitual:'.length)) as {
+        data: { productCategoryId: string; slug: string };
+        variant: { brand: string; presentation: string; price: number };
+        items: unknown[];
+      };
+      expect(payload.data.productCategoryId).toBe('combos');
+      expect(payload.data.slug).toBe('ritual-hair-therapy-amazonica');
+      expect(payload.variant).toEqual({
+        brand: 'Amazônica',
+        presentation: 'Ritual de 3 productos',
+        price: 215000,
+      });
+      expect(payload.items).toEqual(items);
+    });
+
+    it('rechaza presentaciones repetidas', async () => {
+      const fixture = buildFixture();
+      await expectCode(
+        fixture.service.createRitual({
+          ...ritualDto,
+          items: [items[0], items[0]],
+        }),
+        'PRODUCT_RITUAL_INVALID_ITEMS',
+      );
+    });
+
+    it('rechaza presentaciones inexistentes, inactivas o de otro Ritual', async () => {
+      const inactive = buildFixture({
+        findVariantsForRitual: (ids: string[]) =>
+          Promise.resolve(
+            ids.map((id) => ({
+              id,
+              brand: 'MAIS',
+              isActive: id !== 'v-mascarilla',
+              product: { id: 'p', kind: 'SINGLE', isActive: true },
+            })),
+          ),
+      });
+      await expectCode(
+        inactive.service.createRitual(ritualDto),
+        'PRODUCT_RITUAL_ITEM_UNAVAILABLE',
+      );
+
+      const nested = buildFixture({
+        findVariantsForRitual: (ids: string[]) =>
+          Promise.resolve(
+            ids.map((id) => ({
+              id,
+              brand: 'MAIS',
+              isActive: true,
+              product: { id: 'p', kind: 'COMBO', isActive: true },
+            })),
+          ),
+      });
+      await expectCode(
+        nested.service.createRitual(ritualDto),
+        'PRODUCT_RITUAL_ITEM_UNAVAILABLE',
+      );
+
+      const missing = buildFixture();
+      await expectCode(
+        missing.service.createRitual({
+          ...ritualDto,
+          items: [items[0], { variantId: 'x-ghost', quantity: 1 }],
+        }),
+        'PRODUCT_RITUAL_ITEM_UNAVAILABLE',
+      );
+    });
+
+    it('falla con un mensaje claro si no existe la categoría Combos', async () => {
+      const fixture = buildFixture({
+        findCategoryBySlug: () => Promise.resolve(null),
+      });
+      await expectCode(
+        fixture.service.createRitual(ritualDto),
+        'PRODUCT_COMBO_CATEGORY_MISSING',
+      );
+    });
+
+    it('reemplaza lo incluido solo en productos que son Ritual', async () => {
+      const fixture = buildFixture();
+      await fixture.service.replaceRitualItems('r1', items);
+      expect(
+        fixture.calls.some((c) => c.startsWith('replaceRitualItems:')),
+      ).toBe(true);
+      await expectCode(
+        fixture.service.replaceRitualItems('p1', items),
+        'PRODUCT_RITUAL_NOT_FOUND',
+      );
+    });
+
+    it('no deja crear productos normales en Combos ni mover un Ritual fuera', async () => {
+      const fixture = buildFixture();
+      await expectCode(
+        fixture.service.create({
+          productCategoryId: 'combos',
+          name: 'Shampoo',
+        }),
+        'PRODUCT_RITUAL_CATEGORY',
+      );
+      await expectCode(
+        fixture.service.update('r1', { productCategoryId: 'cat1' }),
+        'PRODUCT_RITUAL_CATEGORY',
+      );
+      await expectCode(
+        fixture.service.update('p1', { productCategoryId: 'combos' }),
+        'PRODUCT_RITUAL_CATEGORY',
+      );
+    });
+
+    it('un Ritual no admite agregar ni borrar presentaciones', async () => {
+      const fixture = buildFixture({
+        findVariantById: () =>
+          Promise.resolve({
+            id: 'rv',
+            productId: 'r1',
+            brand: 'Amazônica',
+            presentation: 'Ritual de 3 productos',
+            imageUrl: null,
+            imagePublicId: null,
+          }),
+      });
+      await expectCode(
+        fixture.service.addVariant('r1', {
+          brand: 'X',
+          presentation: 'Y',
+          price: 1,
+        }),
+        'PRODUCT_RITUAL_VARIANT_LOCKED',
+      );
+      await expectCode(
+        fixture.service.removeVariant('rv'),
+        'PRODUCT_RITUAL_VARIANT_LOCKED',
+      );
+    });
+
+    it('bloquea borrar un producto o presentación incluidos, nombrando el Ritual', async () => {
+      const fixture = buildFixture({
+        findRitualsIncluding: () =>
+          Promise.resolve([{ id: 'r1', name: 'Ritual Hair Therapy' }]),
+      });
+      await expectCode(fixture.service.remove('p1'), 'PRODUCT_IN_RITUAL');
+      await fixture.service.removeVariant('v1').catch((error: AppException) => {
+        expect(error.code).toBe('PRODUCT_IN_RITUAL');
+        expect(error.message).toContain('Ritual Hair Therapy');
+      });
+      expect(fixture.calls).not.toContain('deleteProduct');
+      expect(fixture.calls).not.toContain('deleteVariant');
+    });
+
+    it('al cambiar un producto limpia también la caché de los servicios que recomiendan sus Rituales', async () => {
+      const recommendedFor: string[][] = [];
+      const fixture = buildFixture({
+        findRitualsIncluding: () =>
+          Promise.resolve([{ id: 'r1', name: 'Ritual' }]),
+        findTreatmentIdsRecommending: (ids: string[]) => {
+          recommendedFor.push(ids);
+          return Promise.resolve(['t-ritual']);
+        },
+      });
+      await fixture.service.update('p1', { name: 'Shampoo nuevo' });
+      expect(recommendedFor).toEqual([['p1', 'r1']]);
+      expect(
+        fixture.deletedCacheKeys.some((key) => key.includes('t-ritual')),
+      ).toBe(true);
+    });
   });
 });

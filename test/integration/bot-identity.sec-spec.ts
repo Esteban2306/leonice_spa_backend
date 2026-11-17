@@ -291,7 +291,10 @@ describe('Aislamiento de identidad del bot: nunca datos de otra persona', () => 
         '/deposits/automatic',
         (p: Person) => ({ reservationId: p.reservationId }),
       ],
-      ['/reservations/:id/deposits/automatic', () => ({})],
+      [
+        '/reservations/:id/deposits/automatic',
+        () => ({ coverage: 'ANTICIPO' }),
+      ],
     ])(
       'subir un comprobante a la reserva de Bruno por %s se rechaza antes de tocar Cloudinary',
       async (path, extra) => {
@@ -305,7 +308,6 @@ describe('Aislamiento de identidad del bot: nunca datos de otra persona', () => 
           asAlice(),
         ).send({
           phone: bruno.phone,
-          coverage: 'ANTICIPO',
           imageBase64: IMAGE,
           ...extra(bruno),
         });

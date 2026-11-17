@@ -12,6 +12,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -34,6 +35,8 @@ import { LogProductViewDto } from './dto/log-product-view.dto';
 import { CreateProductTagDto } from './dto/create-product-tag.dto';
 import { UpdateProductTagDto } from './dto/update-product-tag.dto';
 import { FindRecommendedForClientQueryDto } from './dto/find-recommended-for-client-query.dto';
+import { CreateRitualDto } from './dto/create-ritual.dto';
+import { ReplaceRitualItemsDto } from './dto/ritual-item.dto';
 
 const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -179,6 +182,19 @@ export class ProductsController {
   @Delete('variants/:variantId/image')
   removeVariantImage(@Param('variantId', ParseUUIDPipe) variantId: string) {
     return this.service.removeVariantImage(variantId);
+  }
+
+  @Post('rituals')
+  createRitual(@Body() dto: CreateRitualDto) {
+    return this.service.createRitual(dto);
+  }
+
+  @Put('rituals/:id/items')
+  replaceRitualItems(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReplaceRitualItemsDto,
+  ) {
+    return this.service.replaceRitualItems(id, dto.items);
   }
 
   @Public()

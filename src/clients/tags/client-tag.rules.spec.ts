@@ -77,19 +77,25 @@ describe('deriveClientTags', () => {
   it('detecta la categoría y el servicio que más repite', () => {
     const tags = deriveClientTags(
       client([
-        visit(10, { categoryName: 'Uñas', treatmentName: 'Semipermanente' }),
-        visit(40, { categoryName: 'Uñas', treatmentName: 'Semipermanente' }),
+        visit(10, {
+          categoryName: 'Spa Coreano',
+          treatmentName: 'Ritual de cuero cabelludo',
+        }),
+        visit(40, {
+          categoryName: 'Spa Coreano',
+          treatmentName: 'Ritual de cuero cabelludo',
+        }),
         visit(80, { categoryName: 'Spa Capilar', treatmentName: 'Alisado' }),
       ]),
       NOW,
     );
     expect(tags).toContainEqual({
       key: ClientTagKey.FRECUENTA,
-      detail: 'Uñas',
+      detail: 'Spa Coreano',
     });
     expect(tags).toContainEqual({
       key: ClientTagKey.REPITE_SERVICIO,
-      detail: 'Semipermanente',
+      detail: 'Ritual de cuero cabelludo',
     });
     expect(
       tags.filter((tag) => tag.key === ClientTagKey.FRECUENTA),

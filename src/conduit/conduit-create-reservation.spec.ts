@@ -5,7 +5,7 @@ import { ConduitBookingToolsController } from './conduit-booking-tools.controlle
 const ID_A = '11111111-1111-4111-8111-111111111111';
 const ID_B = '22222222-2222-4222-8222-222222222222';
 const CATALOG = [
-  { id: ID_A, name: 'Uñas Acrílicas', slug: 'unas-acrilicas' },
+  { id: ID_A, name: 'Alisado Orgánico', slug: 'alisado-organico' },
   { id: ID_B, name: 'Terapia de hidratación', slug: 'terapia-hidratacion' },
   { id: 'x3', name: 'Terapia de nutrición', slug: 'terapia-nutricion' },
 ];
@@ -36,7 +36,7 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
   it('resuelve el nombre al id sin pedir que la IA consulte la lista', async () => {
     const { controller, execute } = build();
     await controller.create(
-      { ...base, treatmentNames: ['uñas acrílicas'] },
+      { ...base, treatmentNames: ['alisado orgánico'] },
       req,
     );
     expect(execute).toHaveBeenCalledWith(
@@ -53,7 +53,7 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
       {
         ...base,
         treatments: [ID_A],
-        treatmentNames: ['Uñas Acrílicas', 'hidratación'],
+        treatmentNames: ['Alisado Orgánico', 'hidratación'],
       },
       req,
     );

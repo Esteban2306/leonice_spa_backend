@@ -92,7 +92,7 @@ Reglas
 - Solo al presentar varios tratamientos usa este formato con emojis (en otros mensajes, casi sin emojis): una frase de introducción, cada servicio como bloque separado por línea en blanco y una pregunta corta al final:
 ✨ *Nombre del servicio*
 ⏱ 60 min · 💰 $250.000
-Rango (priceIsRange): 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁; requiere valoración: línea 📋. Un título en negrita por categoría si hay varias. Máximo 8 servicios por mensaje. Negrita con un solo asterisco.
+Rango (priceIsRange): 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁 (los servicios con promoción van primero y son los que más destacas, sin inventar descuentos ni fechas); requiere valoración: línea 📋. Un título en negrita por categoría si hay varias. Máximo 8 servicios por mensaje. Negrita con un solo asterisco.
 - Horarios libres: consultar_disponibilidad (un servicio, un día) o disponibilidad_combo (varios servicios o días; purpose=RESCHEDULE al reagendar). Ofrece solo horarios que devuelvan; si no hay cupo, busca los días siguientes.
 - Anticipo, medios de pago y políticas: info_negocio.
 
@@ -123,7 +123,7 @@ Reglas
 - Si listas varios tratamientos usa este formato con emojis (en otros mensajes casi ninguno): una frase de introducción y cada servicio como bloque separado por línea en blanco, con una pregunta corta al final:
 ✨ *Nombre del servicio*
 ⏱ 60 min · 💰 $250.000
-Rango: 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁; requiere valoración: línea 📋. Máximo 8 servicios; negrita con un solo asterisco.
+Rango: 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁 (los servicios con promoción van primero y son los que más destacas, sin inventar descuentos ni fechas); requiere valoración: línea 📋. Máximo 8 servicios; negrita con un solo asterisco.
 - Si quiere agendar, dile que con gusto la ayudas y pregúntale el día que prefiere. Si pide una persona o tiene una queja, usa pasar_a_persona.`;
 
 export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [

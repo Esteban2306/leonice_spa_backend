@@ -112,6 +112,26 @@ export class PromotionsService {
     return this.repository.update(id, { isActive: false });
   }
 
+  async remove(id: string) {
+    await this.findOne(id);
+    const { automationRules, openCampaigns } =
+      await this.repository.countBlockingReferences(id);
+    if (automationRules > 0 || openCampaigns > 0) {
+      const causes = [
+        automationRules > 0
+          ? `${automationRules} ${automationRules === 1 ? 'regla de automatización' : 'reglas de automatización'}`
+          : null,
+        openCampaigns > 0
+          ? `${openCampaigns} ${openCampaigns === 1 ? 'campaña en curso o pausada' : 'campañas en curso o pausadas'}`
+          : null,
+      ].filter(Boolean);
+      throw new ConflictException(
+        `No se puede eliminar: la usan ${causes.join(' y ')}. Quita esa relación primero o desactiva la promoción.`,
+      );
+    }
+    await this.repository.delete(id);
+  }
+
   private assertExactlyOneTarget(treatmentId?: string, categoryId?: string) {
     if (!treatmentId && !categoryId)
       throw new BadRequestException(

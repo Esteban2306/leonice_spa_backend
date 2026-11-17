@@ -30,11 +30,16 @@ import { fakeQueues, resetDatabase } from './harness';
       provide: getQueueToken(QUEUE_NAMES.CONDUIT_OUTBOX),
       useValue: fakeQueues.outbox,
     },
+    {
+      provide: getQueueToken(QUEUE_NAMES.SIIGO_SYNC),
+      useValue: fakeQueues.siigo,
+    },
   ],
   exports: [
     getQueueToken(QUEUE_NAMES.RESERVATION_TIMEOUTS),
     getQueueToken(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS),
     getQueueToken(QUEUE_NAMES.CONDUIT_OUTBOX),
+    getQueueToken(QUEUE_NAMES.SIIGO_SYNC),
   ],
 })
 class FakeQueueModule {}

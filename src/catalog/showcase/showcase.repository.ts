@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/infrastructure/database/prisma.service';
+import { PUBLIC_PRODUCT_WHERE } from 'src/products/constants/public-product.where';
 
 const showcaseTreeArgs = {
   where: { isActive: true, showOnWebsite: true },
@@ -12,7 +13,7 @@ const showcaseTreeArgs = {
       include: {
         steps: { orderBy: { position: 'asc' } },
         recommendations: {
-          where: { product: { isActive: true, category: { isActive: true } } },
+          where: { product: PUBLIC_PRODUCT_WHERE },
           orderBy: { createdAt: 'asc' },
           select: {
             product: {

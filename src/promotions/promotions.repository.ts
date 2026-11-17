@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { CampaignStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import {
   PromotionTarget,
@@ -120,6 +120,23 @@ export class PromotionsRepository {
 
   create(data: CreatePromotionData) {
     return this.prisma.client.promotion.create({ data });
+  }
+
+  async countBlockingReferences(id: string) {
+    const [automationRules, openCampaigns] = await Promise.all([
+      this.prisma.client.automationRule.count({ where: { promotionId: id } }),
+      this.prisma.client.campaign.count({
+        where: {
+          promotionId: id,
+          status: { in: [CampaignStatus.RUNNING, CampaignStatus.PAUSED] },
+        },
+      }),
+    ]);
+    return { automationRules, openCampaigns };
+  }
+
+  delete(id: string) {
+    return this.prisma.client.promotion.delete({ where: { id } });
   }
 
   update(id: string, data: Prisma.PromotionUpdateInput) {

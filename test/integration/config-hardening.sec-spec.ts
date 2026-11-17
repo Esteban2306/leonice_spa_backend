@@ -9,6 +9,7 @@ const base = (): Record<string, unknown> => ({
   JWT_SECRET: 'a'.repeat(64),
   JWT_REFRESH_SECRET: 'b'.repeat(64),
   CORS_ORIGIN: 'https://leonicespa.com,https://www.leonicespa.com',
+  COOKIE_DOMAIN: '.leonicespa.com',
   CONDUIT_BASE_URL: 'https://conduit.leonicespa.com',
   CONDUIT_API_KEY: 'k'.repeat(64),
   CONDUIT_TOOL_API_KEY: 'c'.repeat(64),

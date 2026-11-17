@@ -68,7 +68,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'info_productos',
     description:
-      'Productos de la tienda: precio por marca y presentación, para qué sirve, beneficios, modo de uso, precauciones y los tratamientos con los que se recomienda. Úsala cuando pregunten por un producto, su precio, si lo tienen o qué recomiendas para un tratamiento o necesidad; query es lo que pidió la clienta, o vacío para ver el catálogo. El sistema no lleva inventario: disponible significa que está en el catálogo, no que haya unidades.',
+      'Productos de la tienda: precio por marca y presentación, para qué sirve, beneficios, modo de uso, precauciones y los tratamientos con los que se recomienda. Úsala cuando pregunten por un producto, su precio, si lo tienen o qué recomiendas para un tratamiento o necesidad; query es lo que pidió la clienta, o vacío para ver el catálogo. El sistema no lleva inventario: disponible significa que está en el catálogo, no que haya unidades. Incluye los Rituales (combos con precio especial, type ritual) con lo que traen y el ahorro; si un resultado trae hint, síguelo.',
     httpMethod: 'GET',
     path: '/conduit/products',
     parametersSchema: {

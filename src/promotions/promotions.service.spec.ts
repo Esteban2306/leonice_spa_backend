@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PromotionsService } from './promotions.service';
 import { PromotionsRepository } from './promotions.repository';
 
@@ -10,6 +14,10 @@ function build(overlap: { id: string; name: string } | null = null) {
     findOverlapping: jest.fn().mockResolvedValue(overlap),
     create: jest.fn().mockResolvedValue({ id: 'new' }),
     update: jest.fn().mockResolvedValue({ id: 'p1' }),
+    countBlockingReferences: jest
+      .fn()
+      .mockResolvedValue({ automationRules: 0, openCampaigns: 0 }),
+    delete: jest.fn().mockResolvedValue({ id: 'p1' }),
     findById: jest.fn().mockResolvedValue({
       id: 'p1',
       name: 'Actual',
@@ -27,7 +35,7 @@ function build(overlap: { id: string; name: string } | null = null) {
 }
 
 const dto = {
-  name: 'Semana de uñas',
+  name: 'Semana del alisado',
   discountPercentage: 15,
   startsAt: '2026-11-10T00:00:00-05:00',
   endsAt: '2026-11-17T23:59:59-05:00',
@@ -80,5 +88,32 @@ describe('PromotionsService', () => {
     await service.update('p1', { isActive: false });
     expect(repository.findOverlapping).not.toHaveBeenCalled();
     expect(repository.update).toHaveBeenCalled();
+  });
+
+  it('elimina una promoción que nadie usa', async () => {
+    const { service, repository } = build();
+    await service.remove('p1');
+    expect(repository.delete).toHaveBeenCalledWith('p1');
+  });
+
+  it('no elimina una promoción usada por reglas de automatización o campañas abiertas y dice por qué', async () => {
+    const { service, repository } = build();
+    repository.countBlockingReferences.mockResolvedValue({
+      automationRules: 1,
+      openCampaigns: 2,
+    });
+    await expect(service.remove('p1')).rejects.toThrow(
+      /1 regla de automatización y 2 campañas en curso o pausadas/,
+    );
+    expect(repository.delete).not.toHaveBeenCalled();
+  });
+
+  it('responde 404 al eliminar una promoción que no existe', async () => {
+    const { service, repository } = build();
+    repository.findById.mockResolvedValue(null);
+    await expect(service.remove('p1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(repository.delete).not.toHaveBeenCalled();
   });
 });

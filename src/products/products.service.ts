@@ -23,6 +23,12 @@ import { CreateProductTagDto } from './dto/create-product-tag.dto';
 import { UpdateProductTagDto } from './dto/update-product-tag.dto';
 import { normalizePhone } from 'src/clients/utils/normalize-phone.util';
 import { uniqueSlug } from '../catalog/common/slugify';
+import { ProductKind } from '@prisma/client';
+import { COMBO_CATEGORY_SLUG } from './constants/product-combo.constants';
+import { CreateRitualDto } from './dto/create-ritual.dto';
+import { RitualItemDto } from './dto/ritual-item.dto';
+import { ritualVariantLabels } from './domain/ritual-pricing';
+import { toAdminProductView } from './domain/admin-product-view';
 
 function variantKey(brand: string, presentation: string) {
   return `${brand.toLowerCase()}\u0000${presentation.toLowerCase()}`;
@@ -124,14 +130,15 @@ export class ProductsService {
     });
   }
 
-  findAllForAdmin(query: FindAdminProductsQueryDto) {
-    return this.repository.findAdminProducts(query);
+  async findAllForAdmin(query: FindAdminProductsQueryDto) {
+    const products = await this.repository.findAdminProducts(query);
+    return products.map(toAdminProductView);
   }
 
   async findOneForAdmin(id: string) {
     const product = await this.repository.findAdminProductById(id);
     if (!product) throw new AppException('PRODUCT_NOT_FOUND');
-    return product;
+    return toAdminProductView(product);
   }
 
   async findOne(id: string) {
@@ -153,7 +160,8 @@ export class ProductsService {
   }
 
   async create(dto: CreateProductDto) {
-    await this.assertCategoryExists(dto.productCategoryId);
+    const category = await this.assertCategoryExists(dto.productCategoryId);
+    this.assertCategoryFitsKind(category.slug, ProductKind.SINGLE);
     if (dto.tagIds?.length) await this.assertTagsExist(dto.tagIds);
     if (dto.variants?.length) {
       const keys = dto.variants.map((v) => variantKey(v.brand, v.presentation));
@@ -165,23 +173,114 @@ export class ProductsService {
     );
     const product = await this.repository.createProduct({ ...dto, slug });
     await this.invalidateProductsCache();
-    return product;
+    return toAdminProductView(product);
   }
 
   async update(id: string, dto: UpdateProductDto) {
-    await this.assertProductExists(id);
-    if (dto.productCategoryId)
-      await this.assertCategoryExists(dto.productCategoryId);
+    const existing = await this.assertProductExists(id);
+    if (dto.productCategoryId) {
+      const category = await this.assertCategoryExists(dto.productCategoryId);
+      this.assertCategoryFitsKind(category.slug, existing.kind);
+    }
     const product = await this.repository.updateProduct(id, dto);
     await this.invalidateProductsCache(id);
-    return product;
+    return toAdminProductView(product);
+  }
+
+  async createRitual(dto: CreateRitualDto) {
+    const category =
+      await this.repository.findCategoryBySlug(COMBO_CATEGORY_SLUG);
+    if (!category) throw new AppException('PRODUCT_COMBO_CATEGORY_MISSING');
+    if (dto.tagIds?.length) await this.assertTagsExist(dto.tagIds);
+    const labels = await this.validateRitualItems(dto.items);
+
+    const { items, price, imageUrl, tagIds, ...content } = dto;
+    const slug = await uniqueSlug(dto.name, (candidate) =>
+      this.repository.isProductSlugTaken(candidate),
+    );
+    const ritual = await this.repository.createRitual(
+      {
+        ...content,
+        slug,
+        productCategoryId: category.id,
+        tagAssignments: tagIds?.length
+          ? { create: tagIds.map((tagId) => ({ tagId })) }
+          : undefined,
+      },
+      { ...labels, price, imageUrl },
+      items.map(({ variantId, quantity }) => ({ variantId, quantity })),
+    );
+    await this.invalidateProductsCache();
+    return toAdminProductView(ritual);
+  }
+
+  async replaceRitualItems(ritualId: string, items: RitualItemDto[]) {
+    const ritual = await this.assertProductExists(ritualId);
+    if (ritual.kind !== ProductKind.COMBO)
+      throw new AppException('PRODUCT_RITUAL_NOT_FOUND');
+    const labels = await this.validateRitualItems(items);
+    const updated = await this.repository.replaceRitualItems(
+      ritualId,
+      items.map(({ variantId, quantity }) => ({ variantId, quantity })),
+      labels,
+    );
+    await this.invalidateProductsCache(ritualId);
+    return toAdminProductView(updated);
+  }
+
+  private async validateRitualItems(items: RitualItemDto[]) {
+    const ids = items.map((item) => item.variantId);
+    if (new Set(ids).size !== ids.length)
+      throw new AppException('PRODUCT_RITUAL_INVALID_ITEMS', {
+        message: 'No repitas la misma presentación; sube su cantidad.',
+      });
+    const variants = await this.repository.findVariantsForRitual(ids);
+    const byId = new Map(variants.map((variant) => [variant.id, variant]));
+    const unavailable = ids.filter((id) => {
+      const variant = byId.get(id);
+      return (
+        !variant ||
+        !variant.isActive ||
+        !variant.product.isActive ||
+        variant.product.kind !== ProductKind.SINGLE
+      );
+    });
+    if (unavailable.length > 0)
+      throw new AppException('PRODUCT_RITUAL_ITEM_UNAVAILABLE', {
+        details: { variantIds: unavailable },
+      });
+    return ritualVariantLabels(
+      items.map((item) => ({
+        quantity: item.quantity,
+        brand: byId.get(item.variantId)!.brand,
+      })),
+    );
+  }
+
+  private assertCategoryFitsKind(categorySlug: string, kind: ProductKind) {
+    const isComboCategory = categorySlug === COMBO_CATEGORY_SLUG;
+    if (isComboCategory !== (kind === ProductKind.COMBO))
+      throw new AppException('PRODUCT_RITUAL_CATEGORY');
+  }
+
+  private async assertNotInRitual(where: {
+    productId?: string;
+    variantId?: string;
+  }) {
+    const rituals = await this.repository.findRitualsIncluding(where);
+    if (rituals.length === 0) return;
+    const names = rituals.map((ritual) => ritual.name).join(', ');
+    throw new AppException('PRODUCT_IN_RITUAL', {
+      message: `Está incluido en: ${names}. Quítalo de ese Ritual o desactívalo en lugar de borrarlo.`,
+      details: { rituals },
+    });
   }
 
   async toggleActive(id: string) {
     const product = await this.assertProductExists(id);
     const updated = await this.repository.toggleActive(id, !product.isActive);
     await this.invalidateProductsCache(id);
-    return updated;
+    return toAdminProductView(updated);
   }
 
   async remove(id: string) {
@@ -192,6 +291,7 @@ export class ProductsService {
       throw new AppException('PRODUCT_HAS_HISTORY', {
         details: { viewLogs, recommendations },
       });
+    await this.assertNotInRitual({ productId: id });
 
     const imagePublicIds = await this.repository.deleteProduct(id);
     await this.invalidateProductsCache();
@@ -201,7 +301,9 @@ export class ProductsService {
   }
 
   async addVariant(productId: string, dto: CreateProductVariantDto) {
-    await this.assertProductExists(productId);
+    const product = await this.assertProductExists(productId);
+    if (product.kind === ProductKind.COMBO)
+      throw new AppException('PRODUCT_RITUAL_VARIANT_LOCKED');
     await this.assertVariantAvailable(productId, dto.brand, dto.presentation);
     const variant = await this.repository.createVariant(productId, dto);
     await this.invalidateProductsCache(productId);
@@ -233,6 +335,10 @@ export class ProductsService {
 
   async removeVariant(variantId: string) {
     const existing = await this.assertVariantExists(variantId);
+    const product = await this.assertProductExists(existing.productId);
+    if (product.kind === ProductKind.COMBO)
+      throw new AppException('PRODUCT_RITUAL_VARIANT_LOCKED');
+    await this.assertNotInRitual({ variantId });
     await this.repository.deleteVariant(variantId);
     await this.invalidateProductsCache(existing.productId);
     if (existing.imagePublicId)
@@ -478,8 +584,11 @@ export class ProductsService {
       this.cache.delete(CATALOG_CACHE_KEYS.showcase),
     ]);
     if (!productId) return;
-    const treatmentIds =
-      await this.repository.findTreatmentIdsRecommending(productId);
+    const rituals = await this.repository.findRitualsIncluding({ productId });
+    const treatmentIds = await this.repository.findTreatmentIdsRecommending([
+      productId,
+      ...rituals.map((ritual) => ritual.id),
+    ]);
     await Promise.all(
       treatmentIds.map((treatmentId) =>
         this.cache.delete(CATALOG_CACHE_KEYS.recommendation(treatmentId)),
