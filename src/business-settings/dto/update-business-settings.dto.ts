@@ -2,6 +2,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -40,4 +41,12 @@ export class UpdateBusinessSettingsDto {
   @IsString()
   @MaxLength(2000)
   additionalInfo?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  @Matches(/^\+?[0-9][0-9 ]{6,28}$/, {
+    message: 'El WhatsApp de Leo solo admite dígitos, espacios y un + inicial',
+  })
+  ownerContactPhone?: string | null;
 }

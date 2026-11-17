@@ -311,6 +311,7 @@ async function main(): Promise<void> {
     cancellationPolicy:
       'Puedes cancelar o reagendar con 24 horas de anticipación; el anticipo no es reembolsable.',
     address: 'Dirección de prueba del banco de conversaciones',
+    ownerContactPhone: '+57 310 000 1122',
   });
   process.stdout.write(`BENCH_LEONICE_READY ${process.env.PORT}\n`);
 

@@ -18,6 +18,7 @@ export interface BusinessSettingsRow {
   cancellationPolicy: string | null;
   address: string | null;
   additionalInfo: string | null;
+  ownerContactPhone: string | null;
 }
 
 export interface OperatingWindowRow {
@@ -58,6 +59,7 @@ export function buildBotBusinessInfo(
     cancellationPolicy: settings.cancellationPolicy,
     address: settings.address,
     additionalInfo: settings.additionalInfo,
+    ownerContactPhone: settings.ownerContactPhone,
     timeZone: 'America/Bogota',
     weeklySchedule,
   };
@@ -78,6 +80,7 @@ export function businessInfoEventPayload(info: BotBusinessInfo) {
     cancellation_policy: info.cancellationPolicy ?? '',
     address: info.address ?? '',
     additional_info: info.additionalInfo ?? '',
+    owner_contact_phone: info.ownerContactPhone ?? '',
     schedule: info.weeklySchedule.map((d) => `${d.day} ${d.hours}`).join('; '),
   };
 }
@@ -90,5 +93,6 @@ export const BUSINESS_INFO_MAPPING_RULES: Record<string, string> = {
   cancellation_policy: 'negocio.politica_cancelacion',
   address: 'negocio.direccion',
   additional_info: 'negocio.informacion_adicional',
+  owner_contact_phone: 'negocio.whatsapp_de_leo',
   schedule: 'negocio.horario',
 };

@@ -601,6 +601,7 @@ model BusinessSettings {
   cancellationPolicy  String?  @map("cancellation_policy") @db.Text
   address             String?
   additionalInfo      String?  @map("additional_info") @db.Text
+  ownerContactPhone   String?  @map("owner_contact_phone")
   updatedByUserId     String?  @map("updated_by_user_id")
   updatedAt           DateTime @updatedAt @map("updated_at")
 

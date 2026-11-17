@@ -2,7 +2,6 @@ import { CONDUIT_TOOL_CATALOG } from '../tools/conduit-tool-catalog';
 import {
   CONDUIT_BOT_PROMPT_TEMPLATE,
   CONDUIT_BOT_SETTINGS,
-  LEO_CONTACT_PHONE,
 } from './conduit-bot-prompt';
 import { CONDUIT_INTENT_CATALOG } from '../intents/conduit-intent-catalog';
 import { seedConduitPrompt } from '../../../prisma/seed-conduit-prompt';
@@ -215,9 +214,11 @@ describe('prompt del asistente de Leonice', () => {
     expect(start).toBeGreaterThan(-1);
     expect(section).toContain('dueña');
     expect(section).toContain('ahora las citas se atienden por aquí');
-    expect(section).toContain(LEO_CONTACT_PHONE);
+    expect(section).toContain('WhatsApp de Leo de "Datos del negocio"');
+    expect(section).toContain('no inventes un número');
+    expect(section).not.toMatch(/\+57|\d{7,}/);
     expect(section).toContain('otro tema que no sea una cita');
-    expect(section).toContain('no uses pasar_a_persona salvo queja');
+    expect(section).toContain('pasar_a_persona solo por queja');
     expect(section).toContain('No hables en nombre de Leo');
   });
 

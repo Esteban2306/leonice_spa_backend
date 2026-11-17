@@ -34,6 +34,7 @@ export class BusinessSettingsService {
         cancellationPolicy: null,
         address: null,
         additionalInfo: null,
+        ownerContactPhone: null,
         updatedByUserId: null,
         updatedAt: null,
       }

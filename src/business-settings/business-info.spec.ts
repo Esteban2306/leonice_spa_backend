@@ -15,6 +15,7 @@ const SETTINGS = {
   cancellationPolicy: 'Cancelar con 24 horas.',
   address: 'Calle 1 # 2-3',
   additionalInfo: null,
+  ownerContactPhone: '+57 310 000 1122',
 };
 
 const WINDOWS = [
@@ -35,6 +36,17 @@ describe('payload del hook business.info.updated', () => {
     );
     expect(payload.schedule).toContain('sábado 9:00 a. m. a 1:00 p. m.');
     expect(payload.schedule).toContain('domingo cerrado');
+  });
+
+  it('el WhatsApp de Leo llega al bot como un dato del negocio', () => {
+    expect(payload.owner_contact_phone).toBe('+57 310 000 1122');
+    expect(BUSINESS_INFO_MAPPING_RULES.owner_contact_phone).toBe(
+      'negocio.whatsapp_de_leo',
+    );
+    const cleared = businessInfoEventPayload(
+      buildBotBusinessInfo({ ...SETTINGS, ownerContactPhone: null }, WINDOWS),
+    );
+    expect(cleared.owner_contact_phone).toBe('');
   });
 
   it('un dato borrado viaja como cadena vacía para que Conduit no conserve el anterior', () => {
