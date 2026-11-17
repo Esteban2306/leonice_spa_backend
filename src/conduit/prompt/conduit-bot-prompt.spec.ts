@@ -2,7 +2,9 @@ import { CONDUIT_TOOL_CATALOG } from '../tools/conduit-tool-catalog';
 import {
   CONDUIT_BOT_PROMPT_TEMPLATE,
   CONDUIT_BOT_SETTINGS,
+  LEO_CONTACT_PHONE,
 } from './conduit-bot-prompt';
+import { CONDUIT_INTENT_CATALOG } from '../intents/conduit-intent-catalog';
 import { seedConduitPrompt } from '../../../prisma/seed-conduit-prompt';
 import { SPECIALIST_DEFINITION } from '../../../prisma/seed-conduit-specialist';
 import {
@@ -206,21 +208,47 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).toContain('No cobras ni tomas pagos');
   });
 
-  it('reconoce a Leo, la dueña: ahora el asistente lleva las citas y solo la pasa a ella si hace falta', () => {
+  it('si preguntan por Leo, explica que las citas son por aquí y da el número de Leo para otros temas', () => {
     const start = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Leo, la dueña');
     const end = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Qué consultar');
     const section = CONDUIT_BOT_PROMPT_TEMPLATE.slice(start, end);
     expect(start).toBeGreaterThan(-1);
     expect(section).toContain('dueña');
-    expect(section).toContain('ahora yo me encargo de tus citas');
-    expect(section).toContain('pasar_a_persona');
-    expect(section).toContain('Leo se comunicará');
-    expect(section).toContain('solo si la herramienta devolvió éxito');
+    expect(section).toContain('ahora las citas se atienden por aquí');
+    expect(section).toContain(LEO_CONTACT_PHONE);
+    expect(section).toContain('otro tema que no sea una cita');
+    expect(section).toContain('no uses pasar_a_persona salvo queja');
     expect(section).toContain('No hables en nombre de Leo');
   });
 
+  it('con una clienta registrada nunca pide datos, ni al confirmar', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(/ni siquiera al confirmar/);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
+      /vuelve a llamar consultar_cliente antes de pedir datos/,
+    );
+    const catalog = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking');
+    const slim = catalog?.config?.slim as {
+      prompt: string;
+      confirmHint: string;
+    };
+    expect(slim.confirmHint).toMatch(/Primero llama consultar_cliente/);
+    expect(slim.confirmHint).toMatch(
+      /registered true, llama crear_reserva_whatsapp directo/,
+    );
+    expect(slim.prompt).toMatch(/tampoco al confirmar/);
+  });
+
+  it('un fallo técnico del análisis de la imagen no se le pide reenviar a la clienta', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(/"no analizada"/);
+    expect(t).toMatch(
+      /Nunca digas que no pudiste revisarla ni le pidas reenviarla/,
+    );
+    expect(t).toMatch(/pide otra foto más clara, una sola vez/);
+  });
+
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(9400);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(10100);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

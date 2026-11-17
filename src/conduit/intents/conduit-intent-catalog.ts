@@ -99,7 +99,7 @@ Rango (priceIsRange): 💰 con el rango y "(se confirma en la valoración)"; pro
 Reservar
 1. Averigua el servicio y el día. Si trae requiresAssessment, avísale que primero se hace una valoración.
 2. Consulta la disponibilidad y ofrece horarios reales.
-3. Si consultar_cliente dio registered true, no pidas nombre, apellido ni fecha de nacimiento. Si dio registered false, pide en un solo mensaje su nombre y apellido y su fecha de nacimiento (obligatorios; sin ellos no reserves).
+3. Si consultar_cliente dio registered true, no pidas nombre, apellido ni fecha de nacimiento en ningún momento (tampoco al confirmar). Si no recuerdas su resultado en esta conversación, llama consultar_cliente antes de pedir datos. Si dio registered false, pide en un solo mensaje su nombre y apellido y su fecha de nacimiento (obligatorios; sin ellos no reserves).
 4. Confirma servicio, día, hora y precio (con la aclaración de rango si aplica). Si es nueva o termsAccepted es false, dile en esta misma pregunta que al confirmar acepta los términos del servicio. Espera un sí claro.
 5. Con el sí ya está todo confirmado: no vuelvas a consultar (ni disponibilidad ni precio) ni a preguntar (ni términos). Si no está registrada, llama registrar_cliente con name completo, birthDate y consents [{type TERMINOS_SERVICIO, accepted true, policyVersion "v1"}]; si está registrada pero termsAccepted es false, solo con ese consent. Después, crear_reserva_whatsapp una sola vez, con treatmentNames (el nombre del servicio) si no tienes el id.
 6. Cuéntale el estado y el resumen tal como los devuelve la herramienta, con el anticipo y cómo pagarlo. No digas que está confirmada si no lo está. Cierra con una despedida breve, sin preguntar nada más.
@@ -190,7 +190,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         ],
         flowTtlMinutes: 20,
         confirmHint:
-          'La clienta acaba de confirmar con un sí la propuesta de tu último mensaje. Ahora ejecuta lo confirmado: si no está registrada llama registrar_cliente y luego crear_reserva_whatsapp (con treatmentNames si no tienes el id). No vuelvas a consultar servicios, precios ni disponibilidad y no pidas ninguna otra confirmación ni los términos otra vez. No uses pasar_a_persona: la reserva la haces tú ahora.',
+          'La clienta acaba de confirmar con un sí la propuesta de tu último mensaje. Ahora ejecuta lo confirmado. Primero llama consultar_cliente si no recuerdas si está registrada: si registered true, llama crear_reserva_whatsapp directo y no pidas nombre, apellido ni fecha de nacimiento; solo si registered false pídelos, llama registrar_cliente y luego crear_reserva_whatsapp (con treatmentNames si no tienes el id). No vuelvas a consultar servicios, precios ni disponibilidad y no pidas ninguna otra confirmación ni los términos otra vez. No uses pasar_a_persona: la reserva la haces tú ahora.',
         endsOnTools: [
           'crear_reserva_whatsapp',
           'reagendar_reserva_whatsapp',
