@@ -224,14 +224,18 @@ describe('prompt del asistente de Leonice', () => {
   it('con una clienta registrada nunca pide datos, ni al confirmar', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(/ni siquiera al confirmar/);
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
-      /vuelve a llamar consultar_cliente antes de pedir datos/,
+      /"Datos vigentes", vuelve a llamar consultar_cliente antes de pedir datos/,
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
+      /ficha queda creada y ya no le vuelves a pedir datos/,
     );
     const catalog = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking');
     const slim = catalog?.config?.slim as {
       prompt: string;
       confirmHint: string;
     };
-    expect(slim.confirmHint).toMatch(/Primero llama consultar_cliente/);
+    expect(slim.confirmHint).toMatch(/llama primero consultar_cliente/);
+    expect(slim.prompt).toMatch(/no vuelvas a pedirle datos/);
     expect(slim.confirmHint).toMatch(
       /registered true, llama crear_reserva_whatsapp directo/,
     );

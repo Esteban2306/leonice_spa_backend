@@ -60,6 +60,13 @@ describe('CONDUIT_TOOL_CATALOG', () => {
     },
   );
 
+  it('solo el perfil de la clienta queda fijo en la memoria del bot (sin datos sensibles)', () => {
+    const pinned = CONDUIT_TOOL_CATALOG.filter((t) => t.pinResultInMemory).map(
+      (t) => t.name,
+    );
+    expect(pinned).toEqual(['consultar_cliente']);
+  });
+
   it('solo la de comprobante pide imagen y solo pasar_a_persona pausa el bot', () => {
     expect(
       CONDUIT_TOOL_CATALOG.filter((t) => t.requiresImageAttachment).map(

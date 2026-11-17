@@ -8,6 +8,7 @@ export interface ConduitToolDefinition {
   parametersSchema: JsonSchema;
   injectPhoneParamName?: string;
   pausesBotMinutes?: number;
+  pinResultInMemory?: boolean;
   requiresImageAttachment?: boolean;
   imageParamName?: string;
 }
@@ -55,6 +56,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
       'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
     httpMethod: 'GET',
     path: '/conduit/clients/me',
+    pinResultInMemory: true,
     parametersSchema: { type: 'object', properties: {} },
   },
   {

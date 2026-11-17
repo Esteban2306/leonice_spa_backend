@@ -9,6 +9,7 @@ interface RemoteTool {
   name: string;
   endpointUrl: string;
   isActive: boolean;
+  pinResultInMemory?: boolean;
 }
 
 const REQUIRED_ENV = [
@@ -59,6 +60,7 @@ export async function seedConduitTools(
       injectPhoneParamName: tool.injectPhoneParamName,
     }),
     ...(tool.pausesBotMinutes && { pausesBotMinutes: tool.pausesBotMinutes }),
+    ...(tool.pinResultInMemory && { pinResultInMemory: true }),
   });
 
   for (const tool of CONDUIT_TOOL_CATALOG) {
@@ -82,6 +84,9 @@ export async function seedConduitTools(
       current.endpointUrl === `${publicUrl}${tool.path}`
         ? null
         : `apunta a ${current.endpointUrl}`,
+      (current.pinResultInMemory ?? false) === (tool.pinResultInMemory ?? false)
+        ? null
+        : 'memoria fija distinta del catálogo; aplica con CONDUIT_TOOLS_OVERWRITE=true',
     ].filter(Boolean);
     console.log(
       `[conduit] herramienta ${tool.name}: ya existía${notes.length ? ` (⚠ ${notes.join('; ')})` : ''}`,
