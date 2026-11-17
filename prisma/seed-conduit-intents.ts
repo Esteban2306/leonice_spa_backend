@@ -28,8 +28,10 @@ type Mode = (typeof MODES)[number];
  *   reemplaza su definición (frases, textos, herramienta). El modo que
  *   eligió el operador se conserva, salvo que CONDUIT_INTENTS_MODE esté
  *   definido explícitamente.
- * - Las marcadas `lockedMode` (p. ej. medios de pago, con texto genérico
- *   pendiente) nunca pasan de SOMBRA desde este seed.
+ * - Las marcadas `lockedMode` quedan siempre en ese modo al crearse o
+ *   actualizarse: medios de pago (texto genérico pendiente) en SOMBRA; las
+ *   quejas y el aviso de Leo en ACTIVO, porque deben actuar sin depender de
+ *   que la IA lo decida.
  */
 export async function seedConduitIntents(
   env: NodeJS.ProcessEnv = process.env,

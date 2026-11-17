@@ -126,4 +126,56 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(greeters).not.toContain('human_request');
     expect(greeters).not.toContain('courtesy');
   });
+
+  it('las quejas y el aviso de Leo quedan activos siempre, sin depender de la IA', () => {
+    const complaint = CONDUIT_INTENT_CATALOG.find(
+      (i) => i.key === 'complaint',
+    )!;
+    const leo = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'leo_notice')!;
+    expect(complaint.lockedMode).toBe('ACTIVE');
+    expect(complaint.handler).toBe('HANDOFF');
+    expect(leo.lockedMode).toBe('ACTIVE');
+    expect(leo.config?.notice).toBe(true);
+    expect(leo.config?.tool).toBe('info_negocio');
+  });
+
+  it('reconoce la queja real de la prueba y no confunde un elogio', () => {
+    const complaint = CONDUIT_INTENT_CATALOG.find(
+      (i) => i.key === 'complaint',
+    )!;
+    const norm = (t: string) =>
+      t
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9 ]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const matches = (t: string) =>
+      complaint.patterns.some((p) => new RegExp(p).test(norm(t))) &&
+      !(complaint.denyPatterns ?? []).some((p) => new RegExp(p).test(norm(t)));
+    expect(
+      matches('Pésimo servicio, me dañaron el cabello y nadie me responde'),
+    ).toBe(true);
+    expect(matches('Me quemaron el cabello con el alisado')).toBe(true);
+    expect(matches('Llevo dos días y nadie me contesta')).toBe(true);
+    expect(matches('Me dejaron sin cita y nadie me responde')).toBe(true);
+    expect(matches('Llevo una semana y no me han respondido')).toBe(true);
+    expect(matches('Excelente servicio, gracias')).toBe(false);
+    expect(matches('No tengo ninguna queja, todo bien')).toBe(false);
+  });
+
+  it('el aviso de Leo salta cuando preguntan por ella, no con un saludo ni con el nombre del spa', () => {
+    const leo = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'leo_notice')!;
+    const hits = (t: string) =>
+      leo.patterns.some((p) => new RegExp(p).test(t)) &&
+      !(leo.denyPatterns ?? []).some((p) => new RegExp(p).test(t));
+    expect(
+      hits('necesito una cita de hidratacion pero sofia que paso con leo'),
+    ).toBe(true);
+    expect(hits('necesito hablar con leo de un tema personal')).toBe(true);
+    expect(hits('hola leo buenas tardes')).toBe(false);
+    expect(hits('hola leo')).toBe(false);
+    expect(hits('hola leonice arenas spa')).toBe(false);
+  });
 });

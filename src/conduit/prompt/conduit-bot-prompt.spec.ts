@@ -207,20 +207,29 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).toContain('No cobras ni tomas pagos');
   });
 
-  it('si preguntan por Leo, explica que las citas son por aquí y da el número de Leo para otros temas', () => {
+  it('si preguntan por Leo, usa el aviso del sistema con su WhatsApp y no inventa un número', () => {
     const start = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Leo, la dueña');
     const end = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Qué consultar');
     const section = CONDUIT_BOT_PROMPT_TEMPLATE.slice(start, end);
     expect(start).toBeGreaterThan(-1);
     expect(section).toContain('dueña');
-    expect(section).toContain('ahora las citas se atienden por aquí');
-    expect(section).toContain('WhatsApp de Leo de "Datos del negocio"');
+    expect(section).toContain('"Aviso obligatorio"');
+    expect(section).toContain('atiende lo demás que pidió');
     expect(section).toContain('no inventes un número');
-    expect(section).not.toMatch(/\+57|\d{7,}/);
-    expect(section).toContain('otro tema que no sea una cita');
     expect(section).toContain('pasar_a_persona solo por queja');
     expect(section).toContain('No hables por Leo');
-    expect(section).toContain('responde las dos cosas');
+    expect(section).not.toMatch(/\+57|\d{7,}/);
+  });
+
+  it('una queja va a una persona en el mismo turno y lo que no existe se reemplaza por opciones reales', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toMatch(
+      /Ante una queja o un daño: pasar_a_persona en ese mismo turno, sin pedir datos/,
+    );
+    expect(t).toMatch(
+      /no lo ofrecemos y en el mismo mensaje propón 2 o 3 opciones reales/,
+    );
+    expect(t).not.toMatch(/si insiste, ofrece pasar con una persona/);
   });
 
   it('con una clienta registrada nunca pide datos, ni al confirmar', () => {

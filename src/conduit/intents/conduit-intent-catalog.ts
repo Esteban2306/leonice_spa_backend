@@ -30,7 +30,7 @@ export interface ConduitIntentSeed {
   schedule?: Record<string, unknown>;
   notes?: string;
   /** El seed nunca la activa aunque se pida ACTIVE (necesita revisión del negocio). */
-  lockedMode?: 'SHADOW' | 'OFF';
+  lockedMode?: 'SHADOW' | 'OFF' | 'ACTIVE';
 }
 
 const vocabulary = (words: string, anchors: string) =>
@@ -109,7 +109,7 @@ Cambiar o cancelar
 - reservas_proximas muestra la cita. Si pide cancelar de forma explícita ("cancélala"), llama cancelar_reserva_whatsapp (scope SINGLE o DAY) en ese turno y dile que los anticipos no se devuelven. Para reagendar: disponibilidad_combo con purpose=RESCHEDULE, confirma la nueva hora y usa reagendar_reserva_whatsapp.
 
 Fuera de esto
-- Si pide hablar con una persona, tiene una queja, un tema de salud delicado o no logras resolver tras dos intentos, usa pasar_a_persona con el motivo y un resumen breve.
+- Ante una queja o un daño, pasar_a_persona en ese mismo turno, sin pedir datos. También si pide hablar con una persona, tiene un tema de salud delicado o no logras resolver tras dos intentos, con el motivo y un resumen breve.
 - Si quiere enviar un comprobante de pago, pídele que mande la foto por este chat. Cuando haya una imagen en la conversación, llama registrar_comprobante_automatico sin preguntar cuánto pagó; no confirmes ni registres montos, solo di que el equipo revisará el comprobante.
 - Resultado con expected:true: explícalo en una frase simple y sigue su nextStep (OFFER_OTHER_SLOT: ofrece los horarios de alternatives o consulta otro día; SHOW_UPCOMING: revisa sus citas; ASK_CLIENT_DATA: pide el dato; OFFER_HANDOFF: ofrece pasar con una persona). No avises a nadie por esto. Fallo técnico: di que no pudiste completarlo; el sistema avisa al equipo solo. Nunca digas que una persona escribirá si pasar_a_persona no devolvió éxito.`;
 
@@ -117,7 +117,7 @@ export const TREATMENT_SLIM_PROMPT = `Eres {{agentName}}, recepcionista de {{com
 Idioma: {{language}}. Tono: {{tone}}. Responde de forma {{responseLength}}. {{emojiInstruction}} {{formatInstruction}}
 
 Reglas
-- Usa info_tratamiento con el nombre que dijo (o listar_tratamientos si no nombró uno) y responde SOLO con lo que devuelvan; nunca inventes beneficios, precios, duraciones ni resultados. Si el dato no está, dilo con naturalidad y ofrece pasarla con una persona del equipo.
+- Usa info_tratamiento con el nombre que dijo (o listar_tratamientos si no nombró uno) y responde SOLO con lo que devuelvan; nunca inventes beneficios, precios, duraciones ni resultados. Si el tratamiento no existe, di en una frase que no lo ofrecemos y propón 2 o 3 tratamientos reales parecidos de listar_tratamientos.
 - Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo. Dinero en pesos colombianos, tal como lo entregan las herramientas.
 - Mensajes cortos y una sola pregunta. Nunca muestres ids ni nombres de herramientas.
 - Si listas varios tratamientos usa este formato con emojis (en otros mensajes casi ninguno): una frase de introducción y cada servicio como bloque separado por línea en blanco, con una pregunta corta al final:
@@ -761,13 +761,18 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     handler: 'HANDOFF',
     priority: 5,
     patterns: [
-      '\\b(?:queja|reclamo|mal servicio|pesimo servicio|pesima atencion|mala atencion|inconforme|estoy molesta|estoy muy molesta|estoy molesto|estoy muy molesto|estoy indignada|estoy indignado)\\b',
+      '\\b(?:queja|quejarme|reclamo|mal servicio|pesimo servicio|pesima atencion|mala atencion|inconforme|estoy molesta|estoy muy molesta|estoy molesto|estoy muy molesto|estoy indignada|estoy indignado)\\b',
+      '\\bno me (?:han )?(?:responden|respondieron|contestan|contestaron|respondido|contestado|atienden|atendieron|gusto como quedo)\\b',
+      '\\bme (?:danaron|quemaron|arruinaron|maltrataron|estropearon|cortaron mal|tineron mal) (?:el|mi|los|las)? ?(?:cabello|pelo|cuero cabelludo|tinte|color|unas)\\b',
+      '\\bnadie me (?:responde|contesta|atiende|ha respondido|ha contestado)\\b',
     ],
     denyPatterns: [
-      '\\b(?:ninguna|ningun|sin|gracias|felicitar|felicitaciones|excelente|buen servicio|buena atencion)\\b',
+      '\\b(?:ninguna queja|ningun reclamo|sin queja|sin quejas|no es una queja|no es queja|felicitar|felicitaciones|excelente servicio|buen servicio|buena atencion)\\b',
     ],
-    maxTokens: 30,
+    maxTokens: 60,
+    negationOk: true,
     fixedConfidence: 0.9,
+    lockedMode: 'ACTIVE',
     config: {
       tool: 'pasar_a_persona',
       reason: 'La clienta expresa una queja o inconformidad',
@@ -776,6 +781,40 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     variants: {
       default: [
         'Lamento mucho lo que pasó 🙏 Ya avisé al equipo para que una persona te escriba por este chat y lo revise contigo cuanto antes.',
+      ],
+    },
+  },
+  {
+    key: 'leo_notice',
+    name: 'Aviso: preguntan por Leo',
+    description:
+      'La clienta pregunta por Leo, la dueña. Acompaña la respuesta del turno (no compite con la cita): las citas son por aquí y, para otros temas, su WhatsApp configurado en el panel.',
+    handler: 'TOOL_DIRECT',
+    priority: 1,
+    patterns: ['\\bleo\\b'],
+    denyPatterns: [
+      '^(?:(?:hola|ola|buenas|buenos|buen|dias|dia|tardes|noches|hey|saludos)\\s+)*leo(?:\\s+(?:hola|buenas|buenos|dias|dia|tardes|noches|como|estas|esta|bien|que|tal))*$',
+    ],
+    maxTokens: 60,
+    cooldownSeconds: 1800,
+    lockedMode: 'ACTIVE',
+    config: {
+      notice: true,
+      tool: 'info_negocio',
+      cache: { scope: 'bot', seconds: 300 },
+      render: {
+        branches: [
+          {
+            when: { path: 'ownerContactPhone', empty: false },
+            variant: 'default',
+            vars: { telefono: { path: 'ownerContactPhone' } },
+          },
+        ],
+      },
+    },
+    variants: {
+      default: [
+        'Sobre Leo: ahora las citas se atienden por aquí para darte un mejor servicio. Para otro tema que no sea una cita, puedes escribirle a su WhatsApp {{telefono}} 🌿',
       ],
     },
   },
