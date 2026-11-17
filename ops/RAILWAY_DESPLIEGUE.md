@@ -6,7 +6,7 @@ Dominios: sitio público `https://leonicespa.com` y `https://www.leonicespa.com`
 
 1. **PostgreSQL** (plugin de Railway).
 2. **Redis** (plugin de Railway). BullMQ necesita `maxmemory-policy noeviction`; verifícalo en la configuración del Redis.
-3. **API**: servicio desde este repositorio. `railway.json` ya indica el `Dockerfile`, el healthcheck `/api/v1/health` y el comando previo `prisma migrate deploy`, que se ejecuta en cada despliegue antes de arrancar.
+3. **API**: servicio desde este repositorio. `railway.json` ya indica el `Dockerfile` y el healthcheck `/api/v1/health`. Las migraciones (`prisma migrate deploy`) las aplica el propio contenedor al arrancar, antes de levantar la API: si una falla, la API no arranca y el despliegue queda fallido en vez de servir con el esquema viejo. El comando previo de `railway.json` se conserva, pero no se depende de él: en noviembre de 2026 dos despliegues terminaron como exitosos sin aplicar sus migraciones.
 
 Rama a desplegar: `main`, que ya incluye todo el trabajo de operaciones, campañas y mensajes automáticos.
 
