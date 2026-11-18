@@ -412,6 +412,21 @@ describe('seedConduitPrompt', () => {
     expect(writes(calls)).toHaveLength(3);
   });
 
+  it('con CONDUIT_MAPPING_OVERWRITE=true reemplaza solo el hook y respeta prompt y ajustes', async () => {
+    const calls = conduit({
+      content: 'editado a mano',
+      isCustom: true,
+      configured: true,
+      mappings: [
+        { eventType: BUSINESS_INFO_EVENT, rules: { x: 'negocio.otro' } },
+      ],
+    });
+    await seedConduitPrompt({ ...env, CONDUIT_MAPPING_OVERWRITE: 'true' });
+    expect(writes(calls)).toEqual([
+      `POST api/external-data/${BOT}/mappings/${BUSINESS_INFO_EVENT}`,
+    ]);
+  });
+
   it('sin configuración de Conduit se omite sin fallar', async () => {
     const calls = conduit({
       content: '',

@@ -98,7 +98,7 @@ La caché de productos y tratamientos expira sola en 5 minutos.
 
 Las promociones se crean en el panel (`/admin/promotions`). Cada una apunta a **un** tratamiento o a **una** categoría, nunca a ambos.
 
-Las campañas de WhatsApp (`/admin/campaigns`) usan plantillas que deben existir en Conduit: el seed del paso 3.4 las crea todas (operativas y de difusión). Si añades plantillas nuevas al catálogo, vuelve a ejecutar `pnpm prisma db seed` con `CONDUIT_BASE_URL` y `CONDUIT_API_KEY`; no sobrescribe las que ya existen salvo que pongas `CONDUIT_TEMPLATES_OVERWRITE=true`.
+Las campañas de WhatsApp (`/admin/campaigns`) usan plantillas que deben existir en Conduit: el seed del paso 3.4 las crea todas (operativas y de difusión). Si añades plantillas nuevas al catálogo, vuelve a ejecutar `pnpm prisma db seed` con `CONDUIT_BASE_URL` y `CONDUIT_API_KEY`; no sobrescribe las que ya existen salvo que pongas `CONDUIT_TEMPLATES_OVERWRITE=true`. Si el seed avisa que el hook `business.info.updated` tiene un mapeo distinto (por ejemplo, al añadir un dato nuevo del negocio para el asistente), vuelve a ejecutarlo con `CONDUIT_MAPPING_OVERWRITE=true`: reemplaza solo ese mapeo. `CONDUIT_PROMPT_OVERWRITE=true` además reemplaza el prompt y los ajustes del asistente editados desde el panel.
 
 ## 6. Panel en `admin.leonicespa.com` (Cloudflare)
 

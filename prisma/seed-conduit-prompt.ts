@@ -42,6 +42,8 @@ export async function seedConduitPrompt(
   }
   const botId = env.CONDUIT_DEFAULT_BOT_ID!;
   const overwrite = env.CONDUIT_PROMPT_OVERWRITE === 'true';
+  const overwriteMapping =
+    overwrite || env.CONDUIT_MAPPING_OVERWRITE === 'true';
   const request = conduitSeedRequest(
     env.CONDUIT_BASE_URL!,
     env.CONDUIT_API_KEY!,
@@ -87,7 +89,7 @@ export async function seedConduitPrompt(
   const current = list.find((m) => m.eventType === BUSINESS_INFO_EVENT);
   if (current && sameRules(current.rules, BUSINESS_INFO_MAPPING_RULES)) {
     console.log(`[conduit] hook ${BUSINESS_INFO_EVENT}: ya estaba`);
-  } else if (!current || overwrite) {
+  } else if (!current || overwriteMapping) {
     await request(
       'POST',
       `api/external-data/${botId}/mappings/${BUSINESS_INFO_EVENT}`,
@@ -100,7 +102,7 @@ export async function seedConduitPrompt(
     console.log(`[conduit] hook ${BUSINESS_INFO_EVENT}: guardado`);
   } else {
     console.warn(
-      `[conduit]   ⚠ el hook ${BUSINESS_INFO_EVENT} tiene un mapeo distinto; no se reemplazó (CONDUIT_PROMPT_OVERWRITE=true).`,
+      `[conduit]   ⚠ el hook ${BUSINESS_INFO_EVENT} tiene un mapeo distinto; no se reemplazó (CONDUIT_MAPPING_OVERWRITE=true reemplaza solo el mapeo).`,
     );
   }
 }
