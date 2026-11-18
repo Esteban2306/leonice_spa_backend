@@ -321,17 +321,19 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       data.triggeringReservationId,
     );
     const since = triggering?.completedAt ?? new Date(0);
-    const hasReturned =
-      await this.reservationsRepository.hasMoreRecentActivityInCategory(
-        data.clientId,
-        data.categoryId,
-        since,
-      );
+    const hasReturned = await this.reservationsRepository.hasMoreRecentActivity(
+      data.clientId,
+      since,
+      {
+        reservationId: data.triggeringReservationId,
+        comboGroupId: triggering?.comboGroupId ?? null,
+      },
+    );
     if (hasReturned) {
       await this.executions.log({
         ...base,
         result: AutomationExecutionResult.SKIPPED,
-        reason: 'El cliente ya tuvo actividad más reciente en esta categoría',
+        reason: 'La clienta ya agendó o tuvo una visita más reciente',
       });
       return;
     }

@@ -574,17 +574,22 @@ export class ReservationsRepository {
     return count > 0;
   }
 
-  async hasMoreRecentActivityInCategory(
+  async hasMoreRecentActivity(
     clientId: string,
-    categoryId: string,
     since: Date,
+    exclude: { reservationId: string; comboGroupId: string | null },
   ): Promise<boolean> {
     const count = await this.prisma.client.reservation.count({
       where: {
         clientId,
-        categoryId,
+        id: { not: exclude.reservationId },
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
         OR: [{ scheduledStart: { gt: since } }, { completedAt: { gt: since } }],
+        ...(exclude.comboGroupId
+          ? {
+              NOT: { comboGroupId: exclude.comboGroupId },
+            }
+          : {}),
       },
     });
     return count > 0;
