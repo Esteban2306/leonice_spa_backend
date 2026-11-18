@@ -39,7 +39,7 @@ const LOST_RACE_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
 ]);
 
 const DEPOSIT_TIMEOUT_REASON = 'Depósito no confirmado a tiempo';
-const IN_PROGRESS_DIGEST_LIMIT = 50;
+const IN_PROGRESS_DIGEST_LIMIT = 8;
 const BUSINESS_DAY_KEY = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Bogota',
   year: 'numeric',
@@ -175,21 +175,22 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
 
   private async reportInProgress(): Promise<void> {
     const now = new Date();
-    const pending = await this.repository.findInProgressStartedBefore(
-      now,
-      IN_PROGRESS_DIGEST_LIMIT,
-    );
-    if (pending.length === 0) {
+    const [total, pending] = await Promise.all([
+      this.repository.countInProgressStartedBefore(now),
+      this.repository.findInProgressStartedBefore(
+        now,
+        IN_PROGRESS_DIGEST_LIMIT,
+      ),
+    ]);
+    if (total === 0) {
       this.logger.debug('Cierre del día: sin citas en curso por completar');
       return;
     }
 
-    this.logger.log(
-      `Cierre del día: ${pending.length} cita(s) en curso sin completar`,
-    );
+    this.logger.log(`Cierre del día: ${total} cita(s) en curso sin completar`);
     this.eventBus.publish(EVENT_TYPES.RESERVATIONS_IN_PROGRESS_PENDING, {
       digestId: BUSINESS_DAY_KEY.format(now),
-      total: pending.length,
+      total,
       items: pending.map((reservation) => ({
         reservationId: reservation.id,
         clientName: reservation.client.name,

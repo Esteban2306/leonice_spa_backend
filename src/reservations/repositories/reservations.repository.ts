@@ -336,6 +336,18 @@ export class ReservationsRepository {
     });
   }
 
+  countInProgressStartedBefore(
+    startedBefore: Date,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<number> {
+    return client.reservation.count({
+      where: {
+        status: ReservationStatus.CITA_EN_CURSO,
+        scheduledStart: { lt: startedBefore },
+      },
+    });
+  }
+
   findInProgressStartedBefore(
     startedBefore: Date,
     limit: number,

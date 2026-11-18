@@ -11,7 +11,7 @@ import {
   JOB_NAMES,
   QUEUE_NAMES,
 } from '../../infrastructure/queue/queue.constants';
-import { formatNotificationDateTime } from '../utils/format-notification-date';
+import { inProgressLine } from '../domain/in-progress-line';
 import { AdminNotificationRecipientsRepository } from 'src/admin-notifications/repository/admin-notification-recipients.repository';
 import {
   ADMIN_TIMEOUT_NOTICE_DELAY_MS,
@@ -296,10 +296,7 @@ export class OperationalNotificationsListener {
     >,
   ): Promise<boolean> {
     const { digestId, total, items } = event.payload;
-    const lines = items.map(
-      (item) =>
-        `• ${formatNotificationDateTime(item.scheduledStart)}: ${item.clientName} (${item.treatmentName})`,
-    );
+    const lines = items.map(inProgressLine);
     try {
       const queued = await this.enqueueForAdmins<AdminInProgressNoticeJobData>(
         JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS,

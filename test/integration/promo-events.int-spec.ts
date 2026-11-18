@@ -225,4 +225,16 @@ describe('eventos: boletas y sorteo', () => {
 
     await expect(events.remove(event.id)).rejects.toThrow('desactívalo');
   });
+
+  it('al editar con premios vacíos se borran y el bot se resincroniza', async () => {
+    const event = await rifa({ prizes: 'Kit de productos' });
+    eventBus.publish.mockClear();
+
+    const updated = await events.update(event.id, { prizes: '' });
+
+    expect(updated.prizes).toBeNull();
+    expect(eventBus.publish).toHaveBeenCalledWith('business.info_changed', {
+      source: 'events',
+    });
+  });
 });

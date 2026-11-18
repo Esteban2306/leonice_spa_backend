@@ -9,8 +9,8 @@ import {
 import { IsZonedDateTime } from '../../common/validation/date-input.validators';
 
 export const EVENT_NAME_MAX = 80;
-export const EVENT_DESCRIPTION_MAX = 280;
-export const EVENT_PRIZES_MAX = 140;
+export const EVENT_DESCRIPTION_MAX = 240;
+export const EVENT_PRIZES_MAX = 120;
 
 export class CreatePromoEventDto {
   @IsString()

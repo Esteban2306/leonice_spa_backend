@@ -33,6 +33,7 @@ interface FixtureOptions {
   depositExpiresAt?: Date | null;
   overdueIds?: string[];
   scheduledStart?: Date;
+  inProgressTotal?: number;
   inProgress?: Array<{
     id: string;
     scheduledStart: Date;
@@ -76,6 +77,10 @@ const buildFixture = (
       ),
     hasSubmittedProof: () =>
       Promise.resolve(options.hasSubmittedProof ?? false),
+    countInProgressStartedBefore: () =>
+      Promise.resolve(
+        options.inProgressTotal ?? options.inProgress?.length ?? 0,
+      ),
     findInProgressStartedBefore: (startedBefore: Date, limit: number) => {
       inProgressQueries.push({ startedBefore, limit });
       return Promise.resolve(options.inProgress ?? []);
@@ -366,5 +371,26 @@ describe('ReservationTimeoutsProcessor', () => {
     await processor.process(buildJob(JOB_NAMES.IN_PROGRESS_DIGEST));
 
     expect(published).toEqual([]);
+  });
+
+  it('al cierre del día lista máximo 8 citas pero informa el total real', async () => {
+    const rows = Array.from({ length: 8 }, (_, i) => ({
+      id: `r${i}`,
+      scheduledStart: new Date(Date.UTC(2026, 10, 17, 13 + (i % 8))),
+      client: { name: `Clienta ${i}` },
+      treatment: { name: 'Hidratación' },
+    }));
+    const { processor, published, inProgressQueries } = buildFixture(null, {
+      inProgress: rows,
+      inProgressTotal: 23,
+    });
+
+    await processor.process(buildJob(JOB_NAMES.IN_PROGRESS_DIGEST));
+
+    expect(inProgressQueries[0].limit).toBe(8);
+    expect(published[0].payload).toMatchObject({ total: 23 });
+    expect((published[0].payload as { items: unknown[] }).items).toHaveLength(
+      8,
+    );
   });
 });

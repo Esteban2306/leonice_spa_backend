@@ -1,3 +1,8 @@
+import {
+  EVENT_DESCRIPTION_MAX,
+  EVENT_NAME_MAX,
+  EVENT_PRIZES_MAX,
+} from '../promo-events/dto/promo-event.dto';
 import { BusinessSettingsService } from './business-settings.service';
 import {
   BUSINESS_INFO_MAPPING_RULES,
@@ -147,5 +152,19 @@ describe('ConduitOutboxListener.handleBusinessInfoChanged', () => {
       businessInfoEventPayload(buildBotBusinessInfo(SETTINGS, WINDOWS))
         .active_events,
     ).toBe('');
+  });
+
+  it('un evento con todos sus textos al máximo cabe en los 500 caracteres que el bot lee de cada dato', () => {
+    const payload = businessInfoEventPayload(
+      buildBotBusinessInfo(SETTINGS, WINDOWS, [
+        {
+          name: 'n'.repeat(EVENT_NAME_MAX),
+          description: 'd'.repeat(EVENT_DESCRIPTION_MAX),
+          prizes: 'p'.repeat(EVENT_PRIZES_MAX),
+          endsAt: new Date('2026-09-30T23:59:59-05:00'),
+        },
+      ]),
+    );
+    expect(payload.active_events.length).toBeLessThanOrEqual(500);
   });
 });
