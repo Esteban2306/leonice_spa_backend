@@ -113,6 +113,45 @@ describe('deriveClientTags', () => {
     expect(result).not.toContain(ClientTagKey.APTA_PROMOCION);
   });
 
+  it('las citas que vencieron sin confirmarse no cuentan como inasistencia', () => {
+    const noShow = (
+      days: number,
+      noShowFromStatus: ReservationStatus | null,
+    ): TagReservation => ({
+      ...visit(days),
+      status: ReservationStatus.NO_SHOW,
+      completedAt: null,
+      noShowFromStatus,
+    });
+    expect(
+      keys(
+        client([
+          visit(30),
+          noShow(50, ReservationStatus.PENDIENTE_VALORACION),
+          noShow(100, ReservationStatus.PENDIENTE_DEPOSITO),
+        ]),
+      ),
+    ).not.toContain(ClientTagKey.NO_SHOW_REITERADO);
+    expect(
+      keys(
+        client([
+          visit(30),
+          noShow(50, ReservationStatus.CONFIRMADA),
+          noShow(100, ReservationStatus.SOLICITUD_INICIADA),
+        ]),
+      ),
+    ).not.toContain(ClientTagKey.NO_SHOW_REITERADO);
+    expect(
+      keys(
+        client([
+          visit(30),
+          noShow(50, ReservationStatus.CONFIRMADA),
+          noShow(100, null),
+        ]),
+      ),
+    ).toContain(ClientTagKey.NO_SHOW_REITERADO);
+  });
+
   it('distingue cita confirmada próxima de reserva pendiente', () => {
     const confirmed: TagReservation = {
       ...visit(-5),

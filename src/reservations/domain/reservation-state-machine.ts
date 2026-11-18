@@ -6,16 +6,19 @@ const ALLOWED_TRANSITIONS: Record<ReservationStatus, ReservationStatus[]> = {
     ReservationStatus.PENDIENTE_VALORACION,
     ReservationStatus.PENDIENTE_DEPOSITO,
     ReservationStatus.CANCELADA,
+    ReservationStatus.NO_SHOW,
   ],
   PENDIENTE_VALORACION: [
     ReservationStatus.PENDIENTE_DEPOSITO,
     ReservationStatus.CANCELADA,
     ReservationStatus.REPROGRAMADA,
+    ReservationStatus.NO_SHOW,
   ],
   PENDIENTE_DEPOSITO: [
     ReservationStatus.CONFIRMADA,
     ReservationStatus.CANCELADA,
     ReservationStatus.REPROGRAMADA,
+    ReservationStatus.NO_SHOW,
   ],
   CONFIRMADA: [
     ReservationStatus.CITA_EN_CURSO,

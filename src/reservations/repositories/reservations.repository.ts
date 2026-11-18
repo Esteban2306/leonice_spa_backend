@@ -8,7 +8,10 @@ import {
   ReservationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { HOLDING_EXCLUDED_STATUSES } from '../domain/reservation-status.constants';
+import {
+  HOLDING_EXCLUDED_STATUSES,
+  UNATTENDED_STATUSES,
+} from '../domain/reservation-status.constants';
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 
@@ -21,6 +24,7 @@ interface UpdateStatusData {
   completedAt?: Date;
   depositExpiresAt?: Date | null;
   depositClockStartedAt?: Date | null;
+  noShowFromStatus?: ReservationStatus | null;
 }
 
 export interface ReservationFilters {
@@ -332,16 +336,16 @@ export class ReservationsRepository {
     });
   }
 
-  async findOverdueConfirmedIds(
-    params: { startedBefore: Date; startedAfter: Date },
+  async findOverdueUnattendedIds(
+    startedBefore: Date,
     limit: number,
     client: PrismaClientOrTx = this.prisma.client,
   ): Promise<string[]> {
     const rows = await client.reservation.findMany({
       where: {
-        status: ReservationStatus.CONFIRMADA,
+        status: { in: [...UNATTENDED_STATUSES] },
         checkedInAt: null,
-        scheduledStart: { lt: params.startedBefore, gte: params.startedAfter },
+        scheduledStart: { lt: startedBefore },
       },
       select: { id: true },
       orderBy: { scheduledStart: 'asc' },

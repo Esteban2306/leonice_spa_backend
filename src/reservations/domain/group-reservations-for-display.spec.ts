@@ -67,6 +67,7 @@ function fakeReservation(
     cancelledAt: null,
     cancellationReason: null,
     cancellationSource: null,
+    noShowFromStatus: null,
     rescheduledFromId: null,
     depositExpiresAt: null,
     depositClockStartedAt: null,

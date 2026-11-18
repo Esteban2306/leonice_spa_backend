@@ -240,6 +240,7 @@ model Reservation {
   cancelledAt              DateTime?           @map("cancelled_at")
   cancellationReason       String?             @map("cancellation_reason")
   cancellationSource       CancellationSource? @map("cancellation_source")
+  noShowFromStatus         ReservationStatus?  @map("no_show_from_status")
   rescheduledFromId        String?             @unique @map("rescheduled_from_id")
   depositExpiresAt         DateTime?           @map("deposit_expires_at")
   depositClockStartedAt    DateTime?           @map("deposit_clock_started_at")

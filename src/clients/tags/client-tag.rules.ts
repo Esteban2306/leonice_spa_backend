@@ -1,4 +1,5 @@
 import { ClientTagKey, ReservationStatus } from '@prisma/client';
+import { noShowCountsAgainstClient } from '../../reservations/domain/reservation-status.constants';
 
 export const NEW_CLIENT_DAYS = 60;
 export const RECURRING_WINDOW_DAYS = 180;
@@ -33,6 +34,7 @@ export interface TagReservation {
   completedAt: Date | null;
   categoryName: string;
   treatmentName: string;
+  noShowFromStatus?: ReservationStatus | null;
 }
 
 export interface TagClientInput {
@@ -105,6 +107,7 @@ export function deriveClientTags(
   const noShows = input.reservations.filter(
     (item) =>
       item.status === ReservationStatus.NO_SHOW &&
+      noShowCountsAgainstClient(item.noShowFromStatus) &&
       daysBetween(item.scheduledStart, now) <= NO_SHOW_WINDOW_DAYS,
   ).length;
   const repeatedNoShow = noShows >= NO_SHOW_REPEATED_MIN;

@@ -48,7 +48,7 @@ const buildFixture = (
   const cancelCalls: CancelCall[] = [];
   const logged: LoggedExecution[] = [];
   const noShowCalls: string[] = [];
-  const sweepWindows: Array<{ startedBefore: Date; startedAfter: Date }> = [];
+  const sweepCutoffs: Date[] = [];
 
   const repository = {
     findById: () =>
@@ -68,11 +68,8 @@ const buildFixture = (
       ),
     hasSubmittedProof: () =>
       Promise.resolve(options.hasSubmittedProof ?? false),
-    findOverdueConfirmedIds: (params: {
-      startedBefore: Date;
-      startedAfter: Date;
-    }) => {
-      sweepWindows.push(params);
+    findOverdueUnattendedIds: (startedBefore: Date) => {
+      sweepCutoffs.push(startedBefore);
       return Promise.resolve(options.overdueIds ?? []);
     },
   };
@@ -104,7 +101,7 @@ const buildFixture = (
     executions as unknown as AutomationExecutionRepository,
   );
 
-  return { processor, cancelCalls, logged, noShowCalls, sweepWindows };
+  return { processor, cancelCalls, logged, noShowCalls, sweepCutoffs };
 };
 
 describe('ReservationTimeoutsProcessor', () => {
@@ -224,7 +221,7 @@ describe('ReservationTimeoutsProcessor', () => {
   });
 
   it('el barrido no-show marca las citas confirmadas sin check-in pasada la gracia', async () => {
-    const { processor, noShowCalls, sweepWindows, logged } = buildFixture(
+    const { processor, noShowCalls, sweepCutoffs, logged } = buildFixture(
       ReservationStatus.CONFIRMADA,
       { overdueIds: ['r1'] },
     );
@@ -232,17 +229,51 @@ describe('ReservationTimeoutsProcessor', () => {
     await processor.process(buildJob(JOB_NAMES.NO_SHOW_SWEEP));
 
     expect(noShowCalls).toEqual(['r1']);
-    const window = sweepWindows[0];
-    expect(Date.now() - window.startedBefore.getTime()).toBeGreaterThanOrEqual(
+    expect(Date.now() - sweepCutoffs[0].getTime()).toBeGreaterThanOrEqual(
       15 * 60_000,
-    );
-    expect(Date.now() - window.startedAfter.getTime()).toBeGreaterThanOrEqual(
-      7 * 24 * 3_600_000,
     );
     expect(logged.at(-1)).toMatchObject({
       type: AutomationExecutionType.NO_SHOW_CHECK,
       result: AutomationExecutionResult.EXECUTED,
+      reason: 'Pasó la hora de la cita sin check-in',
     });
+  });
+
+  it.each([
+    ReservationStatus.SOLICITUD_INICIADA,
+    ReservationStatus.PENDIENTE_VALORACION,
+    ReservationStatus.PENDIENTE_DEPOSITO,
+  ])(
+    'una cita vencida en %s también pasa a no asistió y deja su estado anterior',
+    async (status) => {
+      const { processor, noShowCalls, logged } = buildFixture(status, {
+        overdueIds: ['r1'],
+      });
+
+      await processor.process(buildJob(JOB_NAMES.NO_SHOW_SWEEP));
+
+      expect(noShowCalls).toEqual(['r1']);
+      expect(logged.at(-1)).toMatchObject({
+        type: AutomationExecutionType.NO_SHOW_CHECK,
+        result: AutomationExecutionResult.EXECUTED,
+      });
+      expect(logged.at(-1)?.reason).toContain(`estaba en ${status}`);
+    },
+  );
+
+  it.each([
+    ReservationStatus.COMPLETADA,
+    ReservationStatus.CANCELADA,
+    ReservationStatus.REPROGRAMADA,
+    ReservationStatus.NO_SHOW,
+  ])('una cita en %s no se toca', async (status) => {
+    const { processor, noShowCalls } = buildFixture(status, {
+      overdueIds: ['r1'],
+    });
+
+    await processor.process(buildJob(JOB_NAMES.NO_SHOW_SWEEP));
+
+    expect(noShowCalls).toEqual([]);
   });
 
   it('el barrido no-show respeta una cita que ya hizo check-in o cambió', async () => {

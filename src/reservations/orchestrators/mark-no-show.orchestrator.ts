@@ -24,7 +24,10 @@ export class MarkNoShowOrchestrator {
     const applied = await this.repository.updateStatusIfCurrent(
       reservationId,
       reservation.status,
-      { status: ReservationStatus.NO_SHOW },
+      {
+        status: ReservationStatus.NO_SHOW,
+        noShowFromStatus: reservation.status,
+      },
     );
     if (!applied) return;
 

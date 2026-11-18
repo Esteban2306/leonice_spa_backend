@@ -12,5 +12,4 @@ export const DEPOSIT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 export const DEPOSIT_SWEEP_BATCH_SIZE = 100;
 
 export const NO_SHOW_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
-export const NO_SHOW_SWEEP_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 export const NO_SHOW_SWEEP_BATCH_SIZE = 100;

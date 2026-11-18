@@ -21,8 +21,8 @@ import {
   DEPOSIT_SWEEP_BATCH_SIZE,
   NO_SHOW_GRACE_MS,
   NO_SHOW_SWEEP_BATCH_SIZE,
-  NO_SHOW_SWEEP_LOOKBACK_MS,
 } from '../../reservations/domain/reservation-timing.constants';
+import { UNATTENDED_STATUSES } from '../../reservations/domain/reservation-status.constants';
 
 interface TimeoutJobData {
   reservationId?: string;
@@ -89,7 +89,7 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
           DEPOSIT_TIMEOUT_REASON,
         );
       case JOB_NAMES.NO_SHOW_CHECK:
-        return this.markNoShowIfStillConfirmed(reservationId);
+        return this.markNoShowIfStillUnattended(reservationId);
       default:
         this.logger.warn(`Job desconocido recibido: ${job.name}`);
     }
@@ -132,12 +132,8 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
   }
 
   private async sweepNoShows(): Promise<void> {
-    const now = Date.now();
-    const ids = await this.repository.findOverdueConfirmedIds(
-      {
-        startedBefore: new Date(now - NO_SHOW_GRACE_MS),
-        startedAfter: new Date(now - NO_SHOW_SWEEP_LOOKBACK_MS),
-      },
+    const ids = await this.repository.findOverdueUnattendedIds(
+      new Date(Date.now() - NO_SHOW_GRACE_MS),
       NO_SHOW_SWEEP_BATCH_SIZE,
     );
     if (ids.length === 0) {
@@ -148,7 +144,7 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
     this.logger.log(`Barrido no-show: ${ids.length} cita(s) sin check-in`);
     for (const id of ids) {
       try {
-        await this.markNoShowIfStillConfirmed(id);
+        await this.markNoShowIfStillUnattended(id);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.error(
@@ -317,12 +313,12 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
     });
   }
 
-  private async markNoShowIfStillConfirmed(reservationId: string) {
+  private async markNoShowIfStillUnattended(reservationId: string) {
     const reservation = await this.repository.findById(reservationId);
 
     if (
       !reservation ||
-      reservation.status !== ReservationStatus.CONFIRMADA ||
+      !UNATTENDED_STATUSES.includes(reservation.status) ||
       reservation.checkedInAt
     ) {
       await this.skip(
@@ -332,10 +328,11 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
           ? 'La reserva ya no existe'
           : reservation.checkedInAt
             ? 'Ya hizo check-in'
-            : `Ya no está CONFIRMADA (está en ${reservation.status})`,
+            : `Ya no está pendiente de asistencia (está en ${reservation.status})`,
       );
       return;
     }
+    const previousStatus = reservation.status;
 
     const graceEndsAt = reservation.scheduledStart.getTime() + NO_SHOW_GRACE_MS;
     if (graceEndsAt > Date.now() + 1_000) {
@@ -360,6 +357,10 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
       type: AutomationExecutionType.NO_SHOW_CHECK,
       result: AutomationExecutionResult.EXECUTED,
       reservationId,
+      reason:
+        previousStatus === ReservationStatus.CONFIRMADA
+          ? 'Pasó la hora de la cita sin check-in'
+          : `Pasó la hora de la cita sin confirmarse (estaba en ${previousStatus}); no cuenta como inasistencia de la clienta`,
     });
   }
 }
