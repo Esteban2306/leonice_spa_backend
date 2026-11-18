@@ -82,6 +82,12 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
     if (job.name === JOB_NAMES.IN_PROGRESS_DIGEST) {
       return this.reportInProgress();
     }
+    if (job.name === JOB_NAMES.BUSINESS_INFO_RESYNC) {
+      this.eventBus.publish(EVENT_TYPES.BUSINESS_INFO_CHANGED, {
+        source: 'daily',
+      });
+      return;
+    }
 
     const reservationId = this.requireReservationId(job);
 

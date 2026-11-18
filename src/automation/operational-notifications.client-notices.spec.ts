@@ -25,7 +25,12 @@ function reservation(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function build(rows: ReturnType<typeof reservation>[]) {
+function build(rows: ReturnType<typeof reservation>[], ticket: unknown = null) {
+  const prisma = {
+    client: {
+      eventTicket: { findUnique: jest.fn().mockResolvedValue(ticket) },
+    },
+  };
   const conduit = {
     sendWhatsappMessage: jest
       .fn()
@@ -44,8 +49,9 @@ function build(rows: ReturnType<typeof reservation>[]) {
     {} as never,
     executions as never,
     templates as never,
+    prisma as never,
   );
-  return { service, conduit, executions, templates, reservations };
+  return { service, conduit, executions, templates, reservations, prisma };
 }
 
 describe('avisos a la clienta por aceptar o cancelar', () => {
@@ -134,6 +140,74 @@ describe('avisos a la clienta por aceptar o cancelar', () => {
       { reservationId: 'r1', reason: 'Motivo' },
       ctx,
     );
+
+    expect(conduit.sendWhatsappMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('boletas y ganadoras de eventos', () => {
+  const ticket = (overrides: Record<string, unknown> = {}) => ({
+    number: 23,
+    prize: null,
+    wonAt: null,
+    reservationId: 'r1',
+    clientId: 'c1',
+    event: { name: 'Rifa de aniversario' },
+    client: { name: 'Luz', phone: '573001112233' },
+    ...overrides,
+  });
+
+  it('le entrega la boleta numerada a la clienta', async () => {
+    const { service, conduit, executions } = build([], ticket());
+
+    await service.notifyClientEventTicket({ ticketId: 't1' }, ctx);
+
+    expect(firstSent(conduit)).toMatchObject({
+      phone: '573001112233',
+      variables: { nombre: 'Luz', evento: 'Rifa de aniversario', boleta: '23' },
+    });
+    expect(executions.log).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'EXECUTED', clientId: 'c1' }),
+    );
+  });
+
+  it('a la ganadora le dice su premio', async () => {
+    const { service, conduit } = build(
+      [],
+      ticket({ wonAt: new Date(), prize: 'Kit de productos' }),
+    );
+
+    await service.notifyClientEventWinner({ ticketId: 't1' }, ctx);
+
+    expect(firstSent(conduit).variables).toMatchObject({
+      boleta: '23',
+      premio: 'Kit de productos',
+    });
+  });
+
+  it('si WhatsApp rechaza el número lo deja omitido sin reintentar', async () => {
+    const { service, conduit, executions } = build([], ticket());
+    conduit.sendWhatsappMessage.mockResolvedValue({
+      delivered: false,
+      permanent: true,
+      reason: 'número sin WhatsApp',
+    });
+
+    await expect(
+      service.notifyClientEventTicket({ ticketId: 't1' }, ctx),
+    ).resolves.toBeUndefined();
+    expect(executions.log).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'SKIPPED' }),
+    );
+  });
+
+  it('no escribe a una clienta anonimizada', async () => {
+    const { service, conduit } = build(
+      [],
+      ticket({ client: { name: 'X', phone: 'anonimizado-1' } }),
+    );
+
+    await service.notifyClientEventTicket({ ticketId: 't1' }, ctx);
 
     expect(conduit.sendWhatsappMessage).not.toHaveBeenCalled();
   });

@@ -32,6 +32,7 @@ describe('CONDUIT_TEMPLATE_CATALOG', () => {
       'BONUS_SEASON',
       'BOOK_AHEAD',
       'CARE_REMINDER',
+      'EVENT_ANNOUNCEMENT',
       'HOME_CARE',
       'LAST_DAYS',
       'LOVE_FRIENDSHIP',

@@ -35,6 +35,7 @@ describe('Avisos al equipo por correo (vía Conduit)', () => {
         resolve: (envKey: string) =>
           Promise.resolve(templateIds[envKey] ?? null),
       } as unknown as ConduitTemplateResolver,
+      moduleRef.get(PrismaService),
     );
 
   const handoff = (recipientId: string, idempotencyKey = 'job-1') =>

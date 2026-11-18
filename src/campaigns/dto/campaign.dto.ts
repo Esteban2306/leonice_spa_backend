@@ -33,6 +33,10 @@ export class EstimateCampaignDto {
   @IsUUID()
   promotionId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  eventId?: string;
+
   @ValidateNested()
   @Type(() => AudienceFilterDto)
   filter: AudienceFilterDto;

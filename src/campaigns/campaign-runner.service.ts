@@ -23,6 +23,8 @@ import { MarketingFrequencyService } from '../marketing/marketing-frequency.serv
 import { CampaignsService } from './campaigns.service';
 import {
   buildCampaignVariables,
+  templateNeedsEvent,
+  type CampaignEvent,
   templateNeedsPromotion,
 } from './domain/campaign-variables';
 import {
@@ -147,6 +149,7 @@ export class CampaignRunnerService
         id: string;
         templateCode: string;
         promotionId: string | null;
+        eventId: string | null;
         marketing: boolean;
       };
     },
@@ -187,6 +190,30 @@ export class CampaignRunnerService
         );
         return;
       }
+    }
+
+    let event: CampaignEvent | null = null;
+    if (templateNeedsEvent(template)) {
+      const row = campaign.eventId
+        ? await this.prisma.client.promoEvent.findUnique({
+            where: { id: campaign.eventId },
+            select: {
+              name: true,
+              description: true,
+              prizes: true,
+              endsAt: true,
+              isActive: true,
+            },
+          })
+        : null;
+      if (!row || !row.isActive || row.endsAt <= now) {
+        await this.campaigns.pause(
+          campaign.id,
+          'El evento terminó o fue desactivado',
+        );
+        return;
+      }
+      event = row;
     }
 
     const client = await this.prisma.client.client.findUnique({
@@ -237,6 +264,7 @@ export class CampaignRunnerService
       },
       promotion,
       now,
+      event,
     );
     if ('skip' in built) {
       await this.finish(recipient.id, CampaignRecipientStatus.SKIPPED, {

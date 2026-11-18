@@ -247,6 +247,38 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     ].join('\n'),
   },
   {
+    code: 'CLIENT_EVENT_TICKET',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_EVENT_TICKET',
+    name: 'leonice_boleta_evento',
+    description:
+      'Le entrega a la clienta su boleta numerada de un evento del spa (por ejemplo una rifa) después de completar su visita.',
+    audience: 'CLIENT',
+    variables: ['nombre', 'evento', 'boleta'],
+    body: [
+      '🎟️ Hola {{nombre}}',
+      '',
+      'Gracias por tu visita. Ya participas en *{{evento}}* con la boleta *#{{boleta}}*.',
+      '',
+      '¡Mucha suerte! Te avisaremos por aquí si resultas ganadora 🌿',
+    ].join('\n'),
+  },
+  {
+    code: 'CLIENT_EVENT_WINNER',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_EVENT_WINNER',
+    name: 'leonice_ganadora_evento',
+    description:
+      'Le avisa a la clienta que su boleta ganó en el sorteo de un evento del spa y qué premio recibe.',
+    audience: 'CLIENT',
+    variables: ['nombre', 'evento', 'boleta', 'premio'],
+    body: [
+      '🎉 ¡Felicitaciones, {{nombre}}!',
+      '',
+      'Tu boleta *#{{boleta}}* ganó en *{{evento}}*. Tu premio: *{{premio}}*.',
+      '',
+      'Respóndenos por aquí para coordinar la entrega 🌿',
+    ].join('\n'),
+  },
+  {
     code: 'CLIENT_CANCELLED_BY_ADMIN',
     envKey: 'CONDUIT_TEMPLATE_CLIENT_CANCELLED_BY_ADMIN',
     name: 'leonice_cita_cancelada_por_spa',
@@ -635,6 +667,8 @@ export const BROADCAST_VARIABLES = [
   'promocion',
   'descuento',
   'vigencia',
+  'evento',
+  'detalle',
 ] as const;
 
 export function isBroadcastTemplate(

@@ -31,6 +31,32 @@ function broadcast(
 
 export const BROADCAST_CATALOG: readonly ConduitTemplateDefinition[] = [
   broadcast(
+    'EVENT_ANNOUNCEMENT',
+    'anuncio_evento',
+    'Anuncia un evento o actividad del spa (rifa, aniversario, jornada especial) con su descripción y vigencia.',
+    ['nombre', 'evento', 'detalle', 'vigencia'],
+    [
+      message(
+        'Hola {{nombre}} 🌿',
+        'En Leonice Arenas Spa Capilar tenemos *{{evento}}* {{vigencia}}.',
+        '{{detalle}}',
+        '¿Quieres participar? Respóndenos por aquí y te ayudamos a agendar.',
+      ),
+      message(
+        '{{nombre}}, ¡tenemos algo especial para ti! ✨',
+        '*{{evento}}*, {{vigencia}}.',
+        '{{detalle}}',
+        'Escríbenos por aquí y reservamos tu horario.',
+      ),
+      message(
+        'Hola {{nombre}} 🎉',
+        'Te contamos de *{{evento}}* en Leonice Arenas Spa Capilar, {{vigencia}}.',
+        '{{detalle}}',
+        'Si te animas, respóndenos y te mostramos los horarios disponibles.',
+      ),
+    ],
+  ),
+  broadcast(
     'BIRTHDAY_GREETING',
     'cumpleanos',
     'Saludo de cumpleaños sin promoción, para quienes cumplen años pronto.',

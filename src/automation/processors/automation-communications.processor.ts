@@ -33,6 +33,7 @@ import {
   AdminRescheduleNoticeJobData,
   AdminHandoffNoticeJobData,
   AdminInProgressNoticeJobData,
+  ClientEventTicketNoticeJobData,
   AdminProductPurchaseNoticeJobData,
   AdminReceiptNoticeJobData,
   CancellationLinkNoticeJobData,
@@ -65,7 +66,8 @@ type AutomationJobData =
   | AdminHandoffNoticeJobData
   | AdminProductPurchaseNoticeJobData
   | AdminReceiptNoticeJobData
-  | AdminInProgressNoticeJobData;
+  | AdminInProgressNoticeJobData
+  | ClientEventTicketNoticeJobData;
 
 const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
   JOB_NAMES.RESERVATION_REMINDER_CHECK,
@@ -76,6 +78,8 @@ const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
   JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED,
   JOB_NAMES.NOTIFY_CLIENT_CANCELLATION_CONFIRMED,
   JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK,
+  JOB_NAMES.NOTIFY_CLIENT_EVENT_TICKET,
+  JOB_NAMES.NOTIFY_CLIENT_EVENT_WINNER,
 ]);
 
 const PAUSED_REASON = 'Sistema en pausa: no se envió el mensaje';
@@ -174,6 +178,16 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       case JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PURCHASE:
         return this.notifications.notifyAdminProductPurchase(
           job.data as AdminProductPurchaseNoticeJobData,
+          ctx,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_EVENT_TICKET:
+        return this.notifications.notifyClientEventTicket(
+          job.data as ClientEventTicketNoticeJobData,
+          ctx,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_EVENT_WINNER:
+        return this.notifications.notifyClientEventWinner(
+          job.data as ClientEventTicketNoticeJobData,
           ctx,
         );
       case JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS:
@@ -275,6 +289,10 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.ADMIN_RECEIPT_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS:
         return AutomationExecutionType.ADMIN_IN_PROGRESS_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_EVENT_TICKET:
+        return AutomationExecutionType.CLIENT_EVENT_TICKET_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_EVENT_WINNER:
+        return AutomationExecutionType.CLIENT_EVENT_WINNER_NOTICE;
       default:
         return null;
     }

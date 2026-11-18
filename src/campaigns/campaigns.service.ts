@@ -17,6 +17,7 @@ import {
 } from '../conduit/templates/conduit-template-catalog';
 import { ConduitTemplateResolver } from '../conduit/templates/conduit-template-resolver';
 import {
+  templateNeedsEvent,
   templateNeedsPromotion,
   templateNeedsVisit,
 } from './domain/campaign-variables';
@@ -113,6 +114,7 @@ export class CampaignsService {
       configured:
         usage.find((item) => item.name === template.code)?.configured ?? false,
       needsPromotion: templateNeedsPromotion(template),
+      needsEvent: templateNeedsEvent(template),
       needsVisit: templateNeedsVisit(template),
       body: template.body,
     }));
@@ -121,6 +123,7 @@ export class CampaignsService {
   async estimate(dto: EstimateCampaignDto, now: Date = new Date()) {
     const template = this.requireTemplate(dto.templateCode);
     await this.requirePromotionIfNeeded(template, dto.promotionId, now);
+    await this.requireEventIfNeeded(template, dto.eventId, now);
     const [settings, preview, alreadySentToday] = await Promise.all([
       this.getSettings(),
       this.audiences.preview(dto.filter, template.marketing === true, now),
@@ -140,6 +143,7 @@ export class CampaignsService {
   async create(dto: CreateCampaignDto, now: Date = new Date()) {
     const template = this.requireTemplate(dto.templateCode);
     await this.requirePromotionIfNeeded(template, dto.promotionId, now);
+    await this.requireEventIfNeeded(template, dto.eventId, now);
 
     const usage = (await this.templates.describe()).find(
       (item) => item.name === template.code,
@@ -174,6 +178,7 @@ export class CampaignsService {
         name: dto.name.trim(),
         templateCode: template.code,
         promotionId: dto.promotionId ?? null,
+        eventId: templateNeedsEvent(template) ? (dto.eventId ?? null) : null,
         audience: dto.filter as unknown as Prisma.InputJsonValue,
         marketing,
         pace: dto.pace,
@@ -364,6 +369,23 @@ export class CampaignsService {
     }
   }
 
+  private async requireEventIfNeeded(
+    template: ConduitTemplateDefinition,
+    eventId: string | undefined,
+    now: Date,
+  ) {
+    if (!templateNeedsEvent(template)) return;
+    if (!eventId) {
+      throw new BadRequestException('Elige el evento que vas a anunciar');
+    }
+    const event = await this.prisma.client.promoEvent.findUnique({
+      where: { id: eventId },
+    });
+    if (!event || !event.isActive || event.endsAt <= now) {
+      throw new BadRequestException('El evento no existe o ya terminó');
+    }
+  }
+
   private async requireCampaign(id: string) {
     const campaign = await this.prisma.client.campaign.findUnique({
       where: { id },
@@ -427,6 +449,7 @@ export class CampaignsService {
       templateCode: campaign.templateCode,
       templateName: template?.name ?? campaign.templateCode,
       promotionId: campaign.promotionId,
+      eventId: campaign.eventId,
       audience: campaign.audience,
       pace: campaign.pace,
       status: campaign.status,

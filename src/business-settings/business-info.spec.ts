@@ -125,4 +125,27 @@ describe('ConduitOutboxListener.handleBusinessInfoChanged', () => {
       }),
     );
   });
+
+  it('los eventos vigentes llegan al bot y sin eventos el dato queda vacío', () => {
+    const withEvent = businessInfoEventPayload(
+      buildBotBusinessInfo(SETTINGS, WINDOWS, [
+        {
+          name: 'Rifa de aniversario',
+          description: 'Por cada visita recibes una boleta para la rifa.',
+          prizes: 'Kit de productos y un ritual completo',
+          endsAt: new Date('2026-11-30T23:59:59-05:00'),
+        },
+      ]),
+    );
+    expect(withEvent.active_events).toBe(
+      'Rifa de aniversario (hasta el 30 de noviembre): Por cada visita recibes una boleta para la rifa. Premios: Kit de productos y un ritual completo',
+    );
+    expect(BUSINESS_INFO_MAPPING_RULES.active_events).toBe(
+      'negocio.eventos_vigentes',
+    );
+    expect(
+      businessInfoEventPayload(buildBotBusinessInfo(SETTINGS, WINDOWS))
+        .active_events,
+    ).toBe('');
+  });
 });

@@ -18,6 +18,8 @@ import { AdminNotificationRecipientsRepository } from 'src/admin-notifications/r
 import { AutomationExecutionRepository } from './repositories/automation-execution.repository';
 import { ConduitTemplateResolver } from '../conduit/templates/conduit-template-resolver';
 import { assertMessageDelivered } from './utils/assert-message-delivered';
+import { PrismaService } from '../infrastructure/database/prisma.service';
+import { ANONYMIZED_PHONE_PREFIX } from '../client-privacy/anonymized-client';
 import { formatNotificationDateTime } from './utils/format-notification-date';
 import {
   OPERATIONAL_EMAIL_TEMPLATE_ENV_KEYS,
@@ -26,6 +28,7 @@ import {
   type AdminClientCancellationNoticeJobData,
   type AdminHandoffNoticeJobData,
   type AdminInProgressNoticeJobData,
+  type ClientEventTicketNoticeJobData,
   type AdminProductPurchaseNoticeJobData,
   type AdminReceiptNoticeJobData,
   type AdminRescheduleNoticeJobData,
@@ -83,6 +86,7 @@ export class OperationalNotificationsService {
     private readonly recipients: AdminNotificationRecipientsRepository,
     private readonly executions: AutomationExecutionRepository,
     private readonly templates: ConduitTemplateResolver,
+    private readonly prisma: PrismaService,
   ) {}
 
   async notifyAdminDepositTimeout(
@@ -416,6 +420,112 @@ export class OperationalNotificationsService {
   }
 
   /** Una clienta pidió comprar un producto: el equipo la contacta. */
+  async notifyClientEventTicket(
+    data: ClientEventTicketNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    await this.notifyEventTicket(
+      data.ticketId,
+      ctx,
+      AutomationExecutionType.CLIENT_EVENT_TICKET_NOTICE,
+      'CLIENT_EVENT_TICKET',
+    );
+  }
+
+  async notifyClientEventWinner(
+    data: ClientEventTicketNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    await this.notifyEventTicket(
+      data.ticketId,
+      ctx,
+      AutomationExecutionType.CLIENT_EVENT_WINNER_NOTICE,
+      'CLIENT_EVENT_WINNER',
+    );
+  }
+
+  private async notifyEventTicket(
+    ticketId: string,
+    ctx: ConduitSendContext,
+    type: AutomationExecutionType,
+    template: 'CLIENT_EVENT_TICKET' | 'CLIENT_EVENT_WINNER',
+  ): Promise<void> {
+    const ticket = await this.prisma.client.eventTicket.findUnique({
+      where: { id: ticketId },
+      select: {
+        number: true,
+        prize: true,
+        wonAt: true,
+        reservationId: true,
+        clientId: true,
+        event: { select: { name: true } },
+        client: { select: { name: true, phone: true } },
+      },
+    });
+    const log = (
+      result: AutomationExecutionResult,
+      reason: string,
+    ): Promise<unknown> =>
+      this.executions.log({
+        type,
+        result,
+        reservationId: ticket?.reservationId ?? undefined,
+        clientId: ticket?.clientId,
+        reason,
+      });
+
+    if (!ticket) {
+      await log(AutomationExecutionResult.SKIPPED, 'La boleta ya no existe');
+      return;
+    }
+    if (template === 'CLIENT_EVENT_WINNER' && !ticket.wonAt) {
+      await log(AutomationExecutionResult.SKIPPED, 'La boleta no es ganadora');
+      return;
+    }
+    if (ticket.client.phone.startsWith(ANONYMIZED_PHONE_PREFIX)) {
+      await log(
+        AutomationExecutionResult.SKIPPED,
+        'La clienta fue anonimizada',
+      );
+      return;
+    }
+
+    const templateId = await this.templates.resolve(
+      OPERATIONAL_TEMPLATE_ENV_KEYS[template],
+    );
+    if (!templateId) {
+      throw new UnrecoverableError(
+        `No hay plantilla de Conduit para ${OPERATIONAL_TEMPLATE_ENV_KEYS[template]}: créala con pnpm seed`,
+      );
+    }
+    const result = await this.conduit.sendWhatsappMessage({
+      phone: ticket.client.phone,
+      templateId,
+      variables: {
+        nombre: ticket.client.name,
+        evento: ticket.event.name,
+        boleta: String(ticket.number),
+        ...(template === 'CLIENT_EVENT_WINNER'
+          ? { premio: ticket.prize ?? 'un premio' }
+          : {}),
+      },
+      idempotencyKey: `${ctx.idempotencyKey}:${template}`,
+      companyEventId: ctx.companyEventId,
+    });
+    if (!result.delivered && result.permanent) {
+      await log(
+        AutomationExecutionResult.SKIPPED,
+        `WhatsApp no aceptó el mensaje: ${result.reason ?? 'sin detalle'}`,
+      );
+      return;
+    }
+    assertMessageDelivered(result);
+    await log(
+      AutomationExecutionResult.EXECUTED,
+      `${ticket.event.name}: boleta #${ticket.number}`,
+    );
+  }
+
   async notifyAdminInProgress(
     data: AdminInProgressNoticeJobData,
     ctx: ConduitSendContext,

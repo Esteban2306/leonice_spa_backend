@@ -28,6 +28,7 @@ import { AutomationModule } from './automation/automation.module';
 import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
 import { GlobalGuardChain } from './common/guards/global-guard-chain.guard';
 import { PromotionsModule } from './promotions/promotions.module';
+import { PromoEventsModule } from './promo-events/promo-events.module';
 import { AudiencesModule } from './audiences/audiences.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
@@ -72,6 +73,7 @@ import { AdminModule } from './admin/admin.module';
     QueueModule,
     AutomationModule,
     PromotionsModule,
+    PromoEventsModule,
     AudiencesModule,
     CampaignsModule,
     IdempotencyModule,

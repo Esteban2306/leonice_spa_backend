@@ -12,6 +12,7 @@ export const JOB_NAMES = {
   NO_SHOW_CHECK: 'no-show-check',
   DEPOSIT_EXPIRY_SWEEP: 'deposit-expiry-sweep',
   IN_PROGRESS_DIGEST: 'in-progress-digest',
+  BUSINESS_INFO_RESYNC: 'business-info-resync',
   NO_SHOW_SWEEP: 'no-show-sweep',
 
   // Comunicación saliente — corre en AUTOMATION_COMMUNICATIONS
@@ -37,5 +38,7 @@ export const JOB_NAMES = {
   NOTIFY_ADMIN_PRODUCT_PURCHASE: 'notify-admin-product-purchase',
   NOTIFY_ADMIN_RECEIPT_ISSUE: 'notify-admin-receipt-issue',
   NOTIFY_ADMIN_IN_PROGRESS: 'notify-admin-in-progress',
+  NOTIFY_CLIENT_EVENT_TICKET: 'notify-client-event-ticket',
+  NOTIFY_CLIENT_EVENT_WINNER: 'notify-client-event-winner',
   SEND_CLIENT_CANCELLATION_LINK: 'send-client-cancellation-link',
 } as const;

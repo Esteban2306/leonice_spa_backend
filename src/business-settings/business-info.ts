@@ -21,6 +21,23 @@ export interface BusinessSettingsRow {
   ownerContactPhone: string | null;
 }
 
+export interface ActiveEventRow {
+  name: string;
+  description: string;
+  prizes: string | null;
+  endsAt: Date;
+}
+
+const EVENT_END_FORMAT = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota',
+  day: 'numeric',
+  month: 'long',
+});
+
+export function eventUntilText(endsAt: Date): string {
+  return `hasta el ${EVENT_END_FORMAT.format(endsAt)}`;
+}
+
 export interface OperatingWindowRow {
   dayOfWeek: number;
   startMinute: number;
@@ -38,6 +55,7 @@ export function minutesToClock(minutes: number): string {
 export function buildBotBusinessInfo(
   settings: BusinessSettingsRow,
   windows: readonly OperatingWindowRow[],
+  events: readonly ActiveEventRow[] = [],
 ) {
   const weeklySchedule = BUSINESS_DAY_NAMES.map((day, dayOfWeek) => {
     const ranges = windows
@@ -62,6 +80,12 @@ export function buildBotBusinessInfo(
     ownerContactPhone: settings.ownerContactPhone,
     timeZone: 'America/Bogota',
     weeklySchedule,
+    activeEvents: events.map((event) => ({
+      name: event.name,
+      description: event.description,
+      prizes: event.prizes,
+      until: eventUntilText(event.endsAt),
+    })),
   };
 }
 
@@ -82,6 +106,12 @@ export function businessInfoEventPayload(info: BotBusinessInfo) {
     additional_info: info.additionalInfo ?? '',
     owner_contact_phone: info.ownerContactPhone ?? '',
     schedule: info.weeklySchedule.map((d) => `${d.day} ${d.hours}`).join('; '),
+    active_events: info.activeEvents
+      .map(
+        (event) =>
+          `${event.name} (${event.until}): ${event.description}${event.prizes ? ` Premios: ${event.prizes}` : ''}`,
+      )
+      .join(' | '),
   };
 }
 
@@ -95,4 +125,5 @@ export const BUSINESS_INFO_MAPPING_RULES: Record<string, string> = {
   additional_info: 'negocio.informacion_adicional',
   owner_contact_phone: 'negocio.whatsapp_de_leo',
   schedule: 'negocio.horario',
+  active_events: 'negocio.eventos_vigentes',
 };

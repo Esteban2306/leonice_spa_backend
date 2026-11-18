@@ -12,6 +12,7 @@ import {
 
 const BUSINESS_TIME_ZONE = 'America/Bogota';
 const END_OF_DAY_PATTERN = '59 23 * * *';
+const START_OF_DAY_PATTERN = '1 0 * * *';
 
 const SWEEPS = [
   {
@@ -34,6 +35,14 @@ const SWEEPS = [
     repeat: { pattern: END_OF_DAY_PATTERN, tz: BUSINESS_TIME_ZONE },
     label: 'citas en curso sin completar',
     when: 'todos los días a las 11:59 p. m. (Bogotá)',
+  },
+  {
+    schedulerId: 'business-info-resync',
+    jobName: JOB_NAMES.BUSINESS_INFO_RESYNC,
+    repeat: { pattern: START_OF_DAY_PATTERN, tz: BUSINESS_TIME_ZONE },
+    label:
+      'datos del negocio para el asistente (eventos que empiezan o terminan)',
+    when: 'todos los días a las 12:01 a. m. (Bogotá)',
   },
 ] as const;
 

@@ -120,7 +120,7 @@ export interface EventPayloadMap {
   };
 
   [EVENT_TYPES.BUSINESS_INFO_CHANGED]: {
-    source: 'settings' | 'schedule';
+    source: 'settings' | 'schedule' | 'events' | 'daily';
   };
 
   [EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED]: {

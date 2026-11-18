@@ -79,12 +79,18 @@ export class BusinessSettingsService {
    * Montos en miles de COP, como el resto de la API.
    */
   async forBot() {
-    const [settings, windows] = await Promise.all([
+    const now = new Date();
+    const [settings, windows, events] = await Promise.all([
       this.get(),
       this.prisma.client.operatingWindow.findMany({
         orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
       }),
+      this.prisma.client.promoEvent.findMany({
+        where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+        orderBy: { endsAt: 'asc' },
+        select: { name: true, description: true, prizes: true, endsAt: true },
+      }),
     ]);
-    return buildBotBusinessInfo(settings, windows);
+    return buildBotBusinessInfo(settings, windows, events);
   }
 }

@@ -49,6 +49,7 @@ model Client {
   productViewLogs      ProductViewLog[]
   reservations         Reservation[]
   tags                 ClientTag[]
+  eventTickets         EventTicket[]
 
   @@index([createdAt])
   @@map("clients")
@@ -258,6 +259,7 @@ model Reservation {
   rescheduledFrom          Reservation?        @relation("ReservationReschedule", fields: [rescheduledFromId], references: [id])
   rescheduledTo            Reservation?        @relation("ReservationReschedule")
   treatment                Treatment           @relation(fields: [treatmentId], references: [id])
+  eventTickets             EventTicket[]
 
   @@index([categoryId, status, scheduledStart, scheduledEnd])
   @@index([comboGroupId])
@@ -717,6 +719,8 @@ enum AutomationExecutionType {
   CLIENT_CANCELLATION_LINK_NOTICE
   ADMIN_HANDOFF_NOTICE
   ADMIN_IN_PROGRESS_NOTICE
+  CLIENT_EVENT_TICKET_NOTICE
+  CLIENT_EVENT_WINNER_NOTICE
   ADMIN_PRODUCT_PURCHASE_NOTICE
   ADMIN_RECEIPT_NOTICE
   CLIENT_RESERVATION_CONFIRMED_NOTICE
@@ -801,6 +805,7 @@ model Campaign {
   name            String
   templateCode    String              @map("template_code")
   promotionId     String?             @map("promotion_id")
+  eventId         String?             @map("event_id")
   audience        Json
   marketing       Boolean             @default(true)
   pace            String
@@ -812,6 +817,7 @@ model Campaign {
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
   recipients      CampaignRecipient[]
+  event           PromoEvent?         @relation(fields: [eventId], references: [id])
 
   @@index([status])
   @@map("campaigns")
@@ -844,4 +850,45 @@ model CampaignSettings {
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("campaign_settings")
+}
+
+model PromoEvent {
+  id               String        @id @default(uuid())
+  name             String
+  description      String
+  prizes           String?
+  startsAt         DateTime      @map("starts_at")
+  endsAt           DateTime      @map("ends_at")
+  isActive         Boolean       @default(true) @map("is_active")
+  ticketsEnabled   Boolean       @default(false) @map("tickets_enabled")
+  nextTicketNumber Int           @default(1) @map("next_ticket_number")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  tickets          EventTicket[]
+  campaigns        Campaign[]
+
+  @@index([isActive, startsAt, endsAt])
+  @@map("promo_events")
+}
+
+model EventTicket {
+  id            String       @id @default(uuid())
+  eventId       String       @map("event_id")
+  clientId      String       @map("client_id")
+  reservationId String?      @map("reservation_id")
+  visitKey      String       @map("visit_key")
+  number        Int
+  wonAt         DateTime?    @map("won_at")
+  prize         String?
+  drawnByUserId String?      @map("drawn_by_user_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  event         PromoEvent   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  client        Client       @relation(fields: [clientId], references: [id])
+  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, number])
+  @@unique([eventId, visitKey])
+  @@index([clientId])
+  @@index([eventId, wonAt])
+  @@map("event_tickets")
 }

@@ -23,6 +23,7 @@ function build(recipient: Record<string, unknown> | null) {
     recipients as never,
     executions as never,
     templates as never,
+    {} as never,
   );
   return { service, conduit, executions, templates };
 }

@@ -14,6 +14,13 @@ export interface CampaignPromotion {
   endsAt: Date;
 }
 
+export interface CampaignEvent {
+  name: string;
+  description: string;
+  prizes: string | null;
+  endsAt: Date;
+}
+
 export interface CampaignMemberData {
   name: string;
   lastVisitAt: Date | null;
@@ -29,6 +36,10 @@ export const templateNeedsPromotion = (
     template.variables.includes(name),
   );
 
+export const templateNeedsEvent = (
+  template: Pick<ConduitTemplateDefinition, 'variables'>,
+): boolean => template.variables.includes('evento');
+
 export const templateNeedsVisit = (
   template: Pick<ConduitTemplateDefinition, 'variables'>,
 ): boolean => template.variables.includes('dias');
@@ -41,6 +52,7 @@ export function buildCampaignVariables(
   member: CampaignMemberData,
   promotion: CampaignPromotion | null,
   now: Date,
+  event: CampaignEvent | null = null,
 ): CampaignVariablesResult {
   const values: Record<string, string> = { nombre: member.name };
 
@@ -59,6 +71,15 @@ export function buildCampaignVariables(
     values.promocion = promotion.name;
     values.descuento = percentageText(promotion.discountPercentage);
     values.vigencia = `hasta el ${END_FORMAT.format(promotion.endsAt)}`;
+  }
+
+  if (templateNeedsEvent(template)) {
+    if (!event) return { skip: 'La campaña no tiene evento' };
+    values.evento = event.name;
+    values.detalle = event.prizes
+      ? `${event.description} Premios: ${event.prizes}`
+      : event.description;
+    values.vigencia = `hasta el ${END_FORMAT.format(event.endsAt)}`;
   }
 
   return {

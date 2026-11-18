@@ -18,6 +18,8 @@ export const OPERATIONAL_TEMPLATE_ENV_KEYS = {
   ADMIN_RECEIPT_REVIEW: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW',
   ADMIN_RECEIPT_RETRIES: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES',
   ADMIN_IN_PROGRESS: 'CONDUIT_TEMPLATE_ADMIN_IN_PROGRESS',
+  CLIENT_EVENT_TICKET: 'CONDUIT_TEMPLATE_CLIENT_EVENT_TICKET',
+  CLIENT_EVENT_WINNER: 'CONDUIT_TEMPLATE_CLIENT_EVENT_WINNER',
 } as const;
 
 export type OperationalTemplate = keyof typeof OPERATIONAL_TEMPLATE_ENV_KEYS;
@@ -101,6 +103,10 @@ export interface AdminProductPurchaseNoticeJobData {
   clientName: string | null;
   request: string;
   notes: string | null;
+}
+
+export interface ClientEventTicketNoticeJobData {
+  ticketId: string;
 }
 
 export interface AdminInProgressNoticeJobData {
