@@ -385,6 +385,22 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     ].join('\n'),
   },
   {
+    code: 'ADMIN_IN_PROGRESS',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_IN_PROGRESS',
+    name: 'leonice_aviso_citas_en_curso',
+    description:
+      'Aviso interno al cierre del día: citas que siguen en curso porque nadie las completó ni registró su pago.',
+    audience: 'ADMIN',
+    variables: ['cantidad', 'citas'],
+    body: [
+      '🕚 *Citas en curso sin completar: {{cantidad}}*',
+      '',
+      '{{citas}}',
+      '',
+      'Complétalas desde el calendario del panel y registra cómo pagó cada clienta.',
+    ].join('\n'),
+  },
+  {
     code: 'ADMIN_HANDOFF',
     envKey: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF',
     name: 'leonice_aviso_atencion_humana',
@@ -488,6 +504,22 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
         '<strong>Notas:</strong> {{notas}}',
       ],
       'El asistente sigue activo en ese chat. Contáctala para coordinar la compra en la tienda.',
+    ),
+  },
+  {
+    code: 'ADMIN_IN_PROGRESS_EMAIL',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_IN_PROGRESS_EMAIL',
+    name: 'leonice_correo_citas_en_curso',
+    description:
+      'Correo interno al cierre del día: citas que siguen en curso porque nadie las completó ni registró su pago.',
+    audience: 'ADMIN',
+    channel: 'EMAIL',
+    subject: 'Citas en curso sin completar: {{cantidad}}',
+    variables: ['cantidad', 'citas'],
+    body: emailLayout(
+      'Citas en curso sin completar: {{cantidad}}',
+      ['<div style="white-space:pre-line">{{citas}}</div>'],
+      'Complétalas desde el calendario del panel y registra cómo pagó cada clienta.',
     ),
   },
   {

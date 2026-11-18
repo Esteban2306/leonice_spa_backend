@@ -336,6 +336,27 @@ export class ReservationsRepository {
     });
   }
 
+  findInProgressStartedBefore(
+    startedBefore: Date,
+    limit: number,
+    client: PrismaClientOrTx = this.prisma.client,
+  ) {
+    return client.reservation.findMany({
+      where: {
+        status: ReservationStatus.CITA_EN_CURSO,
+        scheduledStart: { lt: startedBefore },
+      },
+      select: {
+        id: true,
+        scheduledStart: true,
+        client: { select: { name: true } },
+        treatment: { select: { name: true } },
+      },
+      orderBy: { scheduledStart: 'asc' },
+      take: limit,
+    });
+  }
+
   async findOverdueUnattendedIds(
     startedBefore: Date,
     limit: number,

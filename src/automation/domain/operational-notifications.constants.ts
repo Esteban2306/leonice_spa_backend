@@ -17,6 +17,7 @@ export const OPERATIONAL_TEMPLATE_ENV_KEYS = {
   ADMIN_PRODUCT_PURCHASE: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PURCHASE',
   ADMIN_RECEIPT_REVIEW: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW',
   ADMIN_RECEIPT_RETRIES: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES',
+  ADMIN_IN_PROGRESS: 'CONDUIT_TEMPLATE_ADMIN_IN_PROGRESS',
 } as const;
 
 export type OperationalTemplate = keyof typeof OPERATIONAL_TEMPLATE_ENV_KEYS;
@@ -31,6 +32,7 @@ export const OPERATIONAL_EMAIL_TEMPLATE_ENV_KEYS: Partial<
   ADMIN_PRODUCT_PURCHASE: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PURCHASE_EMAIL',
   ADMIN_RECEIPT_REVIEW: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW_EMAIL',
   ADMIN_RECEIPT_RETRIES: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES_EMAIL',
+  ADMIN_IN_PROGRESS: 'CONDUIT_TEMPLATE_ADMIN_IN_PROGRESS_EMAIL',
 };
 
 export const ADMIN_TIMEOUT_NOTICE_DELAY_MS = 60_000;
@@ -99,6 +101,13 @@ export interface AdminProductPurchaseNoticeJobData {
   clientName: string | null;
   request: string;
   notes: string | null;
+}
+
+export interface AdminInProgressNoticeJobData {
+  recipientId: string;
+  digestId: string;
+  total: number;
+  lines: string[];
 }
 
 export interface AdminReceiptNoticeJobData {

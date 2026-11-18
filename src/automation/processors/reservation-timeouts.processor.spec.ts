@@ -9,6 +9,7 @@ import { AppException } from '../../common/errors/app.exception';
 import { JOB_NAMES } from '../../infrastructure/queue/queue.constants';
 import { ReservationsRepository } from '../../reservations/repositories/reservations.repository';
 import { AdminCancelReservationOrchestrator } from '../../reservations/orchestrators/admin-cancel-reservation.orchestrator';
+import type { EventBusService } from '../../common/events/event.service';
 import { MarkNoShowOrchestrator } from '../../reservations/orchestrators/mark-no-show.orchestrator';
 import { AutomationExecutionRepository } from '../repositories/automation-execution.repository';
 import { ReservationTimeoutsProcessor } from './reservation-timeouts.processor';
@@ -32,6 +33,12 @@ interface FixtureOptions {
   depositExpiresAt?: Date | null;
   overdueIds?: string[];
   scheduledStart?: Date;
+  inProgress?: Array<{
+    id: string;
+    scheduledStart: Date;
+    client: { name: string };
+    treatment: { name: string };
+  }>;
 }
 
 const EXPIRED_DEADLINE = new Date(Date.now() - 60_000);
@@ -49,6 +56,7 @@ const buildFixture = (
   const logged: LoggedExecution[] = [];
   const noShowCalls: string[] = [];
   const sweepCutoffs: Date[] = [];
+  const inProgressQueries: Array<{ startedBefore: Date; limit: number }> = [];
 
   const repository = {
     findById: () =>
@@ -68,6 +76,10 @@ const buildFixture = (
       ),
     hasSubmittedProof: () =>
       Promise.resolve(options.hasSubmittedProof ?? false),
+    findInProgressStartedBefore: (startedBefore: Date, limit: number) => {
+      inProgressQueries.push({ startedBefore, limit });
+      return Promise.resolve(options.inProgress ?? []);
+    },
     findOverdueUnattendedIds: (startedBefore: Date) => {
       sweepCutoffs.push(startedBefore);
       return Promise.resolve(options.overdueIds ?? []);
@@ -94,14 +106,30 @@ const buildFixture = (
     },
   };
 
+  const published: Array<{ type: string; payload: unknown }> = [];
+  const eventBus = {
+    publish: (type: string, payload: unknown) => {
+      published.push({ type, payload });
+    },
+  };
+
   const processor = new ReservationTimeoutsProcessor(
     repository as unknown as ReservationsRepository,
     adminCancel as unknown as AdminCancelReservationOrchestrator,
     markNoShow as unknown as MarkNoShowOrchestrator,
     executions as unknown as AutomationExecutionRepository,
+    eventBus as unknown as EventBusService,
   );
 
-  return { processor, cancelCalls, logged, noShowCalls, sweepCutoffs };
+  return {
+    processor,
+    cancelCalls,
+    logged,
+    noShowCalls,
+    sweepCutoffs,
+    published,
+    inProgressQueries,
+  };
 };
 
 describe('ReservationTimeoutsProcessor', () => {
@@ -286,5 +314,57 @@ describe('ReservationTimeoutsProcessor', () => {
 
     expect(noShowCalls).toEqual([]);
     expect(logged.at(-1)?.result).toBe(AutomationExecutionResult.SKIPPED);
+  });
+
+  it('al cierre del día avisa las citas en curso sin completar, sin completarlas', async () => {
+    const start = new Date('2026-11-17T15:00:00Z');
+    const {
+      processor,
+      published,
+      inProgressQueries,
+      noShowCalls,
+      cancelCalls,
+    } = buildFixture(null, {
+      inProgress: [
+        {
+          id: 'r9',
+          scheduledStart: start,
+          client: { name: 'Luz Marina' },
+          treatment: { name: 'Hidratación' },
+        },
+      ],
+    });
+
+    await processor.process(buildJob(JOB_NAMES.IN_PROGRESS_DIGEST));
+
+    expect(
+      Date.now() - inProgressQueries[0].startedBefore.getTime(),
+    ).toBeLessThan(5_000);
+    expect(published).toHaveLength(1);
+    expect(published[0].type).toBe('reservations.in_progress_pending');
+    expect(published[0].payload).toMatchObject({
+      total: 1,
+      items: [
+        {
+          reservationId: 'r9',
+          clientName: 'Luz Marina',
+          treatmentName: 'Hidratación',
+          scheduledStart: start,
+        },
+      ],
+    });
+    expect((published[0].payload as { digestId: string }).digestId).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
+    expect(noShowCalls).toEqual([]);
+    expect(cancelCalls).toEqual([]);
+  });
+
+  it('al cierre del día no avisa nada si no hay citas en curso', async () => {
+    const { processor, published } = buildFixture(null, { inProgress: [] });
+
+    await processor.process(buildJob(JOB_NAMES.IN_PROGRESS_DIGEST));
+
+    expect(published).toEqual([]);
   });
 });

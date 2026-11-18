@@ -25,6 +25,7 @@ import {
   type AdminDepositTimeoutNoticeJobData,
   type AdminClientCancellationNoticeJobData,
   type AdminHandoffNoticeJobData,
+  type AdminInProgressNoticeJobData,
   type AdminProductPurchaseNoticeJobData,
   type AdminReceiptNoticeJobData,
   type AdminRescheduleNoticeJobData,
@@ -415,6 +416,35 @@ export class OperationalNotificationsService {
   }
 
   /** Una clienta pidió comprar un producto: el equipo la contacta. */
+  async notifyAdminInProgress(
+    data: AdminInProgressNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.ADMIN_IN_PROGRESS_NOTICE;
+    const recipient = await this.findActiveRecipient(data.recipientId);
+    if (!recipient) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: RECIPIENT_INACTIVE_REASON,
+      });
+      return;
+    }
+
+    const shown = data.lines.length;
+    const more =
+      data.total > shown ? `\n…y ${data.total - shown} más en el panel` : '';
+    await this.notifyRecipient(ctx, 'ADMIN_IN_PROGRESS', recipient, {
+      cantidad: String(data.total),
+      citas: `${data.lines.join('\n')}${more}`,
+    });
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.EXECUTED,
+      reason: `Destinatario ${recipient.id}, cierre ${data.digestId}: ${data.total} cita(s) en curso`,
+    });
+  }
+
   async notifyAdminProductPurchase(
     data: AdminProductPurchaseNoticeJobData,
     ctx: ConduitSendContext,

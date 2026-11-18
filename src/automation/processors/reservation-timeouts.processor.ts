@@ -15,6 +15,8 @@ import { ReservationsRepository } from '../../reservations/repositories/reservat
 import { AdminCancelReservationOrchestrator } from '../../reservations/orchestrators/admin-cancel-reservation.orchestrator';
 import { MarkNoShowOrchestrator } from '../../reservations/orchestrators/mark-no-show.orchestrator';
 import { AutomationExecutionRepository } from '../repositories/automation-execution.repository';
+import { EventBusService } from '../../common/events/event.service';
+import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { AppException } from '../../common/errors/app.exception';
 import type { ErrorCode } from '../../common/errors/error-catalog';
 import {
@@ -37,6 +39,13 @@ const LOST_RACE_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
 ]);
 
 const DEPOSIT_TIMEOUT_REASON = 'Depósito no confirmado a tiempo';
+const IN_PROGRESS_DIGEST_LIMIT = 50;
+const BUSINESS_DAY_KEY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
 
 @Processor(QUEUE_NAMES.RESERVATION_TIMEOUTS)
 export class ReservationTimeoutsProcessor extends WorkerHost {
@@ -47,6 +56,7 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
     private readonly adminCancelOrchestrator: AdminCancelReservationOrchestrator,
     private readonly markNoShowOrchestrator: MarkNoShowOrchestrator,
     private readonly executions: AutomationExecutionRepository,
+    private readonly eventBus: EventBusService,
   ) {
     super();
   }
@@ -68,6 +78,9 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
     }
     if (job.name === JOB_NAMES.NO_SHOW_SWEEP) {
       return this.sweepNoShows();
+    }
+    if (job.name === JOB_NAMES.IN_PROGRESS_DIGEST) {
+      return this.reportInProgress();
     }
 
     const reservationId = this.requireReservationId(job);
@@ -152,6 +165,32 @@ export class ReservationTimeoutsProcessor extends WorkerHost {
         );
       }
     }
+  }
+
+  private async reportInProgress(): Promise<void> {
+    const now = new Date();
+    const pending = await this.repository.findInProgressStartedBefore(
+      now,
+      IN_PROGRESS_DIGEST_LIMIT,
+    );
+    if (pending.length === 0) {
+      this.logger.debug('Cierre del día: sin citas en curso por completar');
+      return;
+    }
+
+    this.logger.log(
+      `Cierre del día: ${pending.length} cita(s) en curso sin completar`,
+    );
+    this.eventBus.publish(EVENT_TYPES.RESERVATIONS_IN_PROGRESS_PENDING, {
+      digestId: BUSINESS_DAY_KEY.format(now),
+      total: pending.length,
+      items: pending.map((reservation) => ({
+        reservationId: reservation.id,
+        clientName: reservation.client.name,
+        treatmentName: reservation.treatment.name,
+        scheduledStart: reservation.scheduledStart,
+      })),
+    });
   }
 
   private isLostRace(error: unknown): boolean {

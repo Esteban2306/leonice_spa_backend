@@ -1,4 +1,5 @@
 import { TestingModule } from '@nestjs/testing';
+import { EventBusService } from '../../src/common/events/event.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Job, UnrecoverableError } from 'bullmq';
 import {
@@ -87,6 +88,7 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
       moduleRef.get(AdminCancelReservationOrchestrator),
       moduleRef.get(MarkNoShowOrchestrator),
       executions,
+      moduleRef.get(EventBusService),
     );
   });
 

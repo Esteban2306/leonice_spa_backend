@@ -32,6 +32,7 @@ import {
   AdminClientCancellationNoticeJobData,
   AdminRescheduleNoticeJobData,
   AdminHandoffNoticeJobData,
+  AdminInProgressNoticeJobData,
   AdminProductPurchaseNoticeJobData,
   AdminReceiptNoticeJobData,
   CancellationLinkNoticeJobData,
@@ -63,7 +64,8 @@ type AutomationJobData =
   | CancellationLinkNoticeJobData
   | AdminHandoffNoticeJobData
   | AdminProductPurchaseNoticeJobData
-  | AdminReceiptNoticeJobData;
+  | AdminReceiptNoticeJobData
+  | AdminInProgressNoticeJobData;
 
 const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
   JOB_NAMES.RESERVATION_REMINDER_CHECK,
@@ -174,6 +176,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
           job.data as AdminProductPurchaseNoticeJobData,
           ctx,
         );
+      case JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS:
+        return this.notifications.notifyAdminInProgress(
+          job.data as AdminInProgressNoticeJobData,
+          ctx,
+        );
       case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
         return this.notifications.notifyAdminReceiptIssue(
           job.data as AdminReceiptNoticeJobData,
@@ -266,6 +273,8 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.ADMIN_PRODUCT_PURCHASE_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
         return AutomationExecutionType.ADMIN_RECEIPT_NOTICE;
+      case JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS:
+        return AutomationExecutionType.ADMIN_IN_PROGRESS_NOTICE;
       default:
         return null;
     }

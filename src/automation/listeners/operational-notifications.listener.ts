@@ -11,6 +11,7 @@ import {
   JOB_NAMES,
   QUEUE_NAMES,
 } from '../../infrastructure/queue/queue.constants';
+import { formatNotificationDateTime } from '../utils/format-notification-date';
 import { AdminNotificationRecipientsRepository } from 'src/admin-notifications/repository/admin-notification-recipients.repository';
 import {
   ADMIN_TIMEOUT_NOTICE_DELAY_MS,
@@ -19,6 +20,7 @@ import {
   type AdminClientCancellationNoticeJobData,
   type AdminRescheduleNoticeJobData,
   type AdminHandoffNoticeJobData,
+  type AdminInProgressNoticeJobData,
   type AdminProductPurchaseNoticeJobData,
   type AdminReceiptNoticeJobData,
   type CancellationLinkNoticeJobData,
@@ -282,6 +284,37 @@ export class OperationalNotificationsListener {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`No se pudo encolar el aviso de traspaso: ${message}`);
+      return false;
+    }
+  }
+
+  @OnEvent(EVENT_TYPES.RESERVATIONS_IN_PROGRESS_PENDING)
+  async handleInProgressPending(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.RESERVATIONS_IN_PROGRESS_PENDING
+    >,
+  ): Promise<boolean> {
+    const { digestId, total, items } = event.payload;
+    const lines = items.map(
+      (item) =>
+        `• ${formatNotificationDateTime(item.scheduledStart)}: ${item.clientName} (${item.treatmentName})`,
+    );
+    try {
+      const queued = await this.enqueueForAdmins<AdminInProgressNoticeJobData>(
+        JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS,
+        'citas en curso sin completar',
+        (recipientId) => ({
+          data: { recipientId, digestId, total, lines },
+          opts: { jobId: `admin-in-progress-${digestId}-${recipientId}` },
+        }),
+      );
+      return queued > 0;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `No se pudo encolar el aviso de citas en curso: ${message}`,
+      );
       return false;
     }
   }

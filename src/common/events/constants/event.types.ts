@@ -24,11 +24,23 @@ export const EVENT_TYPES = {
   CONDUIT_PRODUCT_PURCHASE_REQUESTED: 'conduit.product_purchase_requested',
   CONDUIT_RECEIPT_ISSUE: 'conduit.receipt_issue',
   BUSINESS_INFO_CHANGED: 'business.info_changed',
+  RESERVATIONS_IN_PROGRESS_PENDING: 'reservations.in_progress_pending',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
 
 export interface EventPayloadMap {
+  [EVENT_TYPES.RESERVATIONS_IN_PROGRESS_PENDING]: {
+    digestId: string;
+    total: number;
+    items: Array<{
+      reservationId: string;
+      clientName: string;
+      treatmentName: string;
+      scheduledStart: Date;
+    }>;
+  };
+
   [EVENT_TYPES.RESERVATION_CREATED]: {
     reservationId: string;
     clientId: string;
