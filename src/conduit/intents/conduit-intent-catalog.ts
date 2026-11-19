@@ -792,7 +792,15 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
       'La clienta pregunta por Leo, la dueña. Acompaña la respuesta del turno (no compite con la cita): las citas son por aquí y, para otros temas, su WhatsApp configurado en el panel.',
     handler: 'TOOL_DIRECT',
     priority: 1,
-    patterns: ['\\bleo\\b'],
+    patterns: [
+      '\\b(?:hablar|comunicar(?:me)?|comunicame|contactar|escribirle|llamar(?:la|le)?|pasame|pasar(?:me)?|dile|digale|avisale)\\b.{0,20}\\bleo\\b',
+      '\\b(?:numero|celular|cel|whatsapp|wasap|telefono|contacto)\\b.{0,15}\\bleo\\b',
+      '\\b(?:que paso con|que se hizo|donde esta|no esta|ya no esta|esta|estara)\\s+(?:la\\s+)?leo\\b',
+      '\\bleo\\s+(?:ya\\s+)?(?:no\\s+)?(?:esta|atiende|trabaja|responde|contesta|volvio|sigue|me atiende)\\b',
+      '\\b(?:eres|usted es|tu eres|no eres|es)\\s+(?:la\\s+)?leo\\b',
+      '\\b(?:con|para)\\s+(?:la\\s+)?leo\\b',
+      '\\batien\\w*\\s+(?:la\\s+)?leo\\b',
+    ],
     denyPatterns: [
       '^(?:(?:hola|ola|buenas|buenos|buen|dias|dia|tardes|noches|hey|saludos)\\s+)*leo(?:\\s+(?:hola|buenas|buenos|dias|dia|tardes|noches|como|estas|esta|bien|que|tal))*$',
     ],

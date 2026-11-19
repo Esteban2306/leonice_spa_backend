@@ -180,5 +180,24 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(hits('hola leo buenas tardes')).toBe(false);
     expect(hits('hola leo')).toBe(false);
     expect(hits('hola leonice arenas spa')).toBe(false);
+    expect(hits('me pasas el numero de leo')).toBe(true);
+    expect(hits('esta leo')).toBe(true);
+    expect(hits('leo ya no atiende por aqui')).toBe(true);
+    expect(hits('tu eres leo')).toBe(true);
+    expect(hits('quiero que me atienda leo')).toBe(true);
+    expect(hits('dile a leo que la llamo luego')).toBe(true);
+  });
+
+  it('el aviso de Leo no salta cuando la clienta le habla a Leo como a quien la atiende', () => {
+    const leo = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'leo_notice')!;
+    const hits = (t: string) =>
+      leo.patterns.some((p) => new RegExp(p).test(t)) &&
+      !(leo.denyPatterns ?? []).some((p) => new RegExp(p).test(t));
+    expect(hits('mi leo me regalas direccion por favor')).toBe(false);
+    expect(hits('leo pregunta tecnica')).toBe(false);
+    expect(hits('buenos dias leo necesito una cita para el viernes')).toBe(
+      false,
+    );
+    expect(hits('leo cuanto vale la hidratacion')).toBe(false);
   });
 });

@@ -268,8 +268,20 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toMatch(/pide otra foto más clara, una sola vez/);
   });
 
+  it('aprende de los chats reales: no anuncia revisiones, responde lo pedido y calla lo personal', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('Nunca digas que vas a revisar');
+    expect(t).toContain('Contesta solo lo que preguntó');
+    expect(t).toContain('responde solo [NO_RESPONDER], sin explicar nada');
+    expect(t).toContain('Ante la duda, atiéndela');
+    expect(t).toContain(
+      'da en ese mensaje el precio y los 2 o 3 cupos más cercanos',
+    );
+    expect(t).toContain('Nunca des datos de otras clientas');
+  });
+
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(10100);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(11600);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
