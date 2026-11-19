@@ -19,3 +19,5 @@ test/live/sink.jsonl
 infra/.env.production
 infra/app.env.production
 infra/rclone.conf
+
+conduit-release-backups/

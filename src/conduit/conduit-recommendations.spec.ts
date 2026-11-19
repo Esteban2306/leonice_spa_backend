@@ -65,7 +65,7 @@ describe('GET conduit/recommendations', () => {
       services: Array<Record<string, unknown>>;
       products: Array<Record<string, unknown>>;
     };
-    const needs = (out as { needs: Need[] }).needs;
+    const needs = (out as unknown as { needs: Need[] }).needs;
     const caida = needs.find((n) => n.need === 'caída del cabello')!;
     const frizz = needs.find((n) => n.need === 'frizz')!;
     expect(caida.services).toEqual([]);
