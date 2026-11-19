@@ -175,7 +175,7 @@ describe('despliegue selectivo de Conduit', () => {
       writes.find(
         (w) => w.path === 'templates/tpl-leonice_aviso_atencion_humana',
       )?.body,
-    ).toMatchObject({ bodyHandlebars: template.body });
+    ).toEqual(templateDefinition(template));
 
     expect(
       writes.find((w) => w.path === 'bots/bot/prompts/CONVERSATION')?.body,

@@ -519,7 +519,7 @@ export async function releaseConduit(
       await request(
         'PUT',
         `templates/${String(remote.id)}`,
-        templatePayload(template),
+        templateDefinition(template),
       );
     } else {
       await request('POST', 'templates', templatePayload(template));
