@@ -82,6 +82,14 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(payment.notes).toMatch(/^PENDIENTE/);
   });
 
+  it('los prompts de IA reducida caben en el límite que valida Conduit (6000)', () => {
+    for (const intent of CONDUIT_INTENT_CATALOG) {
+      const slim = (intent.config as { slim?: { prompt?: string } } | undefined)
+        ?.slim;
+      if (slim?.prompt) expect(slim.prompt.length).toBeLessThanOrEqual(6000);
+    }
+  });
+
   it('las reglas duras tienen su texto y las claves reservadas son las conocidas', () => {
     const rules = CONDUIT_INTENT_CATALOG.filter((i) =>
       i.key.startsWith('rule.'),
