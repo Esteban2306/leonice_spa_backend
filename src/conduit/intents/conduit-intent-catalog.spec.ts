@@ -183,6 +183,7 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(hits('me pasas el numero de leo')).toBe(true);
     expect(hits('esta leo')).toBe(true);
     expect(hits('leo ya no atiende por aqui')).toBe(true);
+    expect(hits('leo no esta atendiendo')).toBe(true);
     expect(hits('tu eres leo')).toBe(true);
     expect(hits('quiero que me atienda leo')).toBe(true);
     expect(hits('dile a leo que la llamo luego')).toBe(true);
@@ -199,5 +200,8 @@ describe('CONDUIT_INTENT_CATALOG', () => {
       false,
     );
     expect(hits('leo cuanto vale la hidratacion')).toBe(false);
+    expect(hits('leo esta semana tienes cupo')).toBe(false);
+    expect(hits('leo esta tarde puedo ir')).toBe(false);
+    expect(hits('leo sigue en pie mi cita')).toBe(false);
   });
 });
