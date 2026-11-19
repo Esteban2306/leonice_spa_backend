@@ -237,6 +237,21 @@ describe('prompt del asistente de Leonice', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('nunca menciones ids');
   });
 
+  it('no agenda con "el primero que tengas" ni con un sí a varios horarios: pide día y hora exactos', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'no agendes: pídele que te diga el día y la hora exactos que quiere',
+    );
+    const booking = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking')!;
+    const slim = (booking.config as { slim: { prompt: string } }).slim.prompt;
+    expect(slim).toContain(
+      'no agendes: pídele que te diga el día y la hora exactos',
+    );
+    expect(slim).toContain('Un comprobante no confirma un horario');
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'Un comprobante o un "ya pagué" no confirma un horario',
+    );
+  });
+
   it('entiende los audios transcritos y pide escribir solo si no se pudo escuchar', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
       '"[audio transcrito] …" es lo que dijo en un audio',
@@ -327,7 +342,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(13100);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(13450);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
