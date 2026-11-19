@@ -181,15 +181,24 @@ export function toBotTreatment(
  * viaja en la ficha (info_tratamiento) y pesaba ~37 % de cada lista.
  */
 export function toBotTreatmentListItem(
-  treatment: BotTreatmentSource,
+  treatment: BotTreatmentSource & Pick<BotTreatmentContent, 'idealFor'>,
   client?: BotPricingClient | null,
 ) {
   const full: Record<string, unknown> = {
     ...toBotTreatment(treatment, client),
   };
   delete full.tagline;
-  return full as Omit<ReturnType<typeof toBotTreatment>, 'tagline'>;
+  const idealFor = (treatment.idealFor ?? [])
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, MAX_LIST_IDEAL_FOR);
+  if (idealFor.length > 0) full.idealFor = idealFor;
+  return full as Omit<ReturnType<typeof toBotTreatment>, 'tagline'> & {
+    idealFor?: string[];
+  };
 }
+
+const MAX_LIST_IDEAL_FOR = 3;
 
 const hasPromotion = (item: object): boolean =>
   'promotion' in item && Boolean(item.promotion);

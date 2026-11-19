@@ -786,10 +786,42 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     },
   },
   {
-    key: 'leo_notice',
-    name: 'Aviso: preguntan por Leo',
+    key: 'leo_request',
+    name: 'Pide hablar con Leo',
     description:
-      'La clienta pregunta por Leo, la dueña. Acompaña la respuesta del turno (no compite con la cita): las citas son por aquí y, para otros temas, su WhatsApp configurado en el panel.',
+      'Pide hablar con Leo o su número, sin que sea por una cita: se le avisa solo a Leo (avisar_a_leo) y su número nunca se da.',
+    handler: 'HANDOFF',
+    priority: 5,
+    patterns: [
+      '\\b(?:hablar|comunicarme|comunicar|contactar|contactarme|escribirle|llamar(?:la|le)?)\\s+(?:con\\s+)?(?:la\\s+)?leo\\b',
+      '\\b(?:pasame|pasarme|comunicame|ponme)\\s+(?:con\\s+)?(?:a\\s+)?(?:la\\s+)?leo\\b',
+      '\\b(?:numero|celular|cel|whatsapp|wasap|telefono|contacto)\\s+(?:de\\s+)?(?:la\\s+)?leo\\b',
+      '\\b(?:dile|digale|avisale|avisele)\\s+a\\s+(?:la\\s+)?leo\\b',
+    ],
+    denyPatterns: [
+      `\\b(?:${TOPICS_DENY}|turno|cupo|cupos|precio|precios|valor|cuanto|tratamiento|servicio|producto)\\b`,
+      '(?<!\\bno es (?:de |por |sobre |para )?(?:una |la |las )?)\\bcitas?\\b',
+    ],
+    maxTokens: 25,
+    negationOk: true,
+    fixedConfidence: 0.9,
+    lockedMode: 'ACTIVE',
+    config: {
+      tool: 'avisar_a_leo',
+      reason: 'La clienta pidió hablar con Leo',
+      notifyTeam: false,
+    },
+    variants: {
+      default: [
+        'Listo 🌿 Ya le avisé a Leo que necesitas hablar con ella; ella verá tu mensaje por aquí. Si es sobre una cita, también te ayudo yo.',
+      ],
+    },
+  },
+  {
+    key: 'leo_notice',
+    name: 'Aviso: preguntan por Leo (retirado)',
+    description:
+      'Retirado: el WhatsApp de Leo ya no se da. Si la clienta necesita a Leo, el asistente usa avisar_a_leo. Queda apagado para que una siembra con CONDUIT_INTENTS_OVERWRITE=true lo desactive en producción.',
     handler: 'TOOL_DIRECT',
     priority: 1,
     patterns: [
@@ -806,7 +838,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     ],
     maxTokens: 60,
     cooldownSeconds: 1800,
-    lockedMode: 'ACTIVE',
+    lockedMode: 'OFF',
     config: {
       notice: true,
       tool: 'info_negocio',
@@ -863,6 +895,20 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     priority: 0,
     patterns: [],
     variants: {},
+  },
+  {
+    key: 'rule.first_contact',
+    name: 'Regla: presentación la primera vez',
+    description:
+      'Línea que el asistente incluye sí o sí la primera vez que le responde a una persona por este chat: desde ahora él gestiona las citas.',
+    handler: 'TEMPLATE',
+    priority: 0,
+    patterns: [],
+    variants: {
+      default: [
+        'Desde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊',
+      ],
+    },
   },
   {
     key: 'rule.handoff',

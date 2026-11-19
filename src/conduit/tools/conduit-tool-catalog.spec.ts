@@ -37,6 +37,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
         'depositos_pendientes',
         'registrar_comprobante_automatico',
         'pasar_a_persona',
+        'avisar_a_leo',
       ].sort(),
     );
   });
@@ -67,7 +68,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
     expect(pinned).toEqual(['consultar_cliente']);
   });
 
-  it('solo la de comprobante pide imagen y solo pasar_a_persona pausa el bot', () => {
+  it('solo la de comprobante pide imagen y solo los traspasos (equipo o Leo) pausan el bot', () => {
     expect(
       CONDUIT_TOOL_CATALOG.filter((t) => t.requiresImageAttachment).map(
         (t) => t.name,
@@ -75,6 +76,6 @@ describe('CONDUIT_TOOL_CATALOG', () => {
     ).toEqual(['registrar_comprobante_automatico']);
     expect(
       CONDUIT_TOOL_CATALOG.filter((t) => t.pausesBotMinutes).map((t) => t.name),
-    ).toEqual(['pasar_a_persona']);
+    ).toEqual(['avisar_a_leo', 'pasar_a_persona']);
   });
 });

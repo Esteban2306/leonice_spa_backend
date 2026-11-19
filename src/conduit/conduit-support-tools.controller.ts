@@ -106,6 +106,49 @@ export class ConduitSupportToolsController {
     @Req() req: RequestWithConduitContact,
     @Headers('x-conduit-idempotency-key') idempotencyKey?: string,
   ) {
+    const teamNotified = await this.requestHandoff(
+      dto,
+      req,
+      'TEAM',
+      idempotencyKey,
+    );
+    return {
+      handedOff: teamNotified,
+      teamNotified,
+      message: teamNotified
+        ? 'El equipo fue notificado y responderá por este mismo chat lo antes posible.'
+        : 'No hay nadie del equipo a quien avisar en este momento; no prometas que una persona escribirá.',
+    };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('handoff/owner')
+  async ownerHandoff(
+    @Body() dto: ConduitHandoffDto,
+    @Req() req: RequestWithConduitContact,
+    @Headers('x-conduit-idempotency-key') idempotencyKey?: string,
+  ) {
+    const teamNotified = await this.requestHandoff(
+      dto,
+      req,
+      'OWNER',
+      idempotencyKey,
+    );
+    return {
+      handedOff: teamNotified,
+      teamNotified,
+      message: teamNotified
+        ? 'Se le avisó a Leo que la clienta necesita hablar con ella; ella verá el mensaje y decidirá cómo responder. No des su número ni prometas cuándo escribirá.'
+        : 'No fue posible avisarle a Leo en este momento; no prometas que ella escribirá ni des su número.',
+    };
+  }
+
+  private async requestHandoff(
+    dto: ConduitHandoffDto,
+    req: RequestWithConduitContact,
+    target: 'TEAM' | 'OWNER',
+    idempotencyKey?: string,
+  ): Promise<boolean> {
     const phone =
       req.conduitContact?.phone ??
       (dto.phone ? normalizePhone(dto.phone) : null);
@@ -120,16 +163,9 @@ export class ConduitSupportToolsController {
         reason: dto.reason,
         summary: dto.summary ?? null,
         requestId: idempotencyKey ?? randomUUID(),
+        target,
       },
     );
-
-    const teamNotified = results.some(Boolean);
-    return {
-      handedOff: teamNotified,
-      teamNotified,
-      message: teamNotified
-        ? 'El equipo fue notificado y responderá por este mismo chat lo antes posible.'
-        : 'No hay nadie del equipo a quien avisar en este momento; no prometas que una persona escribirá.',
-    };
+    return results.some(Boolean);
   }
 }

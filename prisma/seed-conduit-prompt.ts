@@ -28,6 +28,8 @@ const REQUIRED_ENV = [
   'CONDUIT_DEFAULT_BOT_ID',
 ] as const;
 
+export const RETIRED_BUSINESS_VARIABLES = ['negocio.whatsapp_de_leo'];
+
 const sameRules = (a: Record<string, string>, b: Record<string, string>) =>
   JSON.stringify(Object.entries(a).sort()) ===
   JSON.stringify(Object.entries(b).sort());
@@ -104,6 +106,26 @@ export async function seedConduitPrompt(
     console.warn(
       `[conduit]   ⚠ el hook ${BUSINESS_INFO_EVENT} tiene un mapeo distinto; no se reemplazó (CONDUIT_MAPPING_OVERWRITE=true reemplaza solo el mapeo).`,
     );
+  }
+
+  const stored = await request<
+    Array<{ fullKey: string }> | { data: Array<{ fullKey: string }> }
+  >('GET', `api/external-data/${botId}/variables?namespace=negocio`);
+  const storedKeys = new Set(
+    (Array.isArray(stored) ? stored : (stored?.data ?? [])).map(
+      (v) => v.fullKey,
+    ),
+  );
+  const retired = RETIRED_BUSINESS_VARIABLES.filter((key) =>
+    storedKeys.has(key),
+  );
+  if (retired.length > 0) {
+    const keys = retired.map(encodeURIComponent).join(',');
+    await request(
+      'DELETE',
+      `api/external-data/${botId}/variables?keys=${keys}`,
+    );
+    console.log(`[conduit] datos retirados del bot: ${retired.join(', ')}`);
   }
 }
 

@@ -207,18 +207,49 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).toContain('No cobras ni tomas pagos');
   });
 
-  it('si preguntan por Leo, usa el aviso del sistema con su WhatsApp y no inventa un número', () => {
+  it('si necesitan a Leo, se le avisa solo a ella con avisar_a_leo y nunca se da su número', () => {
     const start = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Leo, la dueña');
-    const end = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Qué consultar');
+    const end = CONDUIT_BOT_PROMPT_TEMPLATE.indexOf('Situaciones frecuentes');
     const section = CONDUIT_BOT_PROMPT_TEMPLATE.slice(start, end);
     expect(start).toBeGreaterThan(-1);
-    expect(section).toContain('dueña');
-    expect(section).toContain('"Aviso obligatorio"');
-    expect(section).toContain('atiende lo demás que pidió');
-    expect(section).toContain('no inventes un número');
-    expect(section).toContain('pasar_a_persona solo por queja');
-    expect(section).toContain('No hables por Leo');
+    expect(section).toContain('No tienes su número y nunca lo das');
+    expect(section).toContain('avisar_a_leo');
+    expect(section).toContain('si devolvió éxito');
+    expect(section).toContain('No digas si está o no atendiendo');
+    expect(section).not.toContain('Aviso obligatorio');
     expect(section).not.toMatch(/\+57|\d{7,}/);
+  });
+
+  it('la presentación de primera vez la pone el sistema (rule.first_contact); el prompt solo pide los datos una vez', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('y solo esta vez, su nombre');
+    const intro = CONDUIT_INTENT_CATALOG.find(
+      (i) => i.key === 'rule.first_contact',
+    )!;
+    expect(intro.variants.default[0]).toContain(
+      'Desde ahora yo atiendo y gestiono tus citas por aquí',
+    );
+  });
+
+  it('a Leo se le avisa en el mismo turno, sin interrogar a la clienta, y un saludo cariñoso nunca se calla', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'avisar_a_leo en ese mismo turno, sin preguntarle de qué se trata',
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'Un saludo cariñoso ("hola mi reina", "mija", "nena", "linda") es de una clienta: respóndelo',
+    );
+  });
+
+  it('recomienda solo con lo que dice el catálogo y pasa al equipo los temas internos', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'recomienda solo el servicio cuyo idealFor coincide con lo que cuenta',
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'Nunca le atribuyas a un servicio beneficios que no traiga',
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
+      /Temas internos que no son una cita[^\n]*fotos o videos[^\n]*pasar_a_persona/,
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('depositos_pendientes');
   });
 
   it('una compra pedida se avisa al equipo enseguida, sin pedir confirmación', () => {
@@ -272,7 +303,9 @@ describe('prompt del asistente de Leonice', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain('Nunca digas que vas a revisar');
     expect(t).toContain('Contesta solo lo que preguntó');
-    expect(t).toContain('responde solo [NO_RESPONDER], sin explicar nada');
+    expect(t).toContain(
+      'responde solo [NO_RESPONDER]: sin saludo, sin presentarte y sin explicar que no respondes',
+    );
     expect(t).toContain('Ante la duda, atiéndela');
     expect(t).toContain(
       'da en ese mensaje el precio y los 2 o 3 cupos más cercanos',
@@ -281,7 +314,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(11600);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(12200);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
@@ -312,6 +345,7 @@ describe('seedConduitPrompt', () => {
     isCustom: boolean;
     configured: boolean;
     mappings: Array<{ eventType: string; rules: Record<string, string> }>;
+    variables?: string[];
   }) {
     const calls: Call[] = [];
     global.fetch = jest.fn((url: string | URL, init?: RequestInit) => {
@@ -338,6 +372,10 @@ describe('seedConduitPrompt', () => {
         return reply({ configured: state.configured });
       if (method === 'GET' && path.endsWith('/mappings'))
         return reply(state.mappings);
+      if (method === 'GET' && path.endsWith('/variables'))
+        return reply(
+          (state.variables ?? []).map((fullKey) => ({ fullKey, value: 'x' })),
+        );
       return reply({ ok: true });
     }) as never;
     return calls;
@@ -437,6 +475,30 @@ describe('seedConduitPrompt', () => {
     expect(writes(calls)).toEqual([
       `POST api/external-data/${BOT}/mappings/${BUSINESS_INFO_EVENT}`,
     ]);
+  });
+
+  it('borra de Conduit el WhatsApp de Leo que quedó guardado de antes, y solo si está', async () => {
+    const calls = conduit({
+      content: CONDUIT_BOT_PROMPT_TEMPLATE,
+      isCustom: true,
+      configured: true,
+      mappings: [
+        {
+          eventType: BUSINESS_INFO_EVENT,
+          rules: { ...BUSINESS_INFO_MAPPING_RULES },
+        },
+      ],
+      variables: ['negocio.direccion', 'negocio.whatsapp_de_leo'],
+    });
+    await seedConduitPrompt(env);
+    expect(writes(calls)).toEqual([
+      `DELETE api/external-data/${BOT}/variables`,
+    ]);
+    const deleted = (global.fetch as jest.Mock).mock.calls
+      .map(([url]) => String(url))
+      .find((url) => url.includes('keys='));
+    expect(deleted).toContain('keys=negocio.whatsapp_de_leo');
+    expect(deleted).not.toContain('direccion');
   });
 
   it('sin configuración de Conduit se omite sin fallar', async () => {

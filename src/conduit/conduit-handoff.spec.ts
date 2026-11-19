@@ -39,3 +39,34 @@ describe('POST conduit/handoff', () => {
     expect(out.message).toMatch(/no prometas/);
   });
 });
+
+describe('POST conduit/handoff/owner', () => {
+  it('pide el aviso solo para Leo y le dice al bot que no dé su número', async () => {
+    const { controller, publishAsync } = build([true]);
+    const out = await controller.ownerHandoff(
+      { reason: 'Quiere hablar con Leo', summary: 'Tema personal' },
+      req,
+      'idem-2',
+    );
+    expect(publishAsync.mock.calls[0][1]).toMatchObject({
+      target: 'OWNER',
+      reason: 'Quiere hablar con Leo',
+      requestId: 'idem-2',
+    });
+    expect(out).toMatchObject({ handedOff: true, teamNotified: true });
+    expect(out.message).toMatch(/No des su número/);
+  });
+
+  it('el traspaso normal sigue yendo a todo el equipo', async () => {
+    const { controller, publishAsync } = build([true]);
+    await controller.handoff({ reason: 'Queja' }, req);
+    expect(publishAsync.mock.calls[0][1]).toMatchObject({ target: 'TEAM' });
+  });
+
+  it('si no se pudo avisar, no promete que Leo escribirá', async () => {
+    const { controller } = build([false]);
+    const out = await controller.ownerHandoff({ reason: 'Leo' }, req);
+    expect(out).toMatchObject({ handedOff: false, teamNotified: false });
+    expect(out.message).toMatch(/no prometas/);
+  });
+});

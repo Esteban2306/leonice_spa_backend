@@ -12,6 +12,7 @@ import {
   QUEUE_NAMES,
 } from '../../infrastructure/queue/queue.constants';
 import { inProgressLine } from '../domain/in-progress-line';
+import { ownerRecipients } from '../domain/owner-recipients';
 import { AdminNotificationRecipientsRepository } from 'src/admin-notifications/repository/admin-notification-recipients.repository';
 import {
   ADMIN_TIMEOUT_NOTICE_DELAY_MS,
@@ -270,15 +271,27 @@ export class OperationalNotificationsListener {
       typeof EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED
     >,
   ): Promise<boolean> {
-    const { requestId, ...payload } = event.payload;
+    const { requestId, target, ...payload } = event.payload;
     try {
+      const pick =
+        target === 'OWNER'
+          ? <T extends { name: string }>(active: T[]) => {
+              const owners = ownerRecipients(active);
+              if (owners.length > 0) return owners;
+              this.logger.warn(
+                'Aviso para Leo sin un administrador activo con su nombre: se avisa a todos los administradores.',
+              );
+              return active;
+            }
+          : undefined;
       const queued = await this.enqueueForAdmins<AdminHandoffNoticeJobData>(
         JOB_NAMES.NOTIFY_ADMIN_HANDOFF,
-        'traspaso a una persona',
+        target === 'OWNER' ? 'aviso para Leo' : 'traspaso a una persona',
         (recipientId) => ({
           data: { ...payload, recipientId },
           opts: { jobId: `admin-handoff-${requestId}-${recipientId}` },
         }),
+        pick,
       );
       return queued > 0;
     } catch (error: unknown) {
@@ -376,8 +389,10 @@ export class OperationalNotificationsListener {
     jobName: string,
     label: string,
     build: (recipientId: string) => AdminJobSpec<T>,
+    pick?: <R extends { name: string }>(active: R[]) => R[],
   ): Promise<number> {
-    const active = await this.recipients.findActive();
+    const all = await this.recipients.findActive();
+    const active = pick && all.length > 0 ? pick(all) : all;
     if (active.length === 0) {
       this.logger.warn(
         `Aviso "${label}" sin enviar: no hay destinatarios admin activos`,
