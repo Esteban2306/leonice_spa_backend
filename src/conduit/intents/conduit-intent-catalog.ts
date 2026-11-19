@@ -88,7 +88,8 @@ Reglas
 - El teléfono lo pone el sistema: no lo pidas.
 - Si no sabes si está registrada, consultar_cliente primero. Si es el primer mensaje del bot en la conversación, preséntate ("Hola, {nombre}, soy {{agentName}} de {{companyName}}"); si ya te presentaste, no lo repitas.
 - Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo.
-- Servicios, duración, precio, promociones e id: listar_tratamientos. Nunca inventes un id: una herramienta que necesita un id se llama después de recibirlo.
+- Servicios, duración, precio, promociones e id: listar_tratamientos. Nunca inventes un id: una herramienta que necesita un id se llama después de recibirlo. Antes de decir que un servicio no existe, revísalo con listar_tratamientos en ese turno. Si nombra un servicio corto ("nutrición", "hidratación"), es el del catálogo que lo contiene: no le preguntes si existe.
+- Nunca le preguntes qué día quiere: consulta tú disponibilidad_combo desde hoy y ofrece los 2 o 3 cupos más cercanos.
 - Solo al presentar varios tratamientos usa este formato con emojis (en otros mensajes, casi sin emojis): una frase de introducción, cada servicio como bloque separado por línea en blanco y una pregunta corta al final:
 ✨ *Nombre del servicio*
 ⏱ 60 min · 💰 $250.000
@@ -117,6 +118,8 @@ export const TREATMENT_SLIM_PROMPT = `Eres {{agentName}}, recepcionista de {{com
 Idioma: {{language}}. Tono: {{tone}}. Responde de forma {{responseLength}}. {{emojiInstruction}} {{formatInstruction}}
 
 Reglas
+- Si cuenta qué le pasa a su cabello o pide una recomendación: recomendar_para con lo que contó y recomienda solo lo que devuelva (servicios con su porqué y precio, y productos o kits); si no hay servicio para eso pero sí productos, recomiéndalos; sin resultados, dilo con honestidad y ofrece que el equipo la oriente.
+- Si pregunta por un producto: info_productos.
 - Usa info_tratamiento con el nombre que dijo (o listar_tratamientos si no nombró uno) y responde SOLO con lo que devuelvan; nunca inventes beneficios, precios, duraciones ni resultados. Si el tratamiento no existe, di en una frase que no lo ofrecemos y propón 2 o 3 tratamientos reales parecidos de listar_tratamientos.
 - Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo. Dinero en pesos colombianos, tal como lo entregan las herramientas.
 - Mensajes cortos y una sola pregunta. Nunca muestres ids ni nombres de herramientas.
@@ -124,7 +127,7 @@ Reglas
 ✨ *Nombre del servicio*
 ⏱ 60 min · 💰 $250.000
 Rango: 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁 (los servicios con promoción van primero y son los que más destacas, sin inventar descuentos ni fechas); requiere valoración: línea 📋. Máximo 8 servicios; negrita con un solo asterisco.
-- Si quiere agendar, dile que con gusto la ayudas y pregúntale el día que prefiere. Si pide una persona o tiene una queja, usa pasar_a_persona.`;
+- Si quiere agendar, dile que con gusto le buscas los cupos más cercanos (sin preguntarle el día). Si pide una persona o tiene una queja, usa pasar_a_persona.`;
 
 export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
   {
@@ -141,8 +144,10 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         prompt: TREATMENT_SLIM_PROMPT,
         tools: [
           'consultar_cliente',
+          'recomendar_para',
           'info_tratamiento',
           'listar_tratamientos',
+          'info_productos',
           'pasar_a_persona',
         ],
         maxTokens: 700,
@@ -237,8 +242,8 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         '¡Hola {{nombre}}! 🌿 Soy {{agente}} de {{negocio}}.',
       ],
       prefix_default: [
-        '¡Hola! Soy {{agente}} de {{negocio}} 😊',
-        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}.',
+        '¡Hola! Soy {{agente}} de {{negocio}} 😊\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊',
+        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}.\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊',
       ],
       registered: [
         '¡Hola {{nombre}}! 😊 Soy {{agente}} de {{negocio}}. ¿En qué te puedo ayudar hoy?',
@@ -246,9 +251,8 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         '¡Qué gusto saludarte, {{nombre}}! Soy {{agente}} de {{negocio}}. ¿En qué te ayudo?',
       ],
       default: [
-        '¡Hola! 😊 Soy {{agente}} de {{negocio}}. ¿En qué te puedo ayudar hoy?',
-        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}. Cuéntame, ¿qué necesitas?',
-        '¡Qué gusto saludarte! Soy {{agente}} de {{negocio}}. ¿En qué te ayudo?',
+        '¡Hola! 😊 Soy {{agente}} de {{negocio}}.\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊\n\n¿En qué te puedo ayudar hoy?',
+        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}.\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊\n\nCuéntame, ¿qué necesitas?',
       ],
     },
   },
@@ -895,20 +899,6 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     priority: 0,
     patterns: [],
     variants: {},
-  },
-  {
-    key: 'rule.first_contact',
-    name: 'Regla: presentación la primera vez',
-    description:
-      'Línea que el asistente incluye sí o sí la primera vez que le responde a una persona por este chat: desde ahora él gestiona las citas.',
-    handler: 'TEMPLATE',
-    priority: 0,
-    patterns: [],
-    variants: {
-      default: [
-        'Desde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊',
-      ],
-    },
   },
   {
     key: 'rule.handoff',

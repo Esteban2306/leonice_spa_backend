@@ -96,7 +96,7 @@ describe('prompt del asistente de Leonice', () => {
 
   it('prohíbe mostrar datos técnicos y contempla errores de negocio y técnicos', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
-    expect(t).toMatch(/ids, códigos, JSON, nombres de herramientas/);
+    expect(t).toMatch(/nunca menciones ids, códigos, JSON, herramientas/);
     expect(t).toMatch(/expected:true/);
     expect(t).toMatch(/OFFER_OTHER_SLOT/);
     expect(t).toMatch(/Nunca digas que una persona escribirá/);
@@ -128,7 +128,7 @@ describe('prompt del asistente de Leonice', () => {
   it('propone los cupos más cercanos sin pedir el día y da el anticipo en un solo mensaje', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toMatch(
-      /sin pedirle el día, consulta disponibilidad_combo desde hoy/,
+      /nunca le preguntes qué día quiere; consulta tú disponibilidad_combo desde hoy/,
     );
     expect(t).toMatch(/los 2 o 3 cupos más cercanos/);
     expect(t).toMatch(/un solo mensaje ordenado/);
@@ -220,14 +220,21 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).not.toMatch(/\+57|\d{7,}/);
   });
 
-  it('la presentación de primera vez la pone el sistema (rule.first_contact); el prompt solo pide los datos una vez', () => {
+  it('la presentación sale solo a clientas nuevas (consultar_cliente la trae) y los datos se piden una vez', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('y solo esta vez, su nombre');
-    const intro = CONDUIT_INTENT_CATALOG.find(
-      (i) => i.key === 'rule.first_contact',
-    )!;
-    expect(intro.variants.default[0]).toContain(
-      'Desde ahora yo atiendo y gestiono tus citas por aquí',
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'Si consultar_cliente trae firstContactNotice, inclúyelo tal cual',
     );
+  });
+
+  it('recomienda con recomendar_para, ofrece cupos sin preguntar el día y no habla de cómo funciona por dentro', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'recomendar_para con lo que contó, y recomienda solo lo que devuelva',
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'nunca le preguntes qué día quiere',
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('nunca menciones ids');
   });
 
   it('a Leo se le avisa en el mismo turno, sin interrogar a la clienta, y un saludo cariñoso nunca se calla', () => {
@@ -241,10 +248,7 @@ describe('prompt del asistente de Leonice', () => {
 
   it('recomienda solo con lo que dice el catálogo y pasa al equipo los temas internos', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
-      'recomienda solo el servicio cuyo idealFor coincide con lo que cuenta',
-    );
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
-      'Nunca le atribuyas a un servicio beneficios que no traiga',
+      'Nunca le atribuyas a algo beneficios que no traiga',
     );
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
       /Temas internos que no son una cita[^\n]*fotos o videos[^\n]*pasar_a_persona/,
@@ -314,7 +318,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(12200);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(12700);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

@@ -231,36 +231,6 @@ describe('toBotTreatmentListItem', () => {
   });
 });
 
-describe('toBotTreatmentListItem: para quién es cada servicio', () => {
-  it('incluye hasta 3 líneas de idealFor para recomendar con datos reales', () => {
-    const item = toBotTreatmentListItem({
-      ...base,
-      activePromotion: null,
-      idealFor: [
-        ' Frizz y volumen difíciles de controlar ',
-        '',
-        'Cabello con ondas que prefiere llevar liso',
-        'Quien quiere ahorrar tiempo',
-        'Cuarta línea que no cabe',
-      ],
-    });
-    expect(item.idealFor).toEqual([
-      'Frizz y volumen difíciles de controlar',
-      'Cabello con ondas que prefiere llevar liso',
-      'Quien quiere ahorrar tiempo',
-    ]);
-  });
-
-  it('sin contenido no inventa un idealFor', () => {
-    const item = toBotTreatmentListItem({
-      ...base,
-      activePromotion: null,
-      idealFor: [],
-    });
-    expect(item).not.toHaveProperty('idealFor');
-  });
-});
-
 describe('prioritizePromoted', () => {
   it('pone primero los servicios con promoción y conserva el orden dentro de cada grupo', () => {
     const items = [

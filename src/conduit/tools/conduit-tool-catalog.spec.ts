@@ -38,6 +38,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
         'registrar_comprobante_automatico',
         'pasar_a_persona',
         'avisar_a_leo',
+        'recomendar_para',
       ].sort(),
     );
   });

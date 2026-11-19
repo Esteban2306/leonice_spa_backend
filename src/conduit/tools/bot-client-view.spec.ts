@@ -1,4 +1,5 @@
 import { toBotClient } from './bot-client-view';
+import { NEW_CLIENT_INTRO } from './bot-client-view';
 
 const now = new Date('2026-10-24T12:00:00Z');
 const recent = new Date('2026-09-01T12:00:00Z');
@@ -14,7 +15,10 @@ const client = (over: Record<string, unknown> = {}) => ({
 
 describe('toBotClient', () => {
   it('un teléfono desconocido no está registrado y no revela nada más', () => {
-    expect(toBotClient(null, false, now)).toEqual({ registered: false });
+    expect(toBotClient(null, false, now)).toEqual({
+      registered: false,
+      firstContactNotice: NEW_CLIENT_INTRO,
+    });
   });
 
   it('una clienta registrada trae su nombre, el primer nombre y los términos', () => {

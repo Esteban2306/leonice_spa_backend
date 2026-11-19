@@ -121,6 +121,24 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     parametersSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'recomendar_para',
+    description:
+      'Qué recomienda el spa para lo que le pasa a la clienta en su cabello o cuero cabelludo (caída, frizz, resequedad, grasa, caspa, puntas, daño, color, volumen): devuelve los servicios y los productos o kits del catálogo que coinciden, con su porqué (why) y precio. Úsala siempre que cuente un problema o pida una recomendación.',
+    httpMethod: 'GET',
+    path: '/conduit/recommendations',
+    parametersSchema: {
+      type: 'object',
+      required: ['need'],
+      properties: {
+        need: {
+          type: 'string',
+          maxLength: 200,
+          description: 'Lo que contó la clienta, con sus palabras',
+        },
+      },
+    },
+  },
+  {
     name: 'info_tratamiento',
     description:
       'Ficha de UN tratamiento por su nombre: qué es, para quién, beneficios, precio (con la aclaración de rango o precio propio), duración y si requiere valoración. Si el nombre es ambiguo devuelve las opciones.',

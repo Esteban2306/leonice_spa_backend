@@ -12,8 +12,12 @@ interface BotClientSource {
   hairProfileUpdatedAt: Date | null;
 }
 
+export const NEW_CLIENT_INTRO =
+  'Desde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊';
+
 export interface BotClientView {
   registered: boolean;
+  firstContactNotice?: string;
   name?: string;
   firstName?: string;
   termsAccepted?: boolean;
@@ -30,7 +34,9 @@ export function toBotClient(
   termsAccepted: boolean,
   now: Date = new Date(),
 ): BotClientView {
-  if (!client) return { registered: false };
+  if (!client) {
+    return { registered: false, firstContactNotice: NEW_CLIENT_INTRO };
+  }
   const status = getHairProfileStatus(client, now);
   const name = client.name.trim();
   return {
