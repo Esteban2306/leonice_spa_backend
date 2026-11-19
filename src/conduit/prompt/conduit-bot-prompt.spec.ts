@@ -237,6 +237,15 @@ describe('prompt del asistente de Leonice', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('nunca menciones ids');
   });
 
+  it('entiende los audios transcritos y pide escribir solo si no se pudo escuchar', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      '"[audio transcrito] …" es lo que dijo en un audio',
+    );
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'Solo "[audio]": no se pudo escuchar',
+    );
+  });
+
   it('a Leo se le avisa en el mismo turno, sin interrogar a la clienta, y un saludo cariñoso nunca se calla', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
       'avisar_a_leo en ese mismo turno, sin preguntarle de qué se trata',
@@ -318,7 +327,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(12900);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(13100);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
