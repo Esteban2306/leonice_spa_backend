@@ -921,7 +921,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     variants: {
       default: [
         'Ya avisé al equipo y una persona te escribirá por este mismo chat lo antes posible 🙏',
-        'Tuvimos un inconveniente de nuestro lado. Ya le avisé al equipo y una persona te escribirá por aquí en breve 🙏',
+        'Listo 🙏 Ya le pasé tu mensaje al equipo y una persona te escribirá por aquí en breve.',
       ],
     },
   },
