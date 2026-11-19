@@ -1,14 +1,25 @@
 import { ConduitSupportToolsController } from './conduit-support-tools.controller';
+import { TeamHandoffService } from './handoff/team-handoff.service';
+import { memoryCache } from '../../test/helpers/memory-cache';
 
 function build(results: boolean[]) {
   const publishAsync = jest.fn((_type?: unknown, _payload?: unknown) =>
     Promise.resolve(results),
   );
+  const clients = {
+    findByPhone: jest.fn(() => Promise.resolve({ name: 'Diana' })),
+  };
   const controller = new ConduitSupportToolsController(
     {} as never,
-    { findByPhone: jest.fn(() => Promise.resolve({ name: 'Diana' })) } as never,
+    clients as never,
     { publishAsync } as never,
     {} as never,
+    {} as never,
+    new TeamHandoffService(
+      memoryCache() as never,
+      clients as never,
+      { publishAsync } as never,
+    ),
   );
   return { controller, publishAsync };
 }

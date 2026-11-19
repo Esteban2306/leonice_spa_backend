@@ -437,7 +437,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     envKey: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF',
     name: 'leonice_aviso_atencion_humana',
     description:
-      'Aviso interno: una clienta pidió hablar con una persona y el bot quedó en pausa en su chat.',
+      'Aviso interno: una clienta pidió hablar con una persona (o con Leo) y el bot solo responde en su chat preguntas de citas.',
     audience: 'ADMIN',
     variables: ['cliente', 'telefono', 'motivo', 'resumen'],
     body: [
@@ -448,7 +448,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       'Motivo: {{motivo}}',
       'Resumen: {{resumen}}',
       '',
-      'El asistente quedó en pausa en ese chat. Respóndele desde WhatsApp o desde el panel.',
+      'El asistente solo le responderá preguntas de citas en ese chat. Respóndele desde WhatsApp o desde el panel.',
     ].join('\n'),
   },
   {
@@ -559,7 +559,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     envKey: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF_EMAIL',
     name: 'leonice_correo_aviso_atencion_humana',
     description:
-      'Correo interno: una clienta pidió hablar con una persona y el bot quedó en pausa en su chat.',
+      'Correo interno: una clienta pidió hablar con una persona (o con Leo) y el bot solo responde en su chat preguntas de citas.',
     audience: 'ADMIN',
     channel: 'EMAIL',
     subject: 'Una clienta necesita atención personal: {{cliente}}',
@@ -572,7 +572,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
         '<strong>Motivo:</strong> {{motivo}}',
         '<strong>Resumen:</strong> {{resumen}}',
       ],
-      'El asistente quedó en pausa en ese chat. Respóndele desde WhatsApp o desde el panel.',
+      'El asistente solo le responderá preguntas de citas en ese chat. Respóndele desde WhatsApp o desde el panel.',
     ),
   },
   {

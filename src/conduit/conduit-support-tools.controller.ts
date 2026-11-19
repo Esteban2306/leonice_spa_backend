@@ -24,6 +24,16 @@ import { EVENT_TYPES } from '../common/events/constants/event.types';
 import { normalizePhone } from '../clients/utils/normalize-phone.util';
 import { ProductCatalogService } from '../products/catalog/product-catalog.service';
 import { toBotProducts } from './tools/bot-product-view';
+import {
+  detectConcerns,
+  matchProducts,
+  matchTreatments,
+  NEED_UNCLEAR_HINT,
+  NO_MATCH_HINT,
+} from './tools/bot-recommendation';
+import { toBotTreatmentListItem } from './tools/bot-treatment-view';
+import { TreatmentsService } from '../catalog/treatments/treatments.service';
+import { TeamHandoffService } from './handoff/team-handoff.service';
 
 @Controller({ path: 'conduit', version: '1' })
 @ConduitTool()
@@ -33,7 +43,52 @@ export class ConduitSupportToolsController {
     private readonly clients: ClientsRepository,
     private readonly eventBus: EventBusService,
     private readonly productCatalog: ProductCatalogService,
+    private readonly treatments: TreatmentsService,
+    private readonly handoffs: TeamHandoffService,
   ) {}
+
+  @ConduitToolOptionsMeta({ publicData: true })
+  @Get('recommendations')
+  async recommendations(
+    @Req() req: RequestWithConduitContact,
+    @Query('need') need?: string,
+  ) {
+    const text = (need ?? '').slice(0, 200);
+    const concerns = detectConcerns(text);
+    if (concerns.length === 0) {
+      return { status: 'need_unclear', hint: NEED_UNCLEAR_HINT };
+    }
+    const phone = req.conduitContact?.phone;
+    const [treatments, catalog, client] = await Promise.all([
+      this.treatments.findAll(),
+      this.productCatalog.listRecords(),
+      phone ? this.clients.findByPhone(phone) : null,
+    ]);
+    const needs = concerns.map((concern) => ({
+      need: concern.label,
+      services: matchTreatments(treatments, [concern])
+        .slice(0, 2)
+        .map(({ item, why }) => ({
+          ...toBotTreatmentListItem(item, client),
+          why,
+        })),
+      products: matchProducts(catalog, [concern]).slice(0, 3),
+    }));
+    if (
+      needs.every((n) => n.services.length === 0 && n.products.length === 0)
+    ) {
+      return {
+        status: 'no_match',
+        understood: concerns.map((c) => c.label),
+        hint: NO_MATCH_HINT,
+      };
+    }
+    return {
+      status: 'found',
+      needs,
+      hint: 'Responde cada necesidad: recomienda el primer servicio como principal y, si una necesidad no tiene servicio, recomienda sus productos o kits con su porqué y precio. No digas que algo no existe si trae productos.',
+    };
+  }
 
   /**
    * Datos que el bot comunica sin inventar: anticipo (monto e
@@ -106,24 +161,12 @@ export class ConduitSupportToolsController {
     @Req() req: RequestWithConduitContact,
     @Headers('x-conduit-idempotency-key') idempotencyKey?: string,
   ) {
-    const phone =
-      req.conduitContact?.phone ??
-      (dto.phone ? normalizePhone(dto.phone) : null);
-    const client = phone ? await this.clients.findByPhone(phone) : null;
-
-    const results = await this.eventBus.publishAsync(
-      EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED,
-      {
-        phone,
-        lid: req.conduitContact?.lid ?? null,
-        clientName: client?.name ?? null,
-        reason: dto.reason,
-        summary: dto.summary ?? null,
-        requestId: idempotencyKey ?? randomUUID(),
-      },
+    const teamNotified = await this.requestHandoff(
+      dto,
+      req,
+      'TEAM',
+      idempotencyKey,
     );
-
-    const teamNotified = results.some(Boolean);
     return {
       handedOff: teamNotified,
       teamNotified,
@@ -131,5 +174,45 @@ export class ConduitSupportToolsController {
         ? 'El equipo fue notificado y responderá por este mismo chat lo antes posible.'
         : 'No hay nadie del equipo a quien avisar en este momento; no prometas que una persona escribirá.',
     };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('handoff/owner')
+  async ownerHandoff(
+    @Body() dto: ConduitHandoffDto,
+    @Req() req: RequestWithConduitContact,
+    @Headers('x-conduit-idempotency-key') idempotencyKey?: string,
+  ) {
+    const teamNotified = await this.requestHandoff(
+      dto,
+      req,
+      'OWNER',
+      idempotencyKey,
+    );
+    return {
+      handedOff: teamNotified,
+      teamNotified,
+      message: teamNotified
+        ? 'Se le avisó a Leo que la clienta necesita hablar con ella; ella verá el mensaje y decidirá cómo responder. No des su número ni prometas cuándo escribirá.'
+        : 'No fue posible avisarle a Leo en este momento; no prometas que ella escribirá ni des su número.',
+    };
+  }
+
+  private async requestHandoff(
+    dto: ConduitHandoffDto,
+    req: RequestWithConduitContact,
+    target: 'TEAM' | 'OWNER',
+    idempotencyKey?: string,
+  ): Promise<boolean> {
+    return this.handoffs.request({
+      phone:
+        req.conduitContact?.phone ??
+        (dto.phone ? normalizePhone(dto.phone) : null),
+      lid: req.conduitContact?.lid ?? null,
+      reason: dto.reason,
+      summary: dto.summary ?? null,
+      requestId: idempotencyKey,
+      target,
+    });
   }
 }

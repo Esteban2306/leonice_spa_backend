@@ -131,6 +131,7 @@ export interface EventPayloadMap {
     reason: string;
     summary: string | null;
     requestId: string;
+    target?: 'TEAM' | 'OWNER';
   };
 
   [EVENT_TYPES.CONDUIT_PRODUCT_PURCHASE_REQUESTED]: {

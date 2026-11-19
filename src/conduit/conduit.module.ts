@@ -22,6 +22,7 @@ import { ConduitAdminController } from './admin/conduit-admin.controller';
 import { ConduitSpecialistController } from './admin/conduit-specialist.controller';
 import { ConduitVerificationEventsController } from './conduit-verification-events.controller';
 import { ReceiptAlertsService } from './verification/receipt-alerts.service';
+import { TeamHandoffService } from './handoff/team-handoff.service';
 import { BusinessSettingsModule } from '../business-settings/business-settings.module';
 import { ProductsModule } from '../products/products.module';
 import { ConduitSystemPauseService } from './pause/conduit-system-pause.service';
@@ -58,6 +59,7 @@ import { ConduitSystemPauseService } from './pause/conduit-system-pause.service'
     ConduitOutboxProcessor,
     ConduitOutboxSweepScheduler,
     ReceiptAlertsService,
+    TeamHandoffService,
   ],
   exports: [
     ConduitApiClient,

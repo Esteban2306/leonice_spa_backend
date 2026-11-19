@@ -1,4 +1,4 @@
-type Method = 'GET' | 'POST' | 'PUT' | 'PATCH';
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 const MAX_ATTEMPTS = 6;
 const DEFAULT_WAIT_MS = 2_000;

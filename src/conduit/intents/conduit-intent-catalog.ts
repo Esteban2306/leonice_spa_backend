@@ -86,37 +86,40 @@ Reglas
 - Dinero en pesos colombianos tal como lo entregan las herramientas. Nunca inventes servicios, precios, horarios, disponibilidad ni el estado de una reserva.
 - Usa la fecha y hora actuales del final de este mensaje para "hoy", "mañana", "el viernes" y fechas YYYY-MM-DD. Si el día no es claro, pregunta.
 - El teléfono lo pone el sistema: no lo pidas.
-- Si no sabes si está registrada, consultar_cliente primero. Si es el primer mensaje del bot en la conversación, preséntate ("Hola, {nombre}, soy {{agentName}} de {{companyName}}"); si ya te presentaste, no lo repitas.
-- Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo.
-- Servicios, duración, precio, promociones e id: listar_tratamientos. Nunca inventes un id: una herramienta que necesita un id se llama después de recibirlo.
-- Solo al presentar varios tratamientos usa este formato con emojis (en otros mensajes, casi sin emojis): una frase de introducción, cada servicio como bloque separado por línea en blanco y una pregunta corta al final:
+- Si no sabes si está registrada, consultar_cliente primero. En tu primer mensaje preséntate ("Hola, {nombre}, soy {{agentName}} de {{companyName}}"), una sola vez.
+- Precios: priceIsRange → el rango, que se confirma tras el diagnóstico en el spa; personalizedPrice → su precio; sin marcas, fijo.
+- Servicios, duración, precio, promociones e id: listar_tratamientos. Nunca inventes un id: una herramienta que necesita un id se llama después de recibirlo. Antes de decir que un servicio no existe, revísalo con listar_tratamientos en ese turno. Si nombra un servicio corto ("nutrición", "hidratación"), es el del catálogo que lo contiene: no le preguntes si existe.
+- Nunca le preguntes qué día quiere: consulta tú disponibilidad_combo desde hoy y ofrece los 2 o 3 cupos más cercanos.
+- Al presentar varios tratamientos (en otros mensajes, casi sin emojis): una frase de entrada, cada servicio en un bloque y una pregunta corta al final:
 ✨ *Nombre del servicio*
 ⏱ 60 min · 💰 $250.000
-Rango (priceIsRange): 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁 (los servicios con promoción van primero y son los que más destacas, sin inventar descuentos ni fechas); requiere valoración: línea 📋. Un título en negrita por categoría si hay varias. Máximo 8 servicios por mensaje. Negrita con un solo asterisco.
+Rango: 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁 y va primero, sin inventar descuentos ni fechas; requiere valoración: línea 📋. Máximo 8 servicios. Negrita con un solo asterisco.
 - Horarios libres: consultar_disponibilidad (un servicio, un día) o disponibilidad_combo (varios servicios o días; purpose=RESCHEDULE al reagendar). Ofrece solo horarios que devuelvan; si no hay cupo, busca los días siguientes.
 - Anticipo, medios de pago y políticas: info_negocio.
 
 Reservar
-1. Averigua el servicio y el día. Si trae requiresAssessment, avísale que primero se hace una valoración.
-2. Consulta la disponibilidad y ofrece horarios reales.
+1. Averigua el servicio (el día no: si no dijo uno, busca desde hoy). Si trae requiresAssessment, avísale que primero se hace una valoración.
+2. Consulta la disponibilidad y ofrece 2 o 3 cupos reales recomendando el primero, con la pregunta "¿te lo aparto?". Si responde "el primero que tengas", "cualquiera" o solo "sí" a varios horarios, no agendes: pídele que te diga el día y la hora exactos que quiere, o propón uno solo ("¿te aparto el viernes 20 a las 2:00 p. m.?") y espera su sí. Solo se agenda con un sí a una pregunta con un único día y hora, o cuando ella dice el día y la hora.
 3. Si consultar_cliente dio registered true, no pidas nombre, apellido ni fecha de nacimiento en ningún momento (tampoco al confirmar). Si no ves su resultado en "Datos vigentes", llama consultar_cliente antes de pedir datos. Si ya la registraste con registrar_cliente, no vuelvas a pedirle datos. Si dio registered false, pide en un solo mensaje su nombre y apellido y su fecha de nacimiento (obligatorios; sin ellos no reserves).
-4. Confirma servicio, día, hora y precio (con la aclaración de rango si aplica). Si es nueva o termsAccepted es false, dile en esta misma pregunta que al confirmar acepta los términos del servicio. Espera un sí claro.
+4. Confirma servicio, día, hora y precio (con la aclaración de rango si aplica). Si es nueva o termsAccepted es false, dile en esta misma pregunta que al confirmar acepta los términos del servicio; nunca preguntes los términos aparte. Espera un sí claro.
 5. Con el sí ya está todo confirmado: no vuelvas a consultar (ni disponibilidad ni precio) ni a preguntar (ni términos). Si no está registrada, llama registrar_cliente con name completo, birthDate y consents [{type TERMINOS_SERVICIO, accepted true, policyVersion "v1"}]; si está registrada pero termsAccepted es false, solo con ese consent. Después, crear_reserva_whatsapp una sola vez, con treatmentNames (el nombre del servicio) si no tienes el id.
 6. Cuéntale el estado y el resumen tal como los devuelve la herramienta, con el anticipo y cómo pagarlo. No digas que está confirmada si no lo está. Cierra con una despedida breve, sin preguntar nada más.
-- Nunca preguntes por alergias ni embarazo por iniciativa propia. El permiso de salud (DATOS_SALUD) se pide solo si ella dice que SÍ tiene alergias o está embarazada: explica que es por su seguridad y, sin permiso, no lo guardes (con actualizar_perfil_cliente si ya está registrada). Si dice que no tiene nada, no lo menciones y no envíes isPregnant, allergies ni consent en client (mandarlos en falso hace fallar la reserva).
+- Nunca preguntes por alergias ni embarazo. DATOS_SALUD solo si ella dice que SÍ tiene alergias o está embarazada: es por su seguridad y, sin permiso, no lo guardes (actualizar_perfil_cliente si ya está registrada). Si dice que no, no lo menciones ni envíes isPregnant, allergies ni consent en client (en falso hace fallar la reserva).
 
 Cambiar o cancelar
 - reservas_proximas muestra la cita. Si pide cancelar de forma explícita ("cancélala"), llama cancelar_reserva_whatsapp (scope SINGLE o DAY) en ese turno y dile que los anticipos no se devuelven. Para reagendar: disponibilidad_combo con purpose=RESCHEDULE, confirma la nueva hora y usa reagendar_reserva_whatsapp.
 
 Fuera de esto
 - Ante una queja o un daño, pasar_a_persona en ese mismo turno, sin pedir datos. También si pide hablar con una persona, tiene un tema de salud delicado o no logras resolver tras dos intentos, con el motivo y un resumen breve.
-- Si quiere enviar un comprobante de pago, pídele que mande la foto por este chat. Cuando haya una imagen en la conversación, llama registrar_comprobante_automatico sin preguntar cuánto pagó; no confirmes ni registres montos, solo di que el equipo revisará el comprobante.
+- Comprobante: que mande la foto por aquí. Con una imagen, registrar_comprobante_automatico sin preguntar cuánto pagó y di que el equipo lo revisará. Un comprobante no confirma un horario: sin cita apartada, primero confirma día y hora exactos.
 - Resultado con expected:true: explícalo en una frase simple y sigue su nextStep (OFFER_OTHER_SLOT: ofrece los horarios de alternatives o consulta otro día; SHOW_UPCOMING: revisa sus citas; ASK_CLIENT_DATA: pide el dato; OFFER_HANDOFF: ofrece pasar con una persona). No avises a nadie por esto. Fallo técnico: di que no pudiste completarlo; el sistema avisa al equipo solo. Nunca digas que una persona escribirá si pasar_a_persona no devolvió éxito.`;
 
 export const TREATMENT_SLIM_PROMPT = `Eres {{agentName}}, recepcionista de {{companyName}} (spa capilar), por WhatsApp. La clienta pregunta por un tratamiento.
 Idioma: {{language}}. Tono: {{tone}}. Responde de forma {{responseLength}}. {{emojiInstruction}} {{formatInstruction}}
 
 Reglas
+- Si cuenta qué le pasa a su cabello o pide una recomendación: recomendar_para con lo que contó y recomienda solo lo que devuelva (servicios con su porqué y precio, y productos o kits); si no hay servicio para eso pero sí productos, recomiéndalos; sin resultados, dilo con honestidad y ofrece que el equipo la oriente.
+- Si pregunta por un producto: info_productos.
 - Usa info_tratamiento con el nombre que dijo (o listar_tratamientos si no nombró uno) y responde SOLO con lo que devuelvan; nunca inventes beneficios, precios, duraciones ni resultados. Si el tratamiento no existe, di en una frase que no lo ofrecemos y propón 2 o 3 tratamientos reales parecidos de listar_tratamientos.
 - Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo. Dinero en pesos colombianos, tal como lo entregan las herramientas.
 - Mensajes cortos y una sola pregunta. Nunca muestres ids ni nombres de herramientas.
@@ -124,7 +127,7 @@ Reglas
 ✨ *Nombre del servicio*
 ⏱ 60 min · 💰 $250.000
 Rango: 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁 (los servicios con promoción van primero y son los que más destacas, sin inventar descuentos ni fechas); requiere valoración: línea 📋. Máximo 8 servicios; negrita con un solo asterisco.
-- Si quiere agendar, dile que con gusto la ayudas y pregúntale el día que prefiere. Si pide una persona o tiene una queja, usa pasar_a_persona.`;
+- Si quiere agendar, dile que con gusto le buscas los cupos más cercanos (sin preguntarle el día). Si pide una persona o tiene una queja, usa pasar_a_persona.`;
 
 export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
   {
@@ -141,8 +144,10 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         prompt: TREATMENT_SLIM_PROMPT,
         tools: [
           'consultar_cliente',
+          'recomendar_para',
           'info_tratamiento',
           'listar_tratamientos',
+          'info_productos',
           'pasar_a_persona',
         ],
         maxTokens: 700,
@@ -237,8 +242,8 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         '¡Hola {{nombre}}! 🌿 Soy {{agente}} de {{negocio}}.',
       ],
       prefix_default: [
-        '¡Hola! Soy {{agente}} de {{negocio}} 😊',
-        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}.',
+        '¡Hola! Soy {{agente}} de {{negocio}} 😊\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊',
+        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}.\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊',
       ],
       registered: [
         '¡Hola {{nombre}}! 😊 Soy {{agente}} de {{negocio}}. ¿En qué te puedo ayudar hoy?',
@@ -246,9 +251,8 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
         '¡Qué gusto saludarte, {{nombre}}! Soy {{agente}} de {{negocio}}. ¿En qué te ayudo?',
       ],
       default: [
-        '¡Hola! 😊 Soy {{agente}} de {{negocio}}. ¿En qué te puedo ayudar hoy?',
-        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}. Cuéntame, ¿qué necesitas?',
-        '¡Qué gusto saludarte! Soy {{agente}} de {{negocio}}. ¿En qué te ayudo?',
+        '¡Hola! 😊 Soy {{agente}} de {{negocio}}.\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊\n\n¿En qué te puedo ayudar hoy?',
+        '¡Hola! 🌿 Soy {{agente}} de {{negocio}}.\n\nDesde ahora yo atiendo y gestiono tus citas por aquí; cualquier duda de citas, tratamientos o productos me la puedes escribir 😊\n\nCuéntame, ¿qué necesitas?',
       ],
     },
   },
@@ -786,19 +790,59 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     },
   },
   {
-    key: 'leo_notice',
-    name: 'Aviso: preguntan por Leo',
+    key: 'leo_request',
+    name: 'Pide hablar con Leo',
     description:
-      'La clienta pregunta por Leo, la dueña. Acompaña la respuesta del turno (no compite con la cita): las citas son por aquí y, para otros temas, su WhatsApp configurado en el panel.',
+      'Pide hablar con Leo o su número, sin que sea por una cita: se le avisa solo a Leo (avisar_a_leo) y su número nunca se da.',
+    handler: 'HANDOFF',
+    priority: 5,
+    patterns: [
+      '\\b(?:hablar|comunicarme|comunicar|contactar|contactarme|escribirle|llamar(?:la|le)?)\\s+(?:con\\s+)?(?:la\\s+)?leo\\b',
+      '\\b(?:pasame|pasarme|comunicame|ponme)\\s+(?:con\\s+)?(?:a\\s+)?(?:la\\s+)?leo\\b',
+      '\\b(?:numero|celular|cel|whatsapp|wasap|telefono|contacto)\\s+(?:de\\s+)?(?:la\\s+)?leo\\b',
+      '\\b(?:dile|digale|avisale|avisele)\\s+a\\s+(?:la\\s+)?leo\\b',
+    ],
+    denyPatterns: [
+      `\\b(?:${TOPICS_DENY}|turno|cupo|cupos|precio|precios|valor|cuanto|tratamiento|servicio|producto)\\b`,
+      '(?<!\\bno es (?:de |por |sobre |para )?(?:una |la |las )?)\\bcitas?\\b',
+    ],
+    maxTokens: 25,
+    negationOk: true,
+    fixedConfidence: 0.9,
+    lockedMode: 'ACTIVE',
+    config: {
+      tool: 'avisar_a_leo',
+      reason: 'La clienta pidió hablar con Leo',
+      notifyTeam: false,
+    },
+    variants: {
+      default: [
+        'Listo 🌿 Ya le avisé a Leo que necesitas hablar con ella; ella verá tu mensaje por aquí. Si es sobre una cita, también te ayudo yo.',
+      ],
+    },
+  },
+  {
+    key: 'leo_notice',
+    name: 'Aviso: preguntan por Leo (retirado)',
+    description:
+      'Retirado: el WhatsApp de Leo ya no se da. Si la clienta necesita a Leo, el asistente usa avisar_a_leo. Queda apagado para que una siembra con CONDUIT_INTENTS_OVERWRITE=true lo desactive en producción.',
     handler: 'TOOL_DIRECT',
     priority: 1,
-    patterns: ['\\bleo\\b'],
+    patterns: [
+      '\\b(?:hablar|comunicar(?:me)?|comunicame|contactar|escribirle|llamar(?:la|le)?|pasame|pasar(?:me)?|dile|digale|avisale)\\b.{0,20}\\bleo\\b',
+      '\\b(?:numero|celular|cel|whatsapp|wasap|telefono|contacto)\\b.{0,15}\\bleo\\b',
+      '\\b(?:que paso con|que se hizo|donde esta|no esta|ya no esta|esta|estara)\\s+(?:la\\s+)?leo\\b',
+      '\\bleo\\s+(?:ya\\s+)?(?:no\\s+)?(?:esta|atiende|trabaja|responde|contesta|volvio|me atiende)\\b(?!\\s+(?:semana|tarde|manana|noche|dia|vez|mes|cita|lunes|martes|miercoles|jueves|viernes|sabado|domingo)\\b)',
+      '\\b(?:eres|usted es|tu eres|no eres|es)\\s+(?:la\\s+)?leo\\b',
+      '\\b(?:con|para)\\s+(?:la\\s+)?leo\\b',
+      '\\batien\\w*\\s+(?:la\\s+)?leo\\b',
+    ],
     denyPatterns: [
       '^(?:(?:hola|ola|buenas|buenos|buen|dias|dia|tardes|noches|hey|saludos)\\s+)*leo(?:\\s+(?:hola|buenas|buenos|dias|dia|tardes|noches|como|estas|esta|bien|que|tal))*$',
     ],
     maxTokens: 60,
     cooldownSeconds: 1800,
-    lockedMode: 'ACTIVE',
+    lockedMode: 'OFF',
     config: {
       notice: true,
       tool: 'info_negocio',
@@ -867,7 +911,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
     variants: {
       default: [
         'Ya avisé al equipo y una persona te escribirá por este mismo chat lo antes posible 🙏',
-        'Tuvimos un inconveniente de nuestro lado. Ya le avisé al equipo y una persona te escribirá por aquí en breve 🙏',
+        'Listo 🙏 Ya le pasé tu mensaje al equipo y una persona te escribirá por aquí en breve.',
       ],
     },
   },

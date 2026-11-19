@@ -15,9 +15,14 @@ import {
   parseReceiptContact,
   ReceiptAlertsService,
 } from './verification/receipt-alerts.service';
+import { TeamHandoffService } from './handoff/team-handoff.service';
 
 const LIMIT_PER_MINUTE = 600;
 const VERIFICATION_CAPABILITY = 'image-analysis';
+export const HAIR_PHOTO_CAPABILITY = 'foto-cabello';
+const HAIR_PHOTO_VERDICTS = new Set(['VALID', 'NEEDS_REVIEW']);
+export const HAIR_PHOTO_REASON =
+  'Envió una foto de su cabello: una persona del equipo debe atender este chat.';
 
 /**
  * Resultados de verificación de comprobantes que Conduit avisa por webhook.
@@ -27,7 +32,10 @@ const VERIFICATION_CAPABILITY = 'image-analysis';
  */
 @Controller({ path: 'integrations/conduit/verification-events', version: '1' })
 export class ConduitVerificationEventsController {
-  constructor(private readonly alerts: ReceiptAlertsService) {}
+  constructor(
+    private readonly alerts: ReceiptAlertsService,
+    private readonly handoffs: TeamHandoffService,
+  ) {}
 
   @Public()
   @SkipCsrf()
@@ -40,6 +48,9 @@ export class ConduitVerificationEventsController {
     @Headers('x-conduit-event-id') eventId?: string,
   ) {
     const { data } = dto;
+    if (data.capability === HAIR_PHOTO_CAPABILITY) {
+      return this.hairPhoto(dto, eventId);
+    }
     if (data.capability !== VERIFICATION_CAPABILITY) {
       return { received: true, ignored: true };
     }
@@ -65,5 +76,28 @@ export class ConduitVerificationEventsController {
       );
     }
     return { received: true };
+  }
+
+  private async hairPhoto(dto: ConduitVerificationEventDto, eventId?: string) {
+    const { data } = dto;
+    const contact = parseReceiptContact(data.contact);
+    if (!contact || !HAIR_PHOTO_VERDICTS.has(data.verdict)) {
+      return { received: true, ignored: true };
+    }
+    if (await this.alerts.alreadySeen(eventId)) {
+      return { received: true, duplicate: true };
+    }
+    const notified = await this.handoffs.request({
+      phone: contact.phone,
+      lid: contact.phone ? null : (data.contact ?? null),
+      reason: HAIR_PHOTO_REASON,
+      summary:
+        typeof data.variables?.descripcion === 'string'
+          ? data.variables.descripcion.slice(0, 160)
+          : null,
+      requestId: `foto-cabello-${data.verificationId}`,
+      target: 'TEAM',
+    });
+    return { received: true, teamNotified: notified };
   }
 }

@@ -82,6 +82,14 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(payment.notes).toMatch(/^PENDIENTE/);
   });
 
+  it('los prompts de IA reducida caben en el límite que valida Conduit (6000)', () => {
+    for (const intent of CONDUIT_INTENT_CATALOG) {
+      const slim = (intent.config as { slim?: { prompt?: string } } | undefined)
+        ?.slim;
+      if (slim?.prompt) expect(slim.prompt.length).toBeLessThanOrEqual(6000);
+    }
+  });
+
   it('las reglas duras tienen su texto y las claves reservadas son las conocidas', () => {
     const rules = CONDUIT_INTENT_CATALOG.filter((i) =>
       i.key.startsWith('rule.'),
@@ -127,7 +135,7 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(greeters).not.toContain('courtesy');
   });
 
-  it('las quejas, pedir una persona y el aviso de Leo quedan activos siempre, sin depender de la IA', () => {
+  it('las quejas y pedir una persona quedan activos siempre; el aviso con el WhatsApp de Leo queda apagado', () => {
     const complaint = CONDUIT_INTENT_CATALOG.find(
       (i) => i.key === 'complaint',
     )!;
@@ -137,9 +145,7 @@ describe('CONDUIT_INTENT_CATALOG', () => {
       CONDUIT_INTENT_CATALOG.find((i) => i.key === 'human_request')!.lockedMode,
     ).toBe('ACTIVE');
     expect(complaint.handler).toBe('HANDOFF');
-    expect(leo.lockedMode).toBe('ACTIVE');
-    expect(leo.config?.notice).toBe(true);
-    expect(leo.config?.tool).toBe('info_negocio');
+    expect(leo.lockedMode).toBe('OFF');
   });
 
   it('reconoce la queja real de la prueba y no confunde un elogio', () => {
@@ -168,6 +174,31 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(matches('No tengo ninguna queja, todo bien')).toBe(false);
   });
 
+  it('pedir hablar con Leo o su número avisa solo a Leo, salvo que sea por una cita', () => {
+    const leo = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'leo_request')!;
+    expect(leo.handler).toBe('HANDOFF');
+    expect(leo.lockedMode).toBe('ACTIVE');
+    expect(leo.config?.tool).toBe('avisar_a_leo');
+    expect(leo.variants.default.join(' ')).not.toMatch(/\d{7,}/);
+    const hits = (t: string) =>
+      leo.patterns.some((p) => new RegExp(p).test(t)) &&
+      !(leo.denyPatterns ?? []).some((p) => new RegExp(p).test(t));
+    expect(hits('hola necesito hablar con leo es un tema personal')).toBe(true);
+    expect(hits('me pasas el numero de leo')).toBe(true);
+    expect(hits('quiero comunicarme con la leo')).toBe(true);
+    expect(hits('dile a leo que la llamo luego')).toBe(true);
+    expect(hits('pasame con leo porfa')).toBe(true);
+    expect(
+      hits('necesito hablar con leo de un tema personal no es de citas'),
+    ).toBe(true);
+    expect(hits('quiero hablar con leo para agendar una cita')).toBe(false);
+    expect(hits('mi leo me regalas direccion')).toBe(false);
+    expect(hits('tu eres leo')).toBe(false);
+    expect(hits('hola leo buenas tardes')).toBe(false);
+    expect(hits('quiero una cita con leo')).toBe(false);
+    expect(hits('hablar con leonice arenas spa')).toBe(false);
+  });
+
   it('el aviso de Leo salta cuando preguntan por ella, no con un saludo ni con el nombre del spa', () => {
     const leo = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'leo_notice')!;
     const hits = (t: string) =>
@@ -180,5 +211,28 @@ describe('CONDUIT_INTENT_CATALOG', () => {
     expect(hits('hola leo buenas tardes')).toBe(false);
     expect(hits('hola leo')).toBe(false);
     expect(hits('hola leonice arenas spa')).toBe(false);
+    expect(hits('me pasas el numero de leo')).toBe(true);
+    expect(hits('esta leo')).toBe(true);
+    expect(hits('leo ya no atiende por aqui')).toBe(true);
+    expect(hits('leo no esta atendiendo')).toBe(true);
+    expect(hits('tu eres leo')).toBe(true);
+    expect(hits('quiero que me atienda leo')).toBe(true);
+    expect(hits('dile a leo que la llamo luego')).toBe(true);
+  });
+
+  it('el aviso de Leo no salta cuando la clienta le habla a Leo como a quien la atiende', () => {
+    const leo = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'leo_notice')!;
+    const hits = (t: string) =>
+      leo.patterns.some((p) => new RegExp(p).test(t)) &&
+      !(leo.denyPatterns ?? []).some((p) => new RegExp(p).test(t));
+    expect(hits('mi leo me regalas direccion por favor')).toBe(false);
+    expect(hits('leo pregunta tecnica')).toBe(false);
+    expect(hits('buenos dias leo necesito una cita para el viernes')).toBe(
+      false,
+    );
+    expect(hits('leo cuanto vale la hidratacion')).toBe(false);
+    expect(hits('leo esta semana tienes cupo')).toBe(false);
+    expect(hits('leo esta tarde puedo ir')).toBe(false);
+    expect(hits('leo sigue en pie mi cita')).toBe(false);
   });
 });

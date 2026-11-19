@@ -121,6 +121,24 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     parametersSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'recomendar_para',
+    description:
+      'Qué recomienda el spa para lo que le pasa a la clienta en su cabello o cuero cabelludo (caída, frizz, resequedad, grasa, caspa, puntas, daño, color, volumen): devuelve los servicios y los productos o kits del catálogo que coinciden, con su porqué (why) y precio. Úsala siempre que cuente un problema o pida una recomendación.',
+    httpMethod: 'GET',
+    path: '/conduit/recommendations',
+    parametersSchema: {
+      type: 'object',
+      required: ['need'],
+      properties: {
+        need: {
+          type: 'string',
+          maxLength: 200,
+          description: 'Lo que contó la clienta, con sus palabras',
+        },
+      },
+    },
+  },
+  {
     name: 'info_tratamiento',
     description:
       'Ficha de UN tratamiento por su nombre: qué es, para quién, beneficios, precio (con la aclaración de rango o precio propio), duración y si requiere valoración. Si el nombre es ambiguo devuelve las opciones.',
@@ -369,9 +387,27 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     },
   },
   {
+    name: 'avisar_a_leo',
+    description:
+      'Avisa SOLO a Leo, la dueña, que esta clienta necesita hablar con ella (un tema que no es una cita o insiste en hablar con Leo). Su número nunca se da. Pausa el asistente en este chat salvo para preguntas de citas.',
+    httpMethod: 'POST',
+    path: '/conduit/handoff/owner',
+    injectPhoneParamName: 'phone',
+    pausesBotMinutes: 240,
+    parametersSchema: {
+      type: 'object',
+      required: ['reason'],
+      properties: {
+        phone: PHONE,
+        reason: { type: 'string', minLength: 3, maxLength: 300 },
+        summary: { type: 'string', maxLength: 1000 },
+      },
+    },
+  },
+  {
     name: 'pasar_a_persona',
     description:
-      'Pasa la conversación a una persona del spa: si la clienta lo pide, hay una queja, un tema de salud o dos intentos fallidos. Avisa al equipo y pausa el asistente en este chat.',
+      'Pasa la conversación a una persona del spa: si la clienta lo pide, hay una queja, un tema de salud, un tema interno que no es una cita (pagos que no son un anticipo pendiente, fotos o videos de su visita, facturas) o dos intentos fallidos. Avisa al equipo y pausa el asistente en este chat salvo para preguntas de citas.',
     httpMethod: 'POST',
     path: '/conduit/handoff',
     injectPhoneParamName: 'phone',

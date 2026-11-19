@@ -276,6 +276,12 @@ async function main(): Promise<void> {
     },
   });
 
+  await prisma.client.adminNotificationRecipient.upsert({
+    where: { phone: '+573000000998' },
+    update: {},
+    create: { name: 'Leo Arenas (banco)', phone: '+573000000998' },
+  });
+
   const benchRoutes = Router();
   benchRoutes.post(
     '/state',
