@@ -36,14 +36,22 @@ describe('Integridad a nivel de base de datos (CHECK, únicos parciales y FK)', 
     await moduleRef.close();
   });
 
-  const rejects = async (action: Promise<unknown>, constraint: string) => {
+  const rejects = async (
+    action: Promise<unknown>,
+    constraint: string | RegExp,
+  ) => {
     const error: unknown = await action.then(
       () => null,
       (e: unknown) => e,
     );
     expect(error).not.toBeNull();
-    expect(String((error as Error).message)).toContain(constraint);
+    const message = String((error as Error).message);
+    if (typeof constraint === 'string') expect(message).toContain(constraint);
+    else expect(message).toMatch(constraint);
   };
+
+  const RESTRICTED =
+    /violates RESTRICT setting of foreign key constraint|Foreign key constraint violated on the constraint/;
 
   const baseReservation = (overrides: Record<string, unknown> = {}) => ({
     clientId,
@@ -295,26 +303,26 @@ describe('Integridad a nivel de base de datos (CHECK, únicos parciales y FK)', 
     it('no permite borrar un cliente, tratamiento o categoría con reservas', async () => {
       await rejects(
         prisma.client.client.delete({ where: { id: clientId } }),
-        'violates RESTRICT setting of foreign key constraint',
+        RESTRICTED,
       );
       await rejects(
         prisma.client.treatment.delete({
           where: { id: world.secondary.treatmentId },
         }),
-        'violates RESTRICT setting of foreign key constraint',
+        RESTRICTED,
       );
       await rejects(
         prisma.client.category.delete({
           where: { id: world.secondary.categoryId },
         }),
-        'violates RESTRICT setting of foreign key constraint',
+        RESTRICTED,
       );
     });
 
     it('no permite borrar una reserva con depósitos', async () => {
       await rejects(
         prisma.client.reservation.delete({ where: { id: reservationId } }),
-        'violates RESTRICT setting of foreign key constraint',
+        RESTRICTED,
       );
     });
   });
