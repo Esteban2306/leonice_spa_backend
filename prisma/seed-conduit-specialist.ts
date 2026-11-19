@@ -123,6 +123,62 @@ export const SPECIALIST_DEFINITION = {
   contextSources: CONTEXT_SOURCES,
 };
 
+export const HAIR_SPECIALIST_KEY = 'foto-cabello';
+export const HAIR_CAPABILITY = 'foto-cabello';
+
+export const HAIR_SPECIALIST_DEFINITION = {
+  name: 'Foto del cabello',
+  promptTemplate: [
+    'Revisas fotos que las clientas de un spa capilar envían por WhatsApp. Solo decides si la foto muestra el cabello o el cuero cabelludo de una persona: para pedir una valoración, mostrar cómo lo tiene, una referencia de cómo lo quiere o cómo le quedó.',
+    'Si el cabello o el cuero cabelludo de una persona se ve y es lo principal de la foto, es el contenido esperado y la legibilidad es CLEAR, aunque la foto esté algo oscura, borrosa o de lado.',
+    'No es el contenido esperado: un comprobante de pago, una captura de pantalla o de una conversación, un texto, un producto, un paisaje, o una foto donde el cabello no es lo principal (por ejemplo una selfie lejana o un grupo de personas).',
+    'En la descripción pon en pocas palabras lo que se ve del cabello (largo, color, si parece tinturado, alisado o maltratado). No opines, no diagnostiques y no describas la cara ni otros datos de la persona.',
+  ].join('\n'),
+  outputSchema: {
+    version: 1,
+    variables: [
+      {
+        name: 'descripcion',
+        type: 'string',
+        maxLength: 160,
+        label: 'lo que se ve',
+        description:
+          'Lo que se ve del cabello en pocas palabras, sin opiniones ni datos de la persona',
+      },
+    ],
+    uniqueBy: [],
+  },
+  rules: { version: 1, rules: [] },
+  contextSources: { version: 1, sources: [] },
+};
+
+interface SpecialistSeed {
+  key: string;
+  capability: string;
+  definition: typeof SPECIALIST_DEFINITION | typeof HAIR_SPECIALIST_DEFINITION;
+  overwriteEnv: string;
+  modeEnv: string;
+  defaultMode: 'OFF' | 'SHADOW' | 'ACTIVE';
+}
+
+const RECEIPT_SEED: SpecialistSeed = {
+  key: SPECIALIST_KEY,
+  capability: CAPABILITY,
+  definition: SPECIALIST_DEFINITION,
+  overwriteEnv: 'CONDUIT_SPECIALIST_OVERWRITE',
+  modeEnv: 'CONDUIT_SPECIALIST_MODE',
+  defaultMode: 'ACTIVE',
+};
+
+const HAIR_SEED: SpecialistSeed = {
+  key: HAIR_SPECIALIST_KEY,
+  capability: HAIR_CAPABILITY,
+  definition: HAIR_SPECIALIST_DEFINITION,
+  overwriteEnv: 'CONDUIT_HAIR_SPECIALIST_OVERWRITE',
+  modeEnv: 'CONDUIT_HAIR_SPECIALIST_MODE',
+  defaultMode: 'SHADOW',
+};
+
 interface RemoteSpecialist {
   id: string;
   version: number;
@@ -150,18 +206,34 @@ const asList = <T>(value: T[] | { data: T[] }): T[] =>
 export async function seedConduitSpecialist(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
+  if (await seedSpecialist(RECEIPT_SEED, env)) {
+    await enableImages(env);
+  }
+}
+
+export async function seedConduitHairSpecialist(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  await seedSpecialist(HAIR_SEED, env);
+}
+
+async function seedSpecialist(
+  seed: SpecialistSeed,
+  env: NodeJS.ProcessEnv,
+): Promise<boolean> {
+  const { key, capability, definition } = seed;
   const missing = REQUIRED_ENV.filter((key) => !env[key]);
   if (missing.length > 0) {
     console.log(
       `[conduit] Especialista omitido: faltan ${missing.join(', ')}.`,
     );
-    return;
+    return false;
   }
   const botId = env.CONDUIT_DEFAULT_BOT_ID!;
-  const overwrite = env.CONDUIT_SPECIALIST_OVERWRITE === 'true';
-  const mode = env.CONDUIT_SPECIALIST_MODE ?? 'ACTIVE';
+  const overwrite = env[seed.overwriteEnv] === 'true';
+  const mode = env[seed.modeEnv] ?? seed.defaultMode;
   if (!['OFF', 'SHADOW', 'ACTIVE'].includes(mode)) {
-    throw new Error(`CONDUIT_SPECIALIST_MODE inválido: ${mode}`);
+    throw new Error(`${seed.modeEnv} inválido: ${mode}`);
   }
   const request = conduitSeedRequest(
     env.CONDUIT_BASE_URL!,
@@ -172,34 +244,34 @@ export async function seedConduitSpecialist(
   try {
     specialist = await request<RemoteSpecialist>(
       'GET',
-      `specialists/by-key/${SPECIALIST_KEY}`,
+      `specialists/by-key/${key}`,
     );
     if (overwrite) {
       specialist = await request<RemoteSpecialist>(
         'PATCH',
         `specialists/${specialist.id}`,
-        { ...SPECIALIST_DEFINITION, expectedVersion: specialist.version },
+        { ...definition, expectedVersion: specialist.version },
       );
-      console.log(`[conduit] especialista ${SPECIALIST_KEY}: actualizado`);
+      console.log(`[conduit] especialista ${key}: actualizado`);
     } else {
       console.log(
-        `[conduit] especialista ${SPECIALIST_KEY}: ya existía (CONDUIT_SPECIALIST_OVERWRITE=true para reemplazar su definición)`,
+        `[conduit] especialista ${key}: ya existía (${seed.overwriteEnv}=true para reemplazar su definición)`,
       );
     }
   } catch (error) {
     if (!isNotFound(error)) throw error;
     specialist = await request<RemoteSpecialist>('POST', 'specialists', {
-      key: SPECIALIST_KEY,
-      capability: CAPABILITY,
-      ...SPECIALIST_DEFINITION,
+      key,
+      capability,
+      ...definition,
     });
-    console.log(`[conduit] especialista ${SPECIALIST_KEY}: creado`);
+    console.log(`[conduit] especialista ${key}: creado`);
     specialist = await request<RemoteSpecialist>(
       'PATCH',
       `specialists/${specialist.id}`,
       { status: 'ACTIVE' },
     );
-    console.log(`[conduit] especialista ${SPECIALIST_KEY}: activado`);
+    console.log(`[conduit] especialista ${key}: activado`);
   }
 
   const modelKey = env.CONDUIT_SPECIALIST_MODEL_KEY;
@@ -254,21 +326,21 @@ export async function seedConduitSpecialist(
       `bots/${botId}/specialists`,
     ),
   );
-  const current = bindings.find((b) => b.capability === CAPABILITY);
+  const current = bindings.find((b) => b.capability === capability);
   const currentSpecialist = current?.specialist?.id ?? current?.specialistId;
   if (current && currentSpecialist !== specialist.id && !overwrite) {
     console.warn(
-      `[conduit]   ⚠ el bot ya tiene otro especialista en ${CAPABILITY}; no se reemplazó (CONDUIT_SPECIALIST_OVERWRITE=true).`,
+      `[conduit]   ⚠ el bot ya tiene otro especialista en ${capability}; no se reemplazó (${seed.overwriteEnv}=true).`,
     );
   } else if (current && currentSpecialist === specialist.id && !overwrite) {
     console.log(
-      `[conduit] vínculo ${CAPABILITY}: ya existía (${current.mode})`,
+      `[conduit] vínculo ${capability}: ya existía (${current.mode})`,
     );
   } else {
     try {
       const result = await request<{ warnings?: Array<{ message: string }> }>(
         'PUT',
-        `bots/${botId}/specialists/${CAPABILITY}`,
+        `bots/${botId}/specialists/${capability}`,
         {
           specialistId: specialist.id,
           mode,
@@ -276,7 +348,7 @@ export async function seedConduitSpecialist(
           onFailure: 'DEGRADE',
         },
       );
-      console.log(`[conduit] vínculo ${CAPABILITY}: ${mode}`);
+      console.log(`[conduit] vínculo ${capability}: ${mode}`);
       for (const warning of result?.warnings ?? []) {
         console.warn(`[conduit]   ⚠ ${warning.message}`);
       }
@@ -287,6 +359,15 @@ export async function seedConduitSpecialist(
     }
   }
 
+  return true;
+}
+
+async function enableImages(env: NodeJS.ProcessEnv): Promise<void> {
+  const botId = env.CONDUIT_DEFAULT_BOT_ID!;
+  const request = conduitSeedRequest(
+    env.CONDUIT_BASE_URL!,
+    env.CONDUIT_API_KEY!,
+  );
   if (env.CONDUIT_SPECIALIST_ENABLE_IMAGES === 'true') {
     await request('PUT', `bot/config/${botId}`, { imageAnalysisEnabled: true });
     console.log('[conduit] análisis de imágenes del bot: activado');
@@ -298,7 +379,10 @@ export async function seedConduitSpecialist(
 }
 
 if (require.main === module) {
-  seedConduitSpecialist().catch((error: unknown) => {
+  const run = process.argv.includes(HAIR_SPECIALIST_KEY)
+    ? seedConduitHairSpecialist
+    : seedConduitSpecialist;
+  run().catch((error: unknown) => {
     console.error(error);
     process.exit(1);
   });

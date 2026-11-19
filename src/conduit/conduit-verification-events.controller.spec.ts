@@ -26,9 +26,14 @@ function build(seen = false) {
     invalid: jest.fn().mockResolvedValue(1),
     review: jest.fn().mockResolvedValue(undefined),
   };
+  const handoffs = { request: jest.fn().mockResolvedValue(true) };
   return {
     alerts,
-    controller: new ConduitVerificationEventsController(alerts as never),
+    handoffs,
+    controller: new ConduitVerificationEventsController(
+      alerts as never,
+      handoffs as never,
+    ),
   };
 }
 
@@ -110,5 +115,80 @@ describe('ConduitVerificationEventsController', () => {
 
     expect(result).toEqual({ received: true, duplicate: true });
     expect(alerts.invalid).not.toHaveBeenCalled();
+  });
+});
+
+describe('foto del cabello', () => {
+  it('avisa al equipo que debe atender el chat, una vez por foto', async () => {
+    const { controller, handoffs, alerts } = build();
+    const out = await controller.receive(
+      event({
+        capability: 'foto-cabello',
+        verdict: 'VALID',
+        verificationId: 'v9',
+        humanSummary: 'Imagen legible y sin reglas configuradas.',
+        variables: { descripcion: 'Cabello largo con frizz en las puntas' },
+        reasonCodes: [],
+      }),
+      'evt-9',
+    );
+    expect(out).toEqual({ received: true, teamNotified: true });
+    expect(handoffs.request).toHaveBeenCalledWith({
+      phone: '+573001112233',
+      lid: null,
+      reason:
+        'Envió una foto de su cabello: una persona del equipo debe atender este chat.',
+      summary: 'Cabello largo con frizz en las puntas',
+      requestId: 'foto-cabello-v9',
+      target: 'TEAM',
+    });
+    expect(alerts.invalid).not.toHaveBeenCalled();
+  });
+
+  it('una foto dudosa también se pasa al equipo', async () => {
+    const { controller, handoffs } = build();
+    await controller.receive(
+      event({ capability: 'foto-cabello', verdict: 'NEEDS_REVIEW' }),
+      'evt-10',
+    );
+    expect(handoffs.request).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['NOT_APPLICABLE', 'UNREADABLE', 'ERROR', 'INVALID'])(
+    'con %s no avisa',
+    async (verdict) => {
+      const { controller, handoffs } = build();
+      const out = await controller.receive(
+        event({ capability: 'foto-cabello', verdict }),
+        'evt-11',
+      );
+      expect(out).toMatchObject({ ignored: true });
+      expect(handoffs.request).not.toHaveBeenCalled();
+    },
+  );
+
+  it('un evento repetido de Conduit no avisa dos veces', async () => {
+    const { controller, handoffs } = build(true);
+    const out = await controller.receive(
+      event({ capability: 'foto-cabello', verdict: 'VALID' }),
+      'evt-12',
+    );
+    expect(out).toMatchObject({ duplicate: true });
+    expect(handoffs.request).not.toHaveBeenCalled();
+  });
+
+  it('un contacto LID se avisa sin teléfono', async () => {
+    const { controller, handoffs } = build();
+    await controller.receive(
+      event({
+        capability: 'foto-cabello',
+        verdict: 'VALID',
+        contact: '123456789@lid',
+      }),
+      'evt-13',
+    );
+    expect(handoffs.request).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: null, lid: '123456789@lid' }),
+    );
   });
 });

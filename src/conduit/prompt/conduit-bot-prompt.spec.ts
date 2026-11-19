@@ -341,8 +341,17 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain('Nunca des datos de otras clientas');
   });
 
+  it('una foto del cabello va a una persona y nunca se toma por comprobante', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    const rule = t.indexOf('foto-cabello');
+    expect(rule).toBeGreaterThan(0);
+    expect(rule).toBeLessThan(t.indexOf('Otra imagen es el comprobante'));
+    expect(t).toContain('no un comprobante: no registres pago');
+    expect(t).toContain('pasar_a_persona (motivo: foto de su cabello)');
+  });
+
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(13450);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(13650);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

@@ -48,6 +48,7 @@ function build() {
         ]),
       ),
     } as never,
+    {} as never,
   );
 }
 

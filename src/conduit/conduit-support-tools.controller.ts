@@ -33,6 +33,7 @@ import {
 } from './tools/bot-recommendation';
 import { toBotTreatmentListItem } from './tools/bot-treatment-view';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
+import { TeamHandoffService } from './handoff/team-handoff.service';
 
 @Controller({ path: 'conduit', version: '1' })
 @ConduitTool()
@@ -43,6 +44,7 @@ export class ConduitSupportToolsController {
     private readonly eventBus: EventBusService,
     private readonly productCatalog: ProductCatalogService,
     private readonly treatments: TreatmentsService,
+    private readonly handoffs: TeamHandoffService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -202,23 +204,15 @@ export class ConduitSupportToolsController {
     target: 'TEAM' | 'OWNER',
     idempotencyKey?: string,
   ): Promise<boolean> {
-    const phone =
-      req.conduitContact?.phone ??
-      (dto.phone ? normalizePhone(dto.phone) : null);
-    const client = phone ? await this.clients.findByPhone(phone) : null;
-
-    const results = await this.eventBus.publishAsync(
-      EVENT_TYPES.CONDUIT_HANDOFF_REQUESTED,
-      {
-        phone,
-        lid: req.conduitContact?.lid ?? null,
-        clientName: client?.name ?? null,
-        reason: dto.reason,
-        summary: dto.summary ?? null,
-        requestId: idempotencyKey ?? randomUUID(),
-        target,
-      },
-    );
-    return results.some(Boolean);
+    return this.handoffs.request({
+      phone:
+        req.conduitContact?.phone ??
+        (dto.phone ? normalizePhone(dto.phone) : null),
+      lid: req.conduitContact?.lid ?? null,
+      reason: dto.reason,
+      summary: dto.summary ?? null,
+      requestId: idempotencyKey,
+      target,
+    });
   }
 }
