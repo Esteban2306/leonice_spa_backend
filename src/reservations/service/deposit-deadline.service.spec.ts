@@ -5,7 +5,10 @@ import {
   DEFAULT_WEEKLY_WINDOWS,
   type DayException,
 } from '../domain/operating-hours';
-import { OperatingScheduleRepository } from '../repositories/operating-schedule.repository';
+import {
+  OperatingScheduleRepository,
+  type DayOverrideRecord,
+} from '../repositories/operating-schedule.repository';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { DepositDeadlineService } from './deposit-deadline.service';
 
@@ -21,6 +24,7 @@ interface RunningDeadline {
 
 const buildFixture = (options: {
   exceptions?: Array<DayException & { dayKey: string }>;
+  overrides?: DayOverrideRecord[];
   running?: RunningDeadline[];
   casFailsFor?: string[];
   queueError?: Error;
@@ -32,6 +36,7 @@ const buildFixture = (options: {
     findWeeklyWindows: () => Promise.resolve(DEFAULT_WEEKLY_WINDOWS),
     findGlobalExceptionsBetween: () =>
       Promise.resolve(options.exceptions ?? []),
+    findOverridesBetween: () => Promise.resolve(options.overrides ?? []),
   };
   const reservationsRepository = {
     findDepositDeadlinesRunningDuring: () =>
@@ -75,6 +80,22 @@ const fridayBlocked: DayException & { dayKey: string } = {
 describe('DepositDeadlineService.computeExpiry', () => {
   it('aplica los bloqueos globales del rango al reloj hábil', async () => {
     const { service } = buildFixture({ exceptions: [fridayBlocked] });
+    await expect(service.computeExpiry(at(22, 20), at(31, 9))).resolves.toEqual(
+      at(24, 9),
+    );
+  });
+
+  it('un horario especial cerrado detiene el reloj hábil igual que un bloqueo', async () => {
+    const { service } = buildFixture({
+      overrides: [
+        {
+          dayKey: fridayBlocked.dayKey,
+          windows: [],
+          startMinutes: [],
+          reason: 'Cerrado',
+        },
+      ],
+    });
     await expect(service.computeExpiry(at(22, 20), at(31, 9))).resolves.toEqual(
       at(24, 9),
     );

@@ -6,4 +6,5 @@ export type AvailableSlotsType = {
   durationMinutes: number;
   capacity: number;
   stepMinutes?: number;
+  startMinutes?: readonly number[] | null;
 };

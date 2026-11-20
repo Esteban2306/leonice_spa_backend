@@ -43,14 +43,24 @@ export class DepositDeadlineService {
     notAfter: Date,
     client?: PrismaClientOrTx,
   ): Promise<Date> {
-    const [base, exceptions] = await Promise.all([
+    const fromDayKey = getCalendarDayKey(startedAt);
+    const toDayKey = getCalendarDayKey(notAfter);
+    const [base, exceptions, overrides] = await Promise.all([
       this.scheduleRepository.findWeeklyWindows(client),
       this.scheduleRepository.findGlobalExceptionsBetween(
-        getCalendarDayKey(startedAt),
-        getCalendarDayKey(notAfter),
+        fromDayKey,
+        toDayKey,
+        client,
+      ),
+      this.scheduleRepository.findOverridesBetween(
+        fromDayKey,
+        toDayKey,
         client,
       ),
     ]);
+    const overrideByDay = new Map(
+      overrides.map((override) => [override.dayKey, override]),
+    );
 
     const byDay = new Map<string, DayException[]>();
     for (const { dayKey, ...exception } of exceptions) {
@@ -65,6 +75,7 @@ export class DepositDeadlineService {
         getOperatingWindowsForDate(day, {
           base,
           exceptions: byDay.get(getCalendarDayKey(day)) ?? [],
+          override: overrideByDay.get(getCalendarDayKey(day)) ?? null,
         }),
     });
   }

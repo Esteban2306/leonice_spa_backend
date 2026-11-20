@@ -771,6 +771,22 @@ model OperatingWindow {
   @@map("operating_windows")
 }
 
+/// Horario completo de una fecha: reemplaza el horario semanal de ese día.
+/// windows: franjas abiertas [{startMinute, endMinute}] (vacío = cerrado).
+/// startMinutes: horas de inicio permitidas (vacío = cualquiera cada 15 min).
+model ScheduleDayOverride {
+  id              String   @id @default(uuid())
+  date            DateTime @unique @db.Date
+  windows         Json     @default("[]")
+  startMinutes    Int[]    @default([]) @map("start_minutes")
+  reason          String?
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("schedule_day_overrides")
+}
+
 model ScheduleException {
   id              String                @id @default(uuid())
   date            DateTime              @db.Date

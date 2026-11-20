@@ -26,6 +26,7 @@ import { getDayBoundaries } from '../domain/day-boundaries';
 import { getCalendarDayKey } from '../domain/calendar-day-key';
 import { OperatingScheduleService } from '../service/operating-schedule.service';
 import { generateAvailableSlots } from '../domain/availability-calculator';
+import { minuteOfDay } from '../domain/operating-hours';
 import {
   sequenceComboTreatments,
   TreatmentTimingInput,
@@ -175,6 +176,7 @@ export class CreateReservationOrchestrator {
               dayStart,
               dayEnd,
               conflictIntervals,
+              firstSegment: index === 0,
             });
 
             const hasCategoryConflict =
@@ -302,6 +304,7 @@ export class CreateReservationOrchestrator {
     dayStart: Date;
     dayEnd: Date;
     conflictIntervals: TimeInterval[];
+    firstSegment: boolean;
   }): Promise<{
     scheduledStart: Date;
     scheduledEnd: Date;
@@ -318,7 +321,15 @@ export class CreateReservationOrchestrator {
       dayStart,
       dayEnd,
       conflictIntervals,
+      firstSegment,
     } = params;
+
+    const plan = await this.operatingSchedule.getDayPlan(
+      idealStart,
+      categoryId,
+      tx,
+    );
+    const startMinutes = firstSegment ? plan.startMinutes : null;
 
     let candidateStart = idealStart;
     let wasAdjusted = false;
@@ -347,7 +358,9 @@ export class CreateReservationOrchestrator {
       end: candidateEnd,
     });
 
-    if (decision.ok) {
+    const allowedStart =
+      !startMinutes || startMinutes.includes(minuteOfDay(candidateStart));
+    if (decision.ok && allowedStart) {
       return {
         scheduledStart: candidateStart,
         scheduledEnd: candidateEnd,
@@ -356,13 +369,13 @@ export class CreateReservationOrchestrator {
       };
     }
 
-    if (decision.reason === 'CATEGORY_DAY_CONFLICT') {
+    if (!decision.ok && decision.reason === 'CATEGORY_DAY_CONFLICT') {
       assertNoSameDayCategoryConflict(categoryName, true);
       throw placementRejectionException(decision.reason);
     }
     if (
-      decision.reason === 'INVALID_RANGE' ||
-      decision.reason === 'IN_THE_PAST'
+      !decision.ok &&
+      (decision.reason === 'INVALID_RANGE' || decision.reason === 'IN_THE_PAST')
     ) {
       throw placementRejectionException(decision.reason);
     }
@@ -378,16 +391,12 @@ export class CreateReservationOrchestrator {
         dayEnd,
         tx,
       );
-    const windows = await this.operatingSchedule.getWindows(
-      idealStart,
-      categoryId,
-      tx,
-    );
     const allCandidates = generateAvailableSlots({
-      operatingWindows: windows,
+      operatingWindows: plan.windows,
       held,
       durationMinutes,
       capacity,
+      startMinutes,
     });
     const validCandidates = allCandidates.filter((c) => {
       const end = new Date(c.getTime() + durationMinutes * 60_000);
