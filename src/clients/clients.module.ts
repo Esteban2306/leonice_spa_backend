@@ -26,6 +26,7 @@ import { ClientTagsScheduler } from './tags/client-tags.scheduler';
   exports: [
     ClientsService,
     ClientsRepository,
+    clientsHistoryRepository,
     ConsentService,
     ClientTagsService,
   ],

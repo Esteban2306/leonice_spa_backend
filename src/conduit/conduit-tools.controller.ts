@@ -24,6 +24,8 @@ import { ConduitCreateClientDto } from './dto/conduit-create-client.dto';
 import { ConsentService } from 'src/clients/consent/consent.service';
 import { toBotClient } from './tools/bot-client-view';
 import { TeamQuoteService, toBotTeamQuote } from './quotes/team-quote.service';
+import { clientsHistoryRepository } from 'src/clients/repositories/client-history.repository';
+import { toBotLastVisit } from './tools/bot-client-view';
 
 @Controller({ path: 'conduit/clients', version: '1' })
 @ConduitTool()
@@ -33,6 +35,7 @@ export class ConduitToolsController {
     private readonly clientsService: ClientsService,
     private readonly consentService: ConsentService,
     private readonly teamQuotes: TeamQuoteService,
+    private readonly history: clientsHistoryRepository,
   ) {}
 
   @Get('me')
@@ -41,15 +44,17 @@ export class ConduitToolsController {
     const client = phone
       ? await this.clientsRepository.findByPhone(phone)
       : null;
-    const [termsAccepted, quotes] = await Promise.all([
+    const [termsAccepted, quotes, lastVisit] = await Promise.all([
       client ? this.consentService.hasTermsConsent(client.id) : false,
       phone ? this.teamQuotes.activeFor(phone) : [],
+      client ? this.history.getLastCompletedReservation(client.id) : null,
     ]);
     const unsaved = phone
       ? await this.teamQuotes.unsavedTeamPrices(phone, quotes)
       : [];
     return {
       ...toBotClient(client, termsAccepted),
+      ...(lastVisit && { lastVisit: toBotLastVisit(lastVisit) }),
       ...(quotes.length > 0 && { teamQuotes: quotes.map(toBotTeamQuote) }),
       ...(unsaved.length > 0 && {
         teamPricesInChat: unsaved.map((p) => ({

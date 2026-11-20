@@ -53,7 +53,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'consultar_cliente',
     description:
-      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
+      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING) y su última visita (lastVisit: fecha y servicio). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
     httpMethod: 'GET',
     path: '/conduit/clients/me',
     pinResultInMemory: true,
@@ -188,7 +188,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'consultar_disponibilidad',
     description:
-      'Horarios libres de un servicio en un día. Ofrece solo los horarios que devuelva.',
+      'Horarios libres de un servicio en un día, uno por hora. Ofrece solo los que devuelva. Si la clienta pide una hora exacta (por ejemplo 8:30), puedes intentar agendarla: la reserva confirma si cabe.',
     httpMethod: 'GET',
     path: '/conduit/booking/availability',
     parametersSchema: {
@@ -203,7 +203,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'disponibilidad_combo',
     description:
-      'Horarios libres para varios servicios seguidos (combo) o para un rango de días. Usa purpose=RESCHEDULE cuando la clienta va a reagendar.',
+      'Horarios libres, uno por hora, para uno o varios servicios (en un combo todos empiezan a la misma hora) en un rango de días. Usa purpose=RESCHEDULE cuando la clienta va a reagendar.',
     httpMethod: 'GET',
     path: '/conduit/booking/availability/calendar',
     parametersSchema: {

@@ -29,6 +29,32 @@ export interface BotClientView {
   };
 }
 
+const VISIT_DATE = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+export interface BotLastVisit {
+  date: string;
+  treatment: string;
+}
+
+export function toBotLastVisit(
+  visit: {
+    completedAt: Date | null;
+    scheduledStart: Date;
+    treatment: { name: string };
+  } | null,
+): BotLastVisit | undefined {
+  if (!visit) return undefined;
+  return {
+    date: VISIT_DATE.format(visit.completedAt ?? visit.scheduledStart),
+    treatment: visit.treatment.name,
+  };
+}
+
 export function toBotClient(
   client: BotClientSource | null,
   termsAccepted: boolean,
