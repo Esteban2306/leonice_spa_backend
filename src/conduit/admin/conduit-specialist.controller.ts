@@ -264,6 +264,8 @@ export class ConduitSpecialistController {
       );
       if (!created) throw new AppException('CONDUIT_UNAVAILABLE');
       specialist = created;
+    } else {
+      await this.ensureHairRules(specialist.id);
     }
     if (specialist.status !== 'ACTIVE') {
       await this.call('PATCH', `specialists/${specialist.id}`, {
@@ -315,6 +317,7 @@ export class ConduitSpecialistController {
           'El especialista de fotos del cabello no existe todavía: actívalo con tu clave.',
       });
     }
+    if (body.mode !== 'OFF') await this.ensureHairRules(specialist.id);
     return this.bindHairPhoto(specialist.id, body.mode);
   }
 
@@ -360,6 +363,26 @@ export class ConduitSpecialistController {
         },
       },
     );
+  }
+
+  private async ensureHairRules(specialistId: string): Promise<void> {
+    const current = await this.call<Record<string, unknown>>(
+      'GET',
+      `specialists/${specialistId}`,
+    );
+    const rules =
+      current && typeof current.rules === 'object' && current.rules !== null
+        ? (current.rules as { rules?: unknown }).rules
+        : undefined;
+    if (Array.isArray(rules) && rules.length > 0) return;
+    await this.call('PATCH', `specialists/${specialistId}`, {
+      body: {
+        promptTemplate: HAIR_SPECIALIST_DEFINITION.promptTemplate,
+        outputSchema: HAIR_SPECIALIST_DEFINITION.outputSchema,
+        rules: HAIR_SPECIALIST_DEFINITION.rules,
+        changeNote: 'Regla es_cabello para poder avisar al equipo',
+      },
+    });
   }
 
   private hairSpecialist(): Promise<SpecialistSummary | null> {
