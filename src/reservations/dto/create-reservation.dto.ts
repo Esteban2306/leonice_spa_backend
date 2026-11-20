@@ -9,14 +9,29 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { ReservationChannel } from '@prisma/client';
+
+export const MAX_AGREED_PRICE_COP = 10_000_000;
+
+export class AgreedPriceDto {
+  @IsUUID('4')
+  treatmentId: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(MAX_AGREED_PRICE_COP)
+  price: number;
+}
 
 class ConsentInputDto {
   @IsBoolean()
@@ -79,4 +94,12 @@ export class CreateReservationDto {
   @IsOptional()
   @IsEnum(ReservationChannel)
   channel?: ReservationChannel;
+
+  /** Precio acordado por servicio. Solo lo puede fijar el panel (sesión de administrador). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => AgreedPriceDto)
+  agreedPrices?: AgreedPriceDto[];
 }
