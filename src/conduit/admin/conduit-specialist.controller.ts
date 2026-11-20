@@ -26,6 +26,7 @@ import {
   BindingSummary,
   SpecialistSummary,
   VERIFICATION_CAPABILITY,
+  VerificationMode,
   VERIFICATION_SPECIALIST_KEY,
   VerificationStatus,
   buildStatus,
@@ -37,7 +38,15 @@ import {
   ReviewVerificationDto,
   RotateModelKeyDto,
   SetVerificationModeDto,
+  SetupHairPhotoDto,
 } from './conduit-specialist.dto';
+import {
+  HAIR_CAPABILITY,
+  HAIR_SPECIALIST_DEFINITION,
+  HAIR_SPECIALIST_KEY,
+  HAIR_SPECIALIST_MODELS,
+} from '../specialists/hair-photo-specialist';
+import { HairPhotoStatus, buildHairPhotoStatus } from './hair-photo-status';
 
 const RECENT_LIMIT = 10;
 const PENDING_LIMIT = 50;
@@ -93,7 +102,11 @@ export class ConduitSpecialistController {
       optional(
         () =>
           this.call('GET', 'verifications', {
-            query: { botConfigId: botId, limit: RECENT_LIMIT },
+            query: {
+              botConfigId: botId,
+              capability: VERIFICATION_CAPABILITY,
+              limit: RECENT_LIMIT,
+            },
           }),
         [] as unknown,
       ),
@@ -102,6 +115,7 @@ export class ConduitSpecialistController {
           this.call('GET', 'verifications', {
             query: {
               botConfigId: botId,
+              capability: VERIFICATION_CAPABILITY,
               pendingReview: 'true',
               limit: PENDING_LIMIT,
             },
@@ -187,6 +201,186 @@ export class ConduitSpecialistController {
     return this.call('POST', `verifications/${id}/review`, {
       body: { decision: body.decision, note: body.note },
     });
+  }
+
+  @Get('hair-photo')
+  async hairPhotoStatus(): Promise<HairPhotoStatus> {
+    const botId = this.botId();
+    const [bot, bindings, specialist] = await Promise.all([
+      this.call<Record<string, unknown>>('GET', `bot/config/${botId}`),
+      this.call('GET', `bots/${botId}/specialists`),
+      this.hairSpecialist(),
+    ]);
+    let partial = false;
+    const optional = async (run: () => Promise<unknown>) => {
+      try {
+        return await run();
+      } catch {
+        partial = true;
+        return [];
+      }
+    };
+    const [models, recent] = specialist
+      ? await Promise.all([
+          optional(() =>
+            this.call('GET', `specialists/${specialist.id}/models`),
+          ),
+          optional(() =>
+            this.call('GET', 'verifications', {
+              query: {
+                botConfigId: botId,
+                capability: HAIR_CAPABILITY,
+                limit: RECENT_LIMIT,
+              },
+            }),
+          ),
+        ])
+      : [[], []];
+    return buildHairPhotoStatus({
+      imageAnalysisEnabled: bot?.imageAnalysisEnabled === true,
+      specialist,
+      bindings,
+      rawModels: models,
+      rawRecent: recent,
+      partial,
+    });
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('hair-photo/setup')
+  async setupHairPhoto(
+    @Body() body: SetupHairPhotoDto,
+  ): Promise<HairPhotoStatus> {
+    let specialist = await this.hairSpecialist();
+    if (!specialist) {
+      const created = toSpecialistSummary(
+        await this.call('POST', 'specialists', {
+          body: {
+            key: HAIR_SPECIALIST_KEY,
+            capability: HAIR_CAPABILITY,
+            ...HAIR_SPECIALIST_DEFINITION,
+          },
+        }),
+      );
+      if (!created) throw new AppException('CONDUIT_UNAVAILABLE');
+      specialist = created;
+    }
+    if (specialist.status !== 'ACTIVE') {
+      await this.call('PATCH', `specialists/${specialist.id}`, {
+        body: { status: 'ACTIVE' },
+      });
+    }
+
+    const existing = listOf(
+      await this.call('GET', `specialists/${specialist.id}/models`),
+    );
+    for (const wanted of HAIR_SPECIALIST_MODELS) {
+      const current = existing.find(
+        (m): m is { id: string } =>
+          typeof m === 'object' &&
+          m !== null &&
+          (m as Record<string, unknown>).role === wanted.role &&
+          typeof (m as Record<string, unknown>).id === 'string',
+      );
+      if (current) {
+        await this.call(
+          'PATCH',
+          `specialists/${specialist.id}/models/${current.id}`,
+          { body: { apiKey: body.apiKey } },
+        );
+      } else {
+        await this.call('POST', `specialists/${specialist.id}/models`, {
+          body: {
+            provider: 'ANTHROPIC',
+            model: wanted.model,
+            apiKey: body.apiKey,
+            role: wanted.role,
+            tier: 'PAID',
+            priority: wanted.priority,
+          },
+        });
+      }
+    }
+
+    await this.bindHairPhoto(specialist.id, body.mode ?? 'SHADOW');
+    return this.hairPhotoStatus();
+  }
+
+  @Put('hair-photo/binding')
+  async setHairPhotoMode(@Body() body: SetVerificationModeDto) {
+    const specialist = await this.hairSpecialist();
+    if (!specialist) {
+      throw new AppException('NOT_FOUND', {
+        message:
+          'El especialista de fotos del cabello no existe todavía: actívalo con tu clave.',
+      });
+    }
+    return this.bindHairPhoto(specialist.id, body.mode);
+  }
+
+  @Patch('hair-photo/models/:modelId/key')
+  async rotateHairPhotoKey(
+    @Param('modelId', ParseUUIDPipe) modelId: string,
+    @Body() body: RotateModelKeyDto,
+  ) {
+    const specialist = await this.requireHairSpecialist();
+    return toPublicAiModel(
+      await this.call(
+        'PATCH',
+        `specialists/${specialist.id}/models/${modelId}`,
+        { body: { apiKey: body.apiKey } },
+      ),
+    );
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('hair-photo/models/:modelId/reactivate')
+  async reactivateHairPhotoModel(
+    @Param('modelId', ParseUUIDPipe) modelId: string,
+  ) {
+    const specialist = await this.requireHairSpecialist();
+    return toPublicAiModel(
+      await this.call(
+        'POST',
+        `specialists/${specialist.id}/models/${modelId}/reactivate`,
+      ),
+    );
+  }
+
+  private bindHairPhoto(specialistId: string, mode: VerificationMode) {
+    return this.call(
+      'PUT',
+      `bots/${this.botId()}/specialists/${HAIR_CAPABILITY}`,
+      {
+        body: {
+          specialistId,
+          mode,
+          timeoutMs: DEFAULT_TIMEOUT_MS,
+          onFailure: 'DEGRADE',
+        },
+      },
+    );
+  }
+
+  private hairSpecialist(): Promise<SpecialistSummary | null> {
+    return this.call('GET', `specialists/by-key/${HAIR_SPECIALIST_KEY}`)
+      .then(toSpecialistSummary)
+      .catch((error: unknown) => {
+        if (error instanceof AppException && error.code === 'NOT_FOUND') {
+          return null;
+        }
+        throw error;
+      });
+  }
+
+  private async requireHairSpecialist(): Promise<SpecialistSummary> {
+    const specialist = await this.hairSpecialist();
+    if (!specialist) {
+      throw new AppException('NOT_FOUND', {
+        message: 'El especialista de fotos del cabello no existe todavía.',
+      });
+    }
+    return specialist;
   }
 
   private async requireSpecialist(): Promise<SpecialistSummary> {

@@ -32,7 +32,7 @@ export interface ReleaseManifest {
   strayIntents: string[];
 }
 
-export const RELEASE: ReleaseManifest = {
+export const SOFIA_RELEASE: ReleaseManifest = {
   id: '2026-11-19-sofia',
   intents: [
     'leo_request',
@@ -52,6 +52,35 @@ export const RELEASE: ReleaseManifest = {
   retiredVariables: RETIRED_BUSINESS_VARIABLES,
   strayIntents: ['rule.first_contact'],
 };
+
+export const GUIDANCE_RELEASE: ReleaseManifest = {
+  id: '2026-11-20-orientacion',
+  intents: [],
+  tools: [],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
+export const RELEASES: readonly ReleaseManifest[] = [
+  SOFIA_RELEASE,
+  GUIDANCE_RELEASE,
+];
+
+export const RELEASE = RELEASES[RELEASES.length - 1];
+
+export function releaseById(id: string | undefined): ReleaseManifest {
+  if (!id) return RELEASE;
+  const found = RELEASES.find((release) => release.id === id);
+  if (!found) {
+    throw new Error(
+      `No existe la entrega ${id}. Disponibles: ${RELEASES.map((r) => r.id).join(', ')}`,
+    );
+  }
+  return found;
+}
 
 export interface ReleaseBaseline {
   intents: Record<string, Record<string, unknown>>;
@@ -220,7 +249,7 @@ export async function releaseConduit(
 ): Promise<ReleaseResult> {
   const env = options.env ?? process.env;
   const log = options.log ?? ((line: string) => console.log(line));
-  const manifest = options.manifest ?? RELEASE;
+  const manifest = options.manifest ?? releaseById(env.CONDUIT_RELEASE_ID);
   const missing = REQUIRED_ENV.filter((key) => !env[key]);
   if (missing.length > 0) {
     throw new Error(`Faltan variables: ${missing.join(', ')}`);

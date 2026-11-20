@@ -16,10 +16,10 @@ import {
   ReceiptAlertsService,
 } from './verification/receipt-alerts.service';
 import { TeamHandoffService } from './handoff/team-handoff.service';
+import { HAIR_CAPABILITY as HAIR_PHOTO_CAPABILITY } from './specialists/hair-photo-specialist';
 
 const LIMIT_PER_MINUTE = 600;
 const VERIFICATION_CAPABILITY = 'image-analysis';
-export const HAIR_PHOTO_CAPABILITY = 'foto-cabello';
 const HAIR_PHOTO_VERDICTS = new Set(['VALID', 'NEEDS_REVIEW']);
 export const HAIR_PHOTO_REASON =
   'Envió una foto de su cabello: una persona del equipo debe atender este chat.';

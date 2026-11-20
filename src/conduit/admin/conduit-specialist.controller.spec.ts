@@ -559,3 +559,158 @@ describe('ConduitSpecialistController: guardia estática', () => {
     expect(source).not.toMatch(/@Query\(/);
   });
 });
+
+describe('ConduitSpecialistController: fotos del cabello', () => {
+  const HAIR = 'b1c2d3e4-0000-4000-8000-000000000abc';
+  const HAIR_MODEL = 'c1c2d3e4-0000-4000-8000-000000000abd';
+  const hair = (status = 'ACTIVE') => ({
+    id: HAIR,
+    key: 'foto-cabello',
+    name: 'Foto del cabello',
+    status,
+    version: 1,
+  });
+
+  it('sin especialista lo dice y no consulta modelos ni resultados', async () => {
+    const { controller, admin } = build();
+    const status = await controller.hairPhotoStatus();
+    expect(status).toMatchObject({
+      specialist: null,
+      mode: null,
+      models: [],
+      modelReady: false,
+      imageAnalysisEnabled: true,
+    });
+    expect(calls(admin, 'GET', `specialists/${HAIR}/models`)).toHaveLength(0);
+  });
+
+  it('muestra su modo, sus modelos sin la clave y lo que vio en cada foto', async () => {
+    const { controller, admin } = build({
+      'GET specialists/by-key/foto-cabello': hair(),
+      [`GET bots/${BOT}/specialists`]: [
+        binding(),
+        { capability: 'foto-cabello', mode: 'SHADOW', specialistId: HAIR },
+      ],
+      [`GET specialists/${HAIR}/models`]: [model({ id: HAIR_MODEL })],
+      'GET verifications': {
+        items: [
+          {
+            id: VERIFICATION,
+            verdict: 'VALID',
+            mode: 'SHADOW',
+            createdAt: '2026-11-20T10:00:00.000Z',
+            fields: { descripcion: 'Cabello largo castaño, puntas resecas' },
+          },
+        ],
+      },
+    });
+    const status = await controller.hairPhotoStatus();
+    expect(status.mode).toBe('SHADOW');
+    expect(status.modelReady).toBe(true);
+    expect(status.recent).toEqual([
+      {
+        id: VERIFICATION,
+        createdAt: '2026-11-20T10:00:00.000Z',
+        verdict: 'VALID',
+        mode: 'SHADOW',
+        description: 'Cabello largo castaño, puntas resecas',
+      },
+    ]);
+    expect(JSON.stringify(status)).not.toContain('sk-ant');
+    const recentCall = admin.mock.calls.find(
+      (c) =>
+        c[1] === 'verifications' && c[2]?.query?.capability === 'foto-cabello',
+    );
+    expect(recentCall?.[2]?.query).toMatchObject({ botConfigId: BOT });
+  });
+
+  it('activarlo con la clave crea el especialista, sus dos modelos y lo deja en SHADOW', async () => {
+    let created = false;
+    const { controller, admin } = build({
+      'GET specialists/by-key/foto-cabello': () =>
+        created ? hair() : new ConduitAdminError(404, 'no existe'),
+      'POST specialists': () => {
+        created = true;
+        return hair('DRAFT');
+      },
+      [`PATCH specialists/${HAIR}`]: hair(),
+      [`GET specialists/${HAIR}/models`]: [],
+      [`POST specialists/${HAIR}/models`]: model({ id: HAIR_MODEL }),
+      [`PUT bots/${BOT}/specialists/foto-cabello`]: { mode: 'SHADOW' },
+    });
+    await controller.setupHairPhoto({ apiKey: ANTHROPIC_KEY });
+
+    const [createCall] = calls(admin, 'POST', 'specialists');
+    expect(createCall[2]?.body).toMatchObject({
+      key: 'foto-cabello',
+      capability: 'foto-cabello',
+      name: 'Foto del cabello',
+    });
+    expect(calls(admin, 'PATCH', `specialists/${HAIR}`)[0][2]?.body).toEqual({
+      status: 'ACTIVE',
+    });
+    const models = calls(admin, 'POST', `specialists/${HAIR}/models`).map(
+      (c) => c[2]?.body as Record<string, unknown>,
+    );
+    expect(models.map((m) => [m.role, m.model])).toEqual([
+      ['IMAGE_ANALYSIS', 'claude-haiku-5-5'],
+      ['FALLBACK', 'claude-sonnet-5-5'],
+    ]);
+    expect(
+      calls(admin, 'PUT', `bots/${BOT}/specialists/foto-cabello`)[0][2]?.body,
+    ).toMatchObject({
+      specialistId: HAIR,
+      mode: 'SHADOW',
+      onFailure: 'DEGRADE',
+    });
+  });
+
+  it('si ya existe, activarlo solo cambia la clave de sus modelos y el modo', async () => {
+    const { controller, admin } = build({
+      'GET specialists/by-key/foto-cabello': hair(),
+      [`GET specialists/${HAIR}/models`]: [
+        model({ id: HAIR_MODEL }),
+        model({ id: MODEL, role: 'FALLBACK' }),
+      ],
+      [`PATCH specialists/${HAIR}/models/${HAIR_MODEL}`]: model(),
+      [`PATCH specialists/${HAIR}/models/${MODEL}`]: model(),
+      [`PUT bots/${BOT}/specialists/foto-cabello`]: { mode: 'ACTIVE' },
+    });
+    await controller.setupHairPhoto({ apiKey: ANTHROPIC_KEY, mode: 'ACTIVE' });
+    expect(calls(admin, 'POST', 'specialists')).toHaveLength(0);
+    expect(calls(admin, 'POST', `specialists/${HAIR}/models`)).toHaveLength(0);
+    expect(
+      calls(admin, 'PATCH', `specialists/${HAIR}/models/${HAIR_MODEL}`),
+    ).toHaveLength(1);
+    expect(
+      calls(admin, 'PUT', `bots/${BOT}/specialists/foto-cabello`)[0][2]?.body,
+    ).toMatchObject({ mode: 'ACTIVE' });
+  });
+
+  it('cambiar el modo no toca el especialista de comprobantes', async () => {
+    const { controller, admin } = build({
+      'GET specialists/by-key/foto-cabello': hair(),
+      [`PUT bots/${BOT}/specialists/foto-cabello`]: { mode: 'OFF' },
+    });
+    await controller.setHairPhotoMode({ mode: 'OFF' });
+    expect(
+      calls(admin, 'PUT', `bots/${BOT}/specialists/image-analysis`),
+    ).toHaveLength(0);
+  });
+
+  it('sin especialista no se puede cambiar el modo', async () => {
+    const { controller } = build();
+    await expect(
+      controller.setHairPhotoMode({ mode: 'ACTIVE' }),
+    ).rejects.toBeInstanceOf(AppException);
+  });
+
+  it('los comprobantes ya no mezclan las fotos del cabello en su lista', async () => {
+    const { controller, admin } = build();
+    await controller.status();
+    const queries = admin.mock.calls
+      .filter((c) => c[1] === 'verifications')
+      .map((c) => c[2]?.query?.capability);
+    expect(queries).toEqual(['image-analysis', 'image-analysis']);
+  });
+});

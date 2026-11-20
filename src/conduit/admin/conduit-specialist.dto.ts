@@ -27,3 +27,14 @@ export class ReviewVerificationDto {
   @MaxLength(500)
   note?: string;
 }
+
+export class SetupHairPhotoDto {
+  @IsString()
+  @MinLength(20)
+  @MaxLength(400)
+  apiKey!: string;
+
+  @IsOptional()
+  @IsIn(['OFF', 'SHADOW', 'ACTIVE'])
+  mode?: 'OFF' | 'SHADOW' | 'ACTIVE';
+}
