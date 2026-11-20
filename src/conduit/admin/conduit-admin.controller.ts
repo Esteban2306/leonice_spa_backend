@@ -25,8 +25,10 @@ import {
   ConduitIntentKeyParam,
   ConduitPromptTypeParam,
   FindOutboxQueryDto,
+  MuteContactDto,
   SetSystemPauseDto,
 } from './conduit-admin.dto';
+import { DEFAULT_MUTE_REASON, mutedContactAddress } from './muted-contact';
 import { ConduitSystemPauseService } from '../pause/conduit-system-pause.service';
 import { ConduitTemplateResolver } from '../templates/conduit-template-resolver';
 import {
@@ -403,6 +405,40 @@ export class ConduitAdminController {
   @Post('conversations/:id/resume')
   resume(@Param('id', ParseUUIDPipe) id: string) {
     return this.call('POST', `bots/${this.botId()}/conversations/${id}/resume`);
+  }
+
+  @Get('muted-contacts')
+  mutedContacts() {
+    return this.call('GET', `bots/${this.botId()}/muted-contacts`);
+  }
+
+  /** Un número al que el asistente nunca responde (por ejemplo, el bot de otra empresa). */
+  @Put('muted-contacts/:address')
+  muteContact(@Param('address') raw: string, @Body() body: MuteContactDto) {
+    return this.call(
+      'PUT',
+      `bots/${this.botId()}/muted-contacts/${encodeURIComponent(this.mutedAddress(raw))}`,
+      { body: { reason: body.reason?.trim() || DEFAULT_MUTE_REASON } },
+    );
+  }
+
+  @Delete('muted-contacts/:address')
+  unmuteContact(@Param('address') raw: string) {
+    return this.call(
+      'DELETE',
+      `bots/${this.botId()}/muted-contacts/${encodeURIComponent(this.mutedAddress(raw))}`,
+    );
+  }
+
+  private mutedAddress(raw: string): string {
+    const address = mutedContactAddress(decodeURIComponent(raw));
+    if (!address) {
+      throw new AppException('VALIDATION_FAILED', {
+        message:
+          'Número inválido: escribe el celular (10 dígitos) o con código de país.',
+      });
+    }
+    return address;
   }
 
   /** Responder como persona: el bot queda en pausa por takeover humano. */

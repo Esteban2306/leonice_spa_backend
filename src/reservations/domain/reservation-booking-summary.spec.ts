@@ -47,4 +47,24 @@ describe('buildBookingSummary', () => {
     expect(summary).toContain('Pedespa');
     expect(summary).toContain('organizada así');
   });
+
+  it('un combo con los servicios al mismo tiempo dice la hora de inicio y hasta cuándo va cada uno', () => {
+    const summary = buildBookingSummary([
+      {
+        treatmentName: 'Alisado',
+        scheduledStart: new Date('2026-01-01T08:00'),
+        scheduledEnd: new Date('2026-01-01T12:00'),
+        wasAdjusted: false,
+      },
+      {
+        treatmentName: 'Pedespa',
+        scheduledStart: new Date('2026-01-01T08:00'),
+        scheduledEnd: new Date('2026-01-01T09:00'),
+        wasAdjusted: false,
+      },
+    ]);
+    expect(summary).toContain('al mismo tiempo');
+    expect(summary).toContain('Alisado (hasta las');
+    expect(summary).toContain('Pedespa (hasta las');
+  });
 });

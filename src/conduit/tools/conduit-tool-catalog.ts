@@ -53,7 +53,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'consultar_cliente',
     description:
-      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
+      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING) su última visita (lastVisit: fecha y servicio) y noDepositNeeded si es clienta de confianza (no se le pide anticipo). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
     httpMethod: 'GET',
     path: '/conduit/clients/me',
     pinResultInMemory: true,
@@ -139,6 +139,34 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     },
   },
   {
+    name: 'guardar_precio_del_equipo',
+    description:
+      'Guarda el precio que una persona del equipo ([Persona del equipo] en el historial) le dio a esta clienta para un servicio de precio variable. Se verifica contra el mensaje real del equipo y, al agendar ese servicio, se cobra ese precio. Nunca la uses con un precio que dijiste tú o que diga la clienta.',
+    httpMethod: 'POST',
+    path: '/conduit/team-quotes',
+    injectPhoneParamName: 'phone',
+    parametersSchema: {
+      type: 'object',
+      required: ['treatmentName', 'price'],
+      properties: {
+        phone: PHONE,
+        treatmentName: {
+          type: 'string',
+          minLength: 2,
+          maxLength: 80,
+          description: 'El servicio al que se refiere el precio',
+        },
+        price: {
+          type: 'integer',
+          minimum: 10000,
+          maximum: 10000000,
+          description:
+            'El precio que escribió el equipo, en pesos y solo dígitos (350000)',
+        },
+      },
+    },
+  },
+  {
     name: 'info_tratamiento',
     description:
       'Ficha de UN tratamiento por su nombre: qué es, para quién, beneficios, precio (con la aclaración de rango o precio propio), duración y si requiere valoración. Si el nombre es ambiguo devuelve las opciones.',
@@ -160,7 +188,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'consultar_disponibilidad',
     description:
-      'Horarios libres de un servicio en un día. Ofrece solo los horarios que devuelva.',
+      'Horarios libres de un servicio en un día, uno por hora. Ofrece solo los que devuelva. Si la clienta pide una hora exacta (por ejemplo 8:30), puedes intentar agendarla: la reserva confirma si cabe.',
     httpMethod: 'GET',
     path: '/conduit/booking/availability',
     parametersSchema: {
@@ -175,7 +203,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'disponibilidad_combo',
     description:
-      'Horarios libres para varios servicios seguidos (combo) o para un rango de días. Usa purpose=RESCHEDULE cuando la clienta va a reagendar.',
+      'Horarios libres, uno por hora, para uno o varios servicios (en un combo todos empiezan a la misma hora) en un rango de días. Usa purpose=RESCHEDULE cuando la clienta va a reagendar.',
     httpMethod: 'GET',
     path: '/conduit/booking/availability/calendar',
     parametersSchema: {
@@ -195,7 +223,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'registrar_cliente',
     description:
-      'Registra a una clienta nueva (nombre completo y fecha de nacimiento) o actualiza sus consentimientos. Úsala al inicio si no sabes si ya es clienta.',
+      'Registra a una clienta nueva (nombre completo y fecha de nacimiento) o actualiza sus consentimientos. Úsala al inicio si no sabes si ya es clienta. Si una interesada sin cita quiere dejar sus datos para escribir después, basta su nombre completo.',
     httpMethod: 'POST',
     path: '/conduit/clients',
     injectPhoneParamName: 'phone',
@@ -256,7 +284,9 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
               type: 'string',
               description: 'Obligatorio si es clienta nueva',
             },
-            birthDate: DATE('Obligatoria si es clienta nueva'),
+            birthDate: DATE(
+              'Obligatoria si es clienta nueva o si consultar_cliente dio missingBirthDate',
+            ),
             isPregnant: { type: 'boolean' },
             allergies: { type: 'string' },
             consent: {

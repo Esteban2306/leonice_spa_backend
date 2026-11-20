@@ -18,6 +18,10 @@ function build(days: unknown[]) {
     {} as never,
     {} as never,
     { issue } as never,
+    {
+      activeFor: jest.fn(() => Promise.resolve([])),
+      markUsed: jest.fn(() => Promise.resolve()),
+    } as never,
   );
   return { controller, issue };
 }

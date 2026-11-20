@@ -17,6 +17,7 @@ import { ResolveClientDto } from './dto/resolve-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { FindClientsQueryDto } from './dto/find-clients-query.dto';
 import { SetHairProfileDto } from './dto/set-hair-profile.dto';
+import { SetDepositExemptDto } from './dto/set-deposit-exempt.dto';
 import { CreateClientDto } from './dto/create-client.dto';
 import { RecordConsentDto } from './dto/record-consent.dto';
 import { FindPendingHairProfilesQueryDto } from './dto/find-pending-hair-profiles-query.dto';
@@ -102,6 +103,14 @@ export class ClientsController {
   @Get(':id')
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.clientsService.getDetail(id);
+  }
+
+  @Put(':id/deposit-exempt')
+  async setDepositExempt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetDepositExemptDto,
+  ) {
+    return this.clientsService.setDepositExempt(id, dto.depositExempt);
   }
 
   @Patch(':id')

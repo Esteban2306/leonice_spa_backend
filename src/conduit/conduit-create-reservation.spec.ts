@@ -10,10 +10,20 @@ const CATALOG = [
   { id: 'x3', name: 'Terapia de nutrición', slug: 'terapia-nutricion' },
 ];
 
-function build() {
+function build(
+  active: Array<{ id: string; treatmentId: string; price: number }> = [],
+) {
   const execute = jest.fn((_dto?: unknown, _opts?: unknown) =>
-    Promise.resolve({ id: 'res-1' }),
+    Promise.resolve({
+      reservations: [{ id: 'res-1', treatmentId: ID_A }],
+      summary: '',
+      creditAppliedReservationIds: [],
+    }),
   );
+  const quotes = {
+    activeFor: jest.fn((_phone: string) => Promise.resolve(active)),
+    markUsed: jest.fn((_used: unknown) => Promise.resolve()),
+  };
   const controller = new ConduitBookingToolsController(
     { findAll: jest.fn(() => Promise.resolve(CATALOG)) } as never,
     {} as never,
@@ -22,8 +32,9 @@ function build() {
     {} as never,
     {} as never,
     {} as never,
+    quotes as never,
   );
-  return { controller, execute };
+  return { controller, execute, quotes };
 }
 
 const base = {
@@ -31,6 +42,45 @@ const base = {
   scheduledStart: '2026-11-02T09:00:00-05:00',
 };
 const req = { conduitContact: { phone: '573001112233' } } as never;
+
+describe('POST conduit/booking/reservations · precio que dio el equipo', () => {
+  const quote = { id: 'q1', treatmentId: ID_A, price: 350000 };
+
+  it('con un precio del equipo vigente para ese servicio, se agenda con ese precio y se marca usado', async () => {
+    const { controller, execute, quotes } = build([quote]);
+    await controller.create({ ...base, treatments: [ID_A] }, req);
+    const options = execute.mock.calls[0][1] as {
+      priceOverrides: Map<string, number>;
+    };
+    expect(options.priceOverrides.get(ID_A)).toBe(350000);
+    expect(quotes.activeFor).toHaveBeenCalledWith('573001112233');
+    expect(quotes.markUsed).toHaveBeenCalledWith([
+      { quoteId: 'q1', reservationId: 'res-1' },
+    ]);
+  });
+
+  it('un precio del equipo de otro servicio no se aplica', async () => {
+    const { controller, execute, quotes } = build([quote]);
+    await controller.create({ ...base, treatments: [ID_B] }, req);
+    const options = execute.mock.calls[0][1] as {
+      priceOverrides: Map<string, number>;
+    };
+    expect(options.priceOverrides.size).toBe(0);
+    expect(quotes.markUsed).toHaveBeenCalledWith([]);
+  });
+
+  it('sin teléfono verificado no se buscan precios del equipo', async () => {
+    const { controller, execute, quotes } = build([quote]);
+    await controller.create({ ...base, treatments: [ID_A] }, {
+      conduitContact: { lid: '123@lid' },
+    } as never);
+    expect(quotes.activeFor).not.toHaveBeenCalled();
+    const options = execute.mock.calls[0][1] as {
+      priceOverrides: Map<string, number>;
+    };
+    expect(options.priceOverrides.size).toBe(0);
+  });
+});
 
 describe('POST conduit/booking/reservations · servicios por nombre', () => {
   it('resuelve el nombre al id sin pedir que la IA consulte la lista', async () => {
@@ -97,6 +147,10 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
         {} as never,
         {} as never,
         {} as never,
+        {
+          activeFor: jest.fn(() => Promise.resolve([])),
+          markUsed: jest.fn(() => Promise.resolve()),
+        } as never,
       );
       return { controller, getAvailabilityCalendar };
     }
@@ -105,13 +159,24 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
       date,
       available: times.length > 0,
       reason: null,
-      slots: times.map((t) => ({ iso: `${date}T${t}`, localTime: t })),
+      slots: times.map((t) => ({
+        iso: new Date(`${date}T${t.padStart(5, '0')}:00-05:00`).toISOString(),
+        localTime: t,
+      })),
     });
 
-    it('el error lleva los próximos horarios libres (máx. 3 días y 4 horas por día)', async () => {
+    it('el error lleva los próximos horarios libres (máx. 3 días y 4 horas por día, una por hora)', async () => {
       const { controller, getAvailabilityCalendar } = withCalendar([
         day('2026-11-02', []),
-        day('2026-11-03', ['9:00', '9:30', '10:00', '10:30', '11:00']),
+        day('2026-11-03', [
+          '9:00',
+          '9:30',
+          '10:00',
+          '10:30',
+          '11:00',
+          '12:00',
+          '13:00',
+        ]),
         day('2026-11-04', ['8:00']),
         day('2026-11-05', ['2:00']),
         day('2026-11-06', ['3:00']),
@@ -124,7 +189,7 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
       expect((error as AppException).details).toMatchObject({
         date: '2026-11-02',
         alternatives: [
-          { date: '2026-11-03', times: ['9:00', '9:30', '10:00', '10:30'] },
+          { date: '2026-11-03', times: ['9:00', '10:00', '11:00', '12:00'] },
           { date: '2026-11-04', times: ['8:00'] },
           { date: '2026-11-05', times: ['2:00'] },
         ],

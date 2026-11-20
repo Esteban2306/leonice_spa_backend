@@ -87,7 +87,8 @@ export class OperationalNotificationsListener {
   async handleReservationConfirmed(
     event: EventOf<EventPayloadMap, typeof EVENT_TYPES.RESERVATION_CONFIRMED>,
   ): Promise<void> {
-    const { reservationId, comboGroupId } = event.payload;
+    const { reservationId, comboGroupId, withoutDeposit } = event.payload;
+    if (withoutDeposit) return;
     const data: ClientReservationConfirmedNoticeJobData = { reservationId };
     await this.guard(
       'aviso cliente por cita aceptada',

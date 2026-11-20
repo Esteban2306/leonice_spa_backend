@@ -1,0 +1,1 @@
+ALTER TABLE "clients" ALTER COLUMN "birth_date" DROP NOT NULL;

@@ -202,4 +202,47 @@ describe('Herramientas del bot de Conduit (llamadas como las hace Conduit)', () 
       await prisma.client.reservation.count({ where: { clientId: client.id } }),
     ).toBe(1);
   });
+
+  it('una interesada sin cita queda registrada solo con su nombre y al agendar se le pide la fecha', async () => {
+    const { phone, name, birthDate } = newClientDto('interesada');
+    const registered = await asConduit('post', '/conduit/clients', phone).send({
+      phone,
+      name,
+    });
+    expect(registered.status).toBe(201);
+    const lead = await prisma.client.client.findUniqueOrThrow({
+      where: { phone },
+    });
+    expect(lead.birthDate).toBeNull();
+
+    const me = await asConduit('get', '/conduit/clients/me', phone);
+    expect(me.body).toMatchObject({ registered: true, missingBirthDate: true });
+
+    const booking = (withBirthDate: boolean) =>
+      asConduit('post', '/conduit/booking/reservations', phone).send({
+        client: { phone, ...(withBirthDate && { birthDate }) },
+        treatments: [world.secondary.treatmentId],
+        scheduledStart: futureSlot(13, 10).toISOString(),
+      });
+
+    const without = await booking(false);
+    expect(without.status).toBeGreaterThanOrEqual(400);
+    expect(JSON.stringify(without.body)).toContain('birthDate');
+
+    expect((await booking(true)).status).toBe(201);
+    const after = await prisma.client.client.findUniqueOrThrow({
+      where: { phone },
+    });
+    expect(after.birthDate?.toISOString().slice(0, 10)).toBe(birthDate);
+    const meAfter = await asConduit('get', '/conduit/clients/me', phone);
+    expect(meAfter.body).not.toHaveProperty('missingBirthDate');
+  });
+
+  it('registrar a alguien sin nombre sigue sin permitirse', async () => {
+    const { phone } = newClientDto('sin-nombre');
+    const res = await asConduit('post', '/conduit/clients', phone).send({
+      phone,
+    });
+    expect(res.status).toBe(409);
+  });
 });

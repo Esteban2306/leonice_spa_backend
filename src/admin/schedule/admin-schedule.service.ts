@@ -34,6 +34,15 @@ import {
 import { CreateScheduleExceptionDto } from './dto/create-schedule-exception.dto';
 import { UpdateBaseScheduleDto } from './dto/update-base-schedule.dto';
 import { FindScheduleExceptionsQueryDto } from './dto/find-schedule-exceptions-query.dto';
+import { SetDayOverrideDto } from './dto/set-day-override.dto';
+import {
+  MAX_OVERRIDE_RANGE_DAYS,
+  buildDayOverride,
+  dayKeysBetween,
+  describeDayOverrideIssue,
+  toOverrideView,
+} from '../../reservations/domain/day-override';
+import type { DayOverride } from '../../reservations/domain/operating-hours';
 
 interface LiveReservation {
   id: string;
@@ -154,6 +163,145 @@ export class AdminScheduleService {
     return rows.map((row) => this.toExceptionView(row));
   }
 
+  async listOverrides(query: { from: string; to: string }) {
+    this.assertValidDayKey(query.from);
+    this.assertValidDayKey(query.to);
+    const rows = await this.repository.findOverridesBetween(
+      query.from,
+      query.to,
+    );
+    return rows.map(toOverrideView);
+  }
+
+  async setOverride(dto: SetDayOverrideDto, adminUserId: string) {
+    const dayKeys = this.overrideDays(dto.from, dto.to);
+    const { override, issues } = buildDayOverride(
+      dto.windows,
+      dto.startTimes ?? [],
+    );
+    if (issues.length > 0) {
+      throw new AppException('SCHEDULE_EXCEPTION_INVALID_RANGE', {
+        message: issues.map(describeDayOverrideIssue).join(' '),
+        details: { issues },
+      });
+    }
+    const reason = dto.reason?.trim() || null;
+    return this.applyOverrides(dayKeys, override, async (dayKey, tx) => {
+      await this.repository.upsertDayOverride(
+        {
+          dayKey,
+          windows: override.windows,
+          startMinutes: override.startMinutes,
+          reason,
+          createdByUserId: adminUserId,
+        },
+        tx,
+      );
+    });
+  }
+
+  async deleteOverride(dayKey: string) {
+    const [day] = this.overrideDays(dayKey, dayKey);
+    if (!(await this.repository.findDayOverride(day))) {
+      throw new NotFoundException('Esa fecha no tiene un horario especial');
+    }
+    return this.applyOverrides([day], null, async (key, tx) => {
+      await this.repository.deleteDayOverride(key, tx);
+    });
+  }
+
+  private overrideDays(from: string, to: string): string[] {
+    this.assertValidDayKey(from);
+    this.assertValidDayKey(to);
+    this.assertNotPast(from);
+    if (to < from) throw new AppException('DATE_RANGE_INVALID');
+    const days = dayKeysBetween(from, to);
+    if (days.length > MAX_OVERRIDE_RANGE_DAYS) {
+      throw new AppException('DATE_RANGE_INVALID', {
+        message: `Elige como máximo ${MAX_OVERRIDE_RANGE_DAYS} días a la vez.`,
+      });
+    }
+    return days;
+  }
+
+  private async applyOverrides(
+    dayKeys: readonly string[],
+    override: DayOverride | null,
+    write: (dayKey: string, tx: Prisma.TransactionClient) => Promise<void>,
+  ) {
+    const affected = await this.repository.findCategoryIds();
+    const proposedFor = (current: DaySchedule): DaySchedule => ({
+      ...current,
+      override,
+    });
+
+    const conflicts: LiveReservation[] = [];
+    for (const dayKey of dayKeys) {
+      const date = new Date(`${dayKey}T00:00:00`);
+      const current = await this.operatingSchedule.loadDaySchedule(date);
+      const { dayStart, dayEnd } = getDayBoundaries(date);
+      const reservations = await this.repository.findLiveReservationsOnDay({
+        dayStart,
+        dayEnd,
+        categoryIds: affected,
+      });
+      conflicts.push(
+        ...this.findDisplaced(
+          date,
+          reservations,
+          current,
+          proposedFor(current),
+        ),
+      );
+    }
+    if (conflicts.length > 0) {
+      throw new AppException('SCHEDULE_CHANGE_HAS_RESERVATIONS', {
+        message: `Hay ${conflicts.length} reserva(s) que quedarían fuera del nuevo horario. Reprográmalas o cancélalas y vuelve a intentarlo.`,
+        details: {
+          resolution: ['RESCHEDULE', 'CANCEL'],
+          reservations: conflicts.map((r) => this.toConflictView(r)),
+        },
+      });
+    }
+
+    const extended: ExtendedDepositDeadline[] = [];
+    for (const dayKey of dayKeys) {
+      const date = new Date(`${dayKey}T00:00:00`);
+      const dayExtended = await this.availabilityRepository.withCategoriesLock(
+        affected,
+        date,
+        async (tx) => {
+          const current = await this.operatingSchedule.loadDaySchedule(
+            date,
+            tx,
+          );
+          await this.assertNoDisplacedReservations(
+            date,
+            affected,
+            current,
+            proposedFor(current),
+            tx,
+          );
+          await write(dayKey, tx);
+          return this.depositDeadline.extendForScheduleChange(date, tx);
+        },
+      );
+      await this.afterScheduleChange(affected, dayKey, dayExtended);
+      extended.push(...dayExtended);
+    }
+
+    this.eventBus.publish(EVENT_TYPES.BUSINESS_INFO_CHANGED, {
+      source: 'schedule',
+    });
+    return {
+      overrides: await this.listOverrides({
+        from: dayKeys[0],
+        to: dayKeys[dayKeys.length - 1],
+      }),
+      depositDeadlinesExtended: extended,
+    };
+  }
+
   async getDay(dayKey: string) {
     const date = this.assertValidDayKey(dayKey);
     const [schedule, categories, exceptions] = await Promise.all([
@@ -167,8 +315,10 @@ export class AdminScheduleService {
     const global = getOperatingWindowsForDate(date, schedule);
     const { dayStart } = getDayBoundaries(date);
 
+    const override = await this.repository.findDayOverride(dayKey);
     return {
       date: dayKey,
+      override: override ? toOverrideView(override) : null,
       isClosed: global.length === 0,
       windows: global.map((w) => this.toWindowView(w, dayStart)),
       categories: categories.map((category) => {
@@ -385,9 +535,10 @@ export class AdminScheduleService {
     const treatmentIds =
       await this.repository.findTreatmentIdsForCategories(categoryIds);
     await Promise.all(
-      treatmentIds.map((treatmentId) =>
+      treatmentIds.flatMap((treatmentId) => [
         this.cache.delete(availabilityCacheKey(treatmentId, dayKey)),
-      ),
+        this.cache.delete(availabilityCacheKey(treatmentId, dayKey, true)),
+      ]),
     );
     this.logger.log(
       `Disponibilidad invalidada para ${treatmentIds.length} tratamiento(s) el ${dayKey}`,

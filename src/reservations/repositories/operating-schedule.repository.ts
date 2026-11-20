@@ -6,7 +6,12 @@ import {
   ScheduleExceptionType,
 } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import type { DayException, WeeklyWindow } from '../domain/operating-hours';
+import type {
+  DayException,
+  DayOverride,
+  MinuteRange,
+  WeeklyWindow,
+} from '../domain/operating-hours';
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 
@@ -25,6 +30,45 @@ export function toScheduleDate(dayKey: string): Date {
 export function fromScheduleDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+export interface DayOverrideRecord extends DayOverride {
+  dayKey: string;
+  reason: string | null;
+}
+
+export function toOverrideWindows(value: unknown): MinuteRange[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): MinuteRange[] => {
+    if (typeof item !== 'object' || item === null) return [];
+    const { startMinute, endMinute } = item as Record<string, unknown>;
+    return typeof startMinute === 'number' &&
+      typeof endMinute === 'number' &&
+      endMinute > startMinute
+      ? [[startMinute, endMinute]]
+      : [];
+  });
+}
+
+function toOverrideRecord(row: {
+  date: Date;
+  windows: Prisma.JsonValue;
+  startMinutes: number[];
+  reason: string | null;
+}): DayOverrideRecord {
+  return {
+    dayKey: fromScheduleDate(row.date),
+    windows: toOverrideWindows(row.windows),
+    startMinutes: row.startMinutes,
+    reason: row.reason,
+  };
+}
+
+const OVERRIDE_SELECT = {
+  date: true,
+  windows: true,
+  startMinutes: true,
+  reason: true,
+} as const;
 
 export interface CreateScheduleExceptionData {
   dayKey: string;
@@ -47,6 +91,73 @@ export class OperatingScheduleRepository {
       orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
       select: { dayOfWeek: true, startMinute: true, endMinute: true },
     });
+  }
+
+  async findDayOverride(
+    dayKey: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<DayOverrideRecord | null> {
+    const row = await client.scheduleDayOverride.findUnique({
+      where: { date: toScheduleDate(dayKey) },
+      select: OVERRIDE_SELECT,
+    });
+    return row ? toOverrideRecord(row) : null;
+  }
+
+  async findOverridesBetween(
+    fromDayKey: string,
+    toDayKey: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<DayOverrideRecord[]> {
+    const rows = await client.scheduleDayOverride.findMany({
+      where: {
+        date: {
+          gte: toScheduleDate(fromDayKey),
+          lte: toScheduleDate(toDayKey),
+        },
+      },
+      orderBy: { date: 'asc' },
+      select: OVERRIDE_SELECT,
+    });
+    return rows.map(toOverrideRecord);
+  }
+
+  async upsertDayOverride(
+    data: {
+      dayKey: string;
+      windows: readonly MinuteRange[];
+      startMinutes: readonly number[];
+      reason: string | null;
+      createdByUserId: string;
+    },
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<DayOverrideRecord> {
+    const values = {
+      windows: data.windows.map(([startMinute, endMinute]) => ({
+        startMinute,
+        endMinute,
+      })),
+      startMinutes: [...data.startMinutes],
+      reason: data.reason,
+      createdByUserId: data.createdByUserId,
+    };
+    const row = await client.scheduleDayOverride.upsert({
+      where: { date: toScheduleDate(data.dayKey) },
+      create: { date: toScheduleDate(data.dayKey), ...values },
+      update: values,
+      select: OVERRIDE_SELECT,
+    });
+    return toOverrideRecord(row);
+  }
+
+  async deleteDayOverride(
+    dayKey: string,
+    client: PrismaClientOrTx = this.prisma.client,
+  ): Promise<boolean> {
+    const { count } = await client.scheduleDayOverride.deleteMany({
+      where: { date: toScheduleDate(dayKey) },
+    });
+    return count > 0;
   }
 
   async findDayExceptions(

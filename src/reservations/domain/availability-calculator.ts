@@ -1,4 +1,5 @@
 import { AvailableSlotsType } from '../types/disponivility.types';
+import { minuteToDate } from './operating-hours';
 
 export interface HeldInterval {
   scheduledStart: Date;
@@ -37,8 +38,30 @@ export function generateAvailableSlots(params: AvailableSlotsType): Date[] {
     durationMinutes,
     capacity,
     stepMinutes = 15,
+    startMinutes,
   } = params;
   const slots: Date[] = [];
+
+  if (startMinutes && startMinutes.length > 0) {
+    for (const window of operatingWindows) {
+      for (const minute of startMinutes) {
+        const candidate = minuteToDate(window.start, minute);
+        const candidateEnd = new Date(
+          candidate.getTime() + durationMinutes * 60_000,
+        );
+        if (
+          candidate.getTime() < window.start.getTime() ||
+          candidateEnd.getTime() > window.end.getTime()
+        ) {
+          continue;
+        }
+        if (maxConcurrentInWindow(held, candidate, candidateEnd) < capacity) {
+          slots.push(candidate);
+        }
+      }
+    }
+    return slots.sort((a, b) => a.getTime() - b.getTime());
+  }
 
   for (const window of operatingWindows) {
     let candidate = new Date(window.start);

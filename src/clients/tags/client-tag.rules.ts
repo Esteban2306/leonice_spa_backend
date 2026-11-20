@@ -38,7 +38,7 @@ export interface TagReservation {
 }
 
 export interface TagClientInput {
-  birthDate: Date;
+  birthDate: Date | null;
   reservations: readonly TagReservation[];
 }
 
@@ -170,7 +170,10 @@ export function deriveClientTags(
   }
 
   if (repeatedNoShow) add(ClientTagKey.NO_SHOW_REITERADO);
-  if (daysUntilBirthday(input.birthDate, now) <= BIRTHDAY_SOON_DAYS) {
+  if (
+    input.birthDate &&
+    daysUntilBirthday(input.birthDate, now) <= BIRTHDAY_SOON_DAYS
+  ) {
     add(ClientTagKey.CUMPLE_PRONTO);
   }
 

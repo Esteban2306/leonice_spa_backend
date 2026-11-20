@@ -786,6 +786,7 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
         {} as never,
         {} as never,
         { isPaused: () => Promise.resolve(false) } as never,
+        {} as never,
       );
       const reminder = job(
         JOB_NAMES.RESERVATION_REMINDER_CHECK,
@@ -796,6 +797,7 @@ describe('5. Procesos BullMQ: idempotencia, reintentos y duplicados', () => {
         { queueName: QUEUE_NAMES.AUTOMATION_COMMUNICATIONS, id: 'reminder-1' },
       );
 
+      fakeQueues.communications.jobs.length = 0;
       await comms.process(reminder);
       await comms.process(reminder);
 

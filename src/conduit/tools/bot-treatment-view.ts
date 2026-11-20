@@ -240,6 +240,7 @@ export function toBotTreatmentDetail(
       benefits: treatment.benefits ?? [],
       results: treatment.results ?? null,
       considerations: treatment.considerations ?? [],
+      aftercare: treatment.aftercare ?? [],
       recommendedFrequency: treatment.recommendedFrequency ?? null,
     },
     card: {

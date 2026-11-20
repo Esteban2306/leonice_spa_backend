@@ -39,6 +39,10 @@ function build(treatments: unknown[]) {
     {} as never,
     { findByPhone: jest.fn(() => Promise.resolve(null)) } as never,
     {} as never,
+    {
+      activeFor: jest.fn(() => Promise.resolve([])),
+      markUsed: jest.fn(() => Promise.resolve()),
+    } as never,
   );
 }
 

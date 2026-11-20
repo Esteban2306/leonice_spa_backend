@@ -1,3 +1,4 @@
+import { AppException } from '../common/errors/app.exception';
 import {
   Body,
   Controller,
@@ -97,8 +98,24 @@ export class ReservationsController {
     @Body() dto: CreateReservationDto,
     @CurrentUser() user: AuthenticatedUser | undefined,
   ) {
+    const agreed = dto.agreedPrices ?? [];
+    if (agreed.length > 0 && !user) {
+      throw new AppException('FORBIDDEN', {
+        message: 'Solo el panel del spa puede fijar el precio de una reserva.',
+      });
+    }
+    const unknown = agreed.filter(
+      (a) => !dto.treatments.includes(a.treatmentId),
+    );
+    if (unknown.length > 0) {
+      throw new AppException('BAD_REQUEST', {
+        message:
+          'El precio fijado es de un servicio que no está en la reserva.',
+      });
+    }
     return this.createOrchestrator.execute(dto, {
       trustedIdentity: user !== undefined,
+      priceOverrides: new Map(agreed.map((a) => [a.treatmentId, a.price])),
     });
   }
 

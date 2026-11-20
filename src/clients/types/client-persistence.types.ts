@@ -1,7 +1,7 @@
 export interface CreateClientData {
   phone: string;
   name: string;
-  birthDate: Date;
+  birthDate: Date | null;
   whatsappJid?: string;
   allergies?: string;
   isPregnant?: boolean;
@@ -12,4 +12,5 @@ export interface UpdateClientData {
   birthDate?: Date;
   allergies?: string;
   isPregnant?: boolean;
+  depositExempt?: boolean;
 }

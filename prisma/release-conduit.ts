@@ -75,10 +75,43 @@ export const HAIR_PHOTO_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const TEAM_PRICE_RELEASE: ReleaseManifest = {
+  id: '2026-11-21-precio-y-horarios',
+  intents: [],
+  tools: ['guardar_precio_del_equipo'],
+  templates: [],
+  prompt: true,
+  mapping: true,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
+export const FOLLOW_UPS_RELEASE: ReleaseManifest = {
+  id: '2026-11-22-seguimientos-y-fichas',
+  intents: [],
+  tools: [
+    'consultar_cliente',
+    'consultar_disponibilidad',
+    'disponibilidad_combo',
+    'registrar_cliente',
+    'crear_reserva_whatsapp',
+  ],
+  templates: [
+    'leonice_recordatorio_anticipo',
+    'leonice_seguimiento_interesada',
+  ],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
   HAIR_PHOTO_RELEASE,
+  TEAM_PRICE_RELEASE,
+  FOLLOW_UPS_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

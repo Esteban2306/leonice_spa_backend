@@ -1,4 +1,4 @@
-import { toBotClient } from './bot-client-view';
+import { toBotLastVisit, toBotClient } from './bot-client-view';
 import { NEW_CLIENT_INTRO } from './bot-client-view';
 
 const now = new Date('2026-10-24T12:00:00Z');
@@ -82,5 +82,40 @@ describe('toBotClient', () => {
     expect(JSON.stringify(view)).not.toMatch(
       /birth|allerg|pregnan|penicilina/i,
     );
+  });
+});
+
+describe('última visita de la clienta', () => {
+  it('dice la fecha y el servicio de su última cita completada', () => {
+    expect(
+      toBotLastVisit({
+        completedAt: new Date('2026-10-15T20:00:00Z'),
+        scheduledStart: new Date('2026-10-15T15:00:00Z'),
+        treatment: { name: 'Alisado' },
+      }),
+    ).toEqual({ date: '15 de octubre de 2026', treatment: 'Alisado' });
+  });
+
+  it('sin visitas no trae nada', () => {
+    expect(toBotLastVisit(null)).toBeUndefined();
+  });
+});
+
+describe('clienta de confianza', () => {
+  const client = {
+    name: 'Mabel Ruiz',
+    hairLength: null,
+    hairColor: null,
+    hairProfileUpdatedAt: null,
+  };
+
+  it('le avisa al bot que no le pida anticipo', () => {
+    expect(toBotClient({ ...client, depositExempt: true }, true)).toMatchObject(
+      { noDepositNeeded: true },
+    );
+  });
+
+  it('a las demás no les dice nada', () => {
+    expect(toBotClient(client, true)).not.toHaveProperty('noDepositNeeded');
   });
 });

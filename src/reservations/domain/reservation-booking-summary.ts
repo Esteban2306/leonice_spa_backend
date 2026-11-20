@@ -15,6 +15,15 @@ export function buildBookingSummary(segments: BookedSegmentSummary[]): string {
     return s.wasAdjusted ? `${base} (${s.adjustmentReason}).` : `${base}.`;
   }
 
+  const start = segments[0].scheduledStart.getTime();
+  if (segments.every((s) => s.scheduledStart.getTime() === start)) {
+    const parts = segments.map(
+      (s) =>
+        `${s.treatmentName} (hasta las ${formatLocalTime(s.scheduledEnd)})`,
+    );
+    return `Tu combo quedó para las ${formatLocalTime(segments[0].scheduledStart)}, con los servicios al mismo tiempo: ${parts.join(' y ')}.`;
+  }
+
   const parts = segments.map(
     (s) =>
       `${s.treatmentName} de ${formatLocalTime(s.scheduledStart)} a ${formatLocalTime(s.scheduledEnd)}`,

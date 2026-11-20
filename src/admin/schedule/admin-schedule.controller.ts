@@ -14,6 +14,7 @@ import { AdminScheduleService } from './admin-schedule.service';
 import { CreateScheduleExceptionDto } from './dto/create-schedule-exception.dto';
 import { FindScheduleExceptionsQueryDto } from './dto/find-schedule-exceptions-query.dto';
 import { UpdateBaseScheduleDto } from './dto/update-base-schedule.dto';
+import { SetDayOverrideDto } from './dto/set-day-override.dto';
 
 @Controller('admin/schedule')
 export class AdminScheduleController {
@@ -32,6 +33,24 @@ export class AdminScheduleController {
   @Get('exceptions')
   listExceptions(@Query() query: FindScheduleExceptionsQueryDto) {
     return this.adminScheduleService.listExceptions(query);
+  }
+
+  @Get('overrides')
+  listOverrides(@Query() query: FindScheduleExceptionsQueryDto) {
+    return this.adminScheduleService.listOverrides(query);
+  }
+
+  @Put('overrides')
+  setOverride(
+    @Body() dto: SetDayOverrideDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.adminScheduleService.setOverride(dto, user.id);
+  }
+
+  @Delete('overrides/:date')
+  deleteOverride(@Param('date') date: string) {
+    return this.adminScheduleService.deleteOverride(date);
   }
 
   @Get('days/:date')

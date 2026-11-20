@@ -18,12 +18,18 @@ export interface DayException {
   endMinute: number | null;
 }
 
+export type MinuteRange = readonly [number, number];
+
+export interface DayOverride {
+  windows: readonly MinuteRange[];
+  startMinutes: readonly number[];
+}
+
 export interface DaySchedule {
   base: readonly WeeklyWindow[];
   exceptions: readonly DayException[];
+  override?: DayOverride | null;
 }
-
-export type MinuteRange = readonly [number, number];
 
 export const MINUTES_PER_DAY = 24 * 60;
 
@@ -95,9 +101,11 @@ export function resolveDayMinuteRanges(
   const applicable = schedule.exceptions.filter((e) =>
     exceptionAppliesTo(e, categoryId),
   );
-  const base = schedule.base
-    .filter((w) => w.dayOfWeek === dayOfWeek)
-    .map((w): MinuteRange => [w.startMinute, w.endMinute]);
+  const base = schedule.override
+    ? [...schedule.override.windows]
+    : schedule.base
+        .filter((w) => w.dayOfWeek === dayOfWeek)
+        .map((w): MinuteRange => [w.startMinute, w.endMinute]);
   const opened = applicable
     .filter((e) => e.type === 'OPEN')
     .map(exceptionRange);
@@ -138,4 +146,15 @@ export function findIntervalsOutsideWindows<
           interval.scheduledEnd.getTime() <= w.end.getTime(),
       ),
   );
+}
+
+export function fixedStartMinutes(
+  schedule: Pick<DaySchedule, 'override'>,
+): number[] | null {
+  const starts = schedule.override?.startMinutes ?? [];
+  return starts.length > 0 ? [...new Set(starts)].sort((a, b) => a - b) : null;
+}
+
+export function minuteOfDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
 }

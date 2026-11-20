@@ -23,6 +23,9 @@ import { ConduitUpdateClientDto } from './dto/conduit-update-client.dto';
 import { ConduitCreateClientDto } from './dto/conduit-create-client.dto';
 import { ConsentService } from 'src/clients/consent/consent.service';
 import { toBotClient } from './tools/bot-client-view';
+import { TeamQuoteService, toBotTeamQuote } from './quotes/team-quote.service';
+import { clientsHistoryRepository } from 'src/clients/repositories/client-history.repository';
+import { toBotLastVisit } from './tools/bot-client-view';
 
 @Controller({ path: 'conduit/clients', version: '1' })
 @ConduitTool()
@@ -31,6 +34,8 @@ export class ConduitToolsController {
     private readonly clientsRepository: ClientsRepository,
     private readonly clientsService: ClientsService,
     private readonly consentService: ConsentService,
+    private readonly teamQuotes: TeamQuoteService,
+    private readonly history: clientsHistoryRepository,
   ) {}
 
   @Get('me')
@@ -39,10 +44,25 @@ export class ConduitToolsController {
     const client = phone
       ? await this.clientsRepository.findByPhone(phone)
       : null;
-    const termsAccepted = client
-      ? await this.consentService.hasTermsConsent(client.id)
-      : false;
-    return toBotClient(client, termsAccepted);
+    const [termsAccepted, quotes, lastVisit] = await Promise.all([
+      client ? this.consentService.hasTermsConsent(client.id) : false,
+      phone ? this.teamQuotes.activeFor(phone) : [],
+      client ? this.history.getLastCompletedReservation(client.id) : null,
+    ]);
+    const unsaved = phone
+      ? await this.teamQuotes.unsavedTeamPrices(phone, quotes)
+      : [];
+    return {
+      ...toBotClient(client, termsAccepted),
+      ...(lastVisit && { lastVisit: toBotLastVisit(lastVisit) }),
+      ...(quotes.length > 0 && { teamQuotes: quotes.map(toBotTeamQuote) }),
+      ...(unsaved.length > 0 && {
+        teamPricesInChat: unsaved.map((p) => ({
+          price: p.price,
+          said: p.said,
+        })),
+      }),
+    };
   }
 
   @Post()
@@ -75,9 +95,9 @@ export class ConduitToolsController {
     }
 
     if (!client) {
-      if (!dto.name || !dto.birthDate) {
+      if (!dto.name) {
         throw new ConflictException(
-          'Para crear un nuevo cliente se requieren nombre y fecha de nacimiento',
+          'Para registrar a una clienta nueva se requiere su nombre completo',
         );
       }
 
@@ -97,7 +117,9 @@ export class ConduitToolsController {
       client = await this.clientsRepository.create({
         phone: normalizedPhone,
         name: dto.name,
-        birthDate: calendarDateToUtcMidnight(dto.birthDate),
+        birthDate: dto.birthDate
+          ? calendarDateToUtcMidnight(dto.birthDate)
+          : null,
         whatsappJid: dto.whatsappJid,
         allergies: dto.allergies,
         isPregnant: dto.isPregnant || false,
@@ -118,10 +140,13 @@ export class ConduitToolsController {
       phone: _phone,
       whatsappJid: _jid,
       name: _name,
-      birthDate: _birthDate,
+      birthDate,
       ...updates
     } = dto;
-    return this.clientsService.update(client.id, updates);
+    return this.clientsService.update(client.id, {
+      ...updates,
+      ...(client.birthDate === null && birthDate && { birthDate }),
+    });
   }
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
   @Patch()

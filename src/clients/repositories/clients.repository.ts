@@ -105,6 +105,7 @@ export class ClientsRepository {
           name: true,
           phone: true,
           createdAt: true,
+          birthDate: true,
           hairLength: true,
           hairColor: true,
           hairProfileUpdatedAt: true,
@@ -165,9 +166,14 @@ export class ClientsRepository {
       whatsappJid?: string;
       allergies?: string;
       isPregnant?: boolean;
+      birthDate?: Date;
     },
   ): Promise<Client> {
     const data: Record<string, unknown> = {};
+
+    if (current.birthDate === null && incoming.birthDate) {
+      data.birthDate = incoming.birthDate;
+    }
 
     if (!current.whatsappJid && incoming.whatsappJid) {
       data.whatsappJid = incoming.whatsappJid;
@@ -206,6 +212,7 @@ export class ClientsRepository {
         name: data.name,
         birthDate: data.birthDate,
         isPregnant: data.isPregnant,
+        depositExempt: data.depositExempt,
         allergies:
           data.allergies !== undefined
             ? this.encryption.encrypt(data.allergies)

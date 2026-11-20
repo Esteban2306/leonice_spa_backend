@@ -30,6 +30,8 @@ export const JOB_NAMES = {
   NOTIFY_CLIENT_DEPOSIT_REJECTED: 'notify-client-deposit-rejected',
   NOTIFY_CLIENT_RESCHEDULED: 'notify-client-rescheduled',
   NOTIFY_CLIENT_RESERVATION_CONFIRMED: 'notify-client-reservation-confirmed',
+  SEND_CLIENT_DEPOSIT_REMINDER: 'send-client-deposit-reminder',
+  LEAD_FOLLOW_UP_SWEEP: 'lead-follow-up-sweep',
   NOTIFY_CLIENT_CANCELLED_BY_ADMIN: 'notify-client-cancelled-by-admin',
   NOTIFY_ADMIN_RESCHEDULED: 'notify-admin-rescheduled',
   NOTIFY_CLIENT_CANCELLATION_CONFIRMED: 'notify-client-cancellation-confirmed',

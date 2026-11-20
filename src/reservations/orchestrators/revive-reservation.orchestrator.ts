@@ -91,6 +91,7 @@ export class ReviveReservationOrchestrator {
             start: fresh.scheduledStart,
             end: fresh.scheduledEnd,
             excludeReservationId: fresh.id,
+            comboGroupId: fresh.comboGroupId,
             now,
           });
           if (!decision.ok) {

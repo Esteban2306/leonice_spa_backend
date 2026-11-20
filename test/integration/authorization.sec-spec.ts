@@ -74,6 +74,7 @@ const CONDUIT_TOOL_ALLOW_LIST = [
   'POST /api/v1/conduit/handoff',
   'POST /api/v1/conduit/handoff/owner',
   'POST /api/v1/conduit/products/purchase-request',
+  'POST /api/v1/conduit/team-quotes',
   'POST /api/v1/deposits/automatic',
   'POST /api/v1/reservations/:id/deposits/automatic',
 ].sort();

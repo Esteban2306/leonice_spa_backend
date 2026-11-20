@@ -4,8 +4,10 @@ import {
   IsIn,
   IsInt,
   IsOptional,
+  IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -50,4 +52,11 @@ export class ConduitIntentKeyParam {
 export class SetSystemPauseDto {
   @IsBoolean()
   paused!: boolean;
+}
+
+export class MuteContactDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
 }

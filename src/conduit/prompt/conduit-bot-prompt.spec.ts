@@ -84,7 +84,9 @@ describe('prompt del asistente de Leonice', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toMatch(/Lo primero.*consultar_cliente/);
     expect(t).toMatch(/con su primer nombre \("Hola, Diana, soy/);
-    expect(t).toMatch(/registered true, ya los tenemos; no le pidas nombre/);
+    expect(t).toMatch(
+      /registered true, ya los tenemos \(si missingBirthDate, pide solo la fecha\); no le pidas nombre/,
+    );
     expect(t).toMatch(/termsAccepted/);
   });
 
@@ -357,6 +359,24 @@ describe('prompt del asistente de Leonice', () => {
     );
   });
 
+  it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain(
+      '"[Persona del equipo]" marca lo que escribió alguien del equipo',
+    );
+    expect(t).toContain('nunca escribas esa marca');
+    expect(t).toContain('guardar_precio_del_equipo con ese servicio y precio');
+    expect(t).toContain('y si no, no lo uses');
+    expect(t).toContain('Si consultar_cliente trae teamQuotes');
+    expect(t).toContain('si trae teamPricesInChat');
+  });
+
+  it('si hay horarios especiales configurados, los informa cuando preguntan', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('Si "Datos del negocio" trae horarios_especiales');
+    expect(t).toContain('para agendar, igual consulta los cupos');
+  });
+
   it('un comprobante sin anticipo pendiente no se registra: va a una persona', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
@@ -403,7 +423,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(14800);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(15600);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

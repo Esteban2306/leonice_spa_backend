@@ -14,10 +14,8 @@ import {
   findComboStarts,
   orderComboSegments,
 } from './domain/combo-availability';
-import {
-  MAX_ADVANCE_DAYS,
-  MIN_ADVANCE_DAYS,
-} from './domain/reservation-timing.constants';
+import { MAX_ADVANCE_DAYS } from './domain/reservation-timing.constants';
+import { earliestBookableStart } from './validators/validate-advance-window';
 import { GetAvailabilityCalendarDto } from './dto/get-availability-calendar.dto';
 import {
   groupReservationsForDisplay,
@@ -26,8 +24,13 @@ import {
 
 const AVAILABILITY_CACHE_TTL_SECONDS = 10;
 
-export function availabilityCacheKey(treatmentId: string, dayKey: string) {
-  return `availability:${treatmentId}:${dayKey}`;
+export function availabilityCacheKey(
+  treatmentId: string,
+  dayKey: string,
+  anyStart = false,
+) {
+  const key = `availability:${treatmentId}:${dayKey}`;
+  return anyStart ? `${key}:any-start` : key;
 }
 
 export type AvailabilityDayReason =
@@ -58,20 +61,29 @@ export class ReservationsService {
   async getAvailability(
     treatmentId: string,
     dateStr: string,
+    options: { anyStart?: boolean; now?: Date } = {},
   ): Promise<AvailabilitySlot[]> {
-    const cacheKey = availabilityCacheKey(treatmentId, dateStr);
+    const earliest = earliestBookableStart(options.now).getTime();
+    const bookable = (slots: AvailabilitySlot[]) =>
+      slots.filter((slot) => new Date(slot.iso).getTime() >= earliest);
+    const anyStart = options.anyStart ?? false;
+    const cacheKey = availabilityCacheKey(treatmentId, dateStr, anyStart);
 
     const cached = await this.cache.get<AvailabilitySlot[]>(cacheKey);
-    if (cached) return cached;
+    if (cached) return bookable(cached);
 
-    const slots = await this.computeAvailability(treatmentId, dateStr);
+    const slots = await this.computeAvailability(
+      treatmentId,
+      dateStr,
+      anyStart,
+    );
     const shaped: AvailabilitySlot[] = slots.map((s) => ({
       iso: s.toISOString(),
       localTime: formatLocalTime(s),
     }));
 
     void this.cache.set(cacheKey, shaped, AVAILABILITY_CACHE_TTL_SECONDS);
-    return shaped;
+    return bookable(shaped);
   }
 
   async getAvailabilityCalendar(
@@ -102,10 +114,7 @@ export class ReservationsService {
       })),
     );
 
-    const earliest =
-      query.purpose === 'RESCHEDULE'
-        ? now
-        : new Date(now.getTime() + MIN_ADVANCE_DAYS * 24 * 60 * 60 * 1000);
+    const earliest = earliestBookableStart(now);
     const latest = new Date(
       now.getTime() + MAX_ADVANCE_DAYS * 24 * 60 * 60 * 1000,
     );
@@ -148,7 +157,9 @@ export class ReservationsService {
     if (day.getTime() > latest.getTime()) return unavailable('OUT_OF_RANGE');
 
     const perTreatment = await Promise.all(
-      ordered.map((t) => this.getAvailability(t.id, date)),
+      ordered.map((t, index) =>
+        this.getAvailability(t.id, date, { anyStart: index > 0 }),
+      ),
     );
     if (perTreatment[0].length === 0) {
       const windows = await this.operatingSchedule.getWindows(day);
@@ -221,6 +232,7 @@ export class ReservationsService {
   private async computeAvailability(
     treatmentId: string,
     dateStr: string,
+    anyStart: boolean,
   ): Promise<Date[]> {
     const treatment = await this.prisma.client.treatment.findFirst({
       where: { id: treatmentId },
@@ -237,10 +249,8 @@ export class ReservationsService {
 
     const date = new Date(`${dateStr}T00:00:00`);
 
-    const operatingWindows = await this.operatingSchedule.getWindows(
-      date,
-      treatment.categoryId,
-    );
+    const { windows: operatingWindows, startMinutes } =
+      await this.operatingSchedule.getDayPlan(date, treatment.categoryId);
     if (operatingWindows.length === 0) return [];
 
     const dayStart = operatingWindows[0].start;
@@ -260,6 +270,7 @@ export class ReservationsService {
       held,
       durationMinutes,
       capacity,
+      startMinutes: anyStart ? null : startMinutes,
     });
   }
 }

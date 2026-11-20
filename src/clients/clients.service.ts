@@ -94,6 +94,12 @@ export class ClientsService {
       return created;
     }
 
+    if (client.birthDate === null && !dto.birthDate) {
+      throw new AppException('CLIENT_REQUIRED_FIELDS', {
+        details: { missing: ['birthDate'] },
+      });
+    }
+
     if (!options.trustedIdentity) {
       return client;
     }
@@ -103,6 +109,9 @@ export class ClientsService {
     }
 
     return this.repository.fillMissingFields(client, {
+      birthDate: dto.birthDate
+        ? calendarDateToUtcMidnight(dto.birthDate)
+        : undefined,
       whatsappJid,
       allergies: dto.allergies,
       isPregnant: dto.isPregnant,
@@ -140,6 +149,7 @@ export class ClientsService {
         phone: client.phone,
         createdAt: client.createdAt,
         reservationCount: client._count.reservations,
+        missingBirthDate: client.birthDate === null,
         lastReservation: client.reservations[0] ?? null,
         hairProfileStatus: getHairProfileStatus(client, now),
         tags: (tagsByClient.get(client.id) ?? []).map(({ key, detail }) => ({
@@ -276,6 +286,14 @@ export class ClientsService {
       throw new AppException('CLIENT_NOT_FOUND', { details: { clientId: id } });
     }
     return client;
+  }
+
+  async setDepositExempt(
+    id: string,
+    depositExempt: boolean,
+  ): Promise<ClientView> {
+    await this.requireClient(id);
+    return toClientView(await this.repository.update(id, { depositExempt }));
   }
 
   async update(id: string, dto: UpdateClientDto): Promise<ClientView> {

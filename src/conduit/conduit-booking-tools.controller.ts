@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ReservationChannel } from '@prisma/client';
 import { AppException } from '../common/errors/app.exception';
+import { onePerHour, onePerHourByDay } from './tools/bot-slots';
 import { ConduitTool } from './decorators/conduit-tool.decorator';
 import { VerifiedPhone } from './decorators/verified-phone.decorator';
 import {
@@ -27,6 +28,7 @@ import {
 } from './tools/bot-treatment-view';
 import { matchTreatment } from './tools/treatment-matcher';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
+import { TeamQuoteService } from './quotes/team-quote.service';
 import { ClientsRepository } from '../clients/repositories/clients.repository';
 import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationOrchestrator } from '../reservations/orchestrators/create-reservation.orchestrator';
@@ -58,6 +60,7 @@ export class ConduitBookingToolsController {
     private readonly rescheduleReservation: RescheduleReservationOrchestrator,
     private readonly clientsRepository: ClientsRepository,
     private readonly cancellationLinks: CancellationLinkService,
+    private readonly teamQuotes: TeamQuoteService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -116,7 +119,11 @@ export class ConduitBookingToolsController {
       query.treatmentId,
       query.date,
     );
-    return { treatmentId: query.treatmentId, date: query.date, slots };
+    return {
+      treatmentId: query.treatmentId,
+      date: query.date,
+      slots: onePerHour(slots),
+    };
   }
 
   /**
@@ -125,8 +132,10 @@ export class ConduitBookingToolsController {
    */
   @ConduitToolOptionsMeta({ publicData: true })
   @Get('availability/calendar')
-  getAvailabilityCalendar(@Query() query: GetAvailabilityCalendarDto) {
-    return this.reservationsService.getAvailabilityCalendar(query);
+  async getAvailabilityCalendar(@Query() query: GetAvailabilityCalendarDto) {
+    const calendar =
+      await this.reservationsService.getAvailabilityCalendar(query);
+    return { ...calendar, days: onePerHourByDay(calendar.days) };
   }
 
   @Post('reservations')
@@ -135,16 +144,37 @@ export class ConduitBookingToolsController {
     @Req() req: RequestWithConduitContact,
   ) {
     const treatments = await this.resolveTreatmentIds(dto);
+    const phone = req.conduitContact?.phone;
+    const quotes =
+      phone && hasVerifiedIdentity(req)
+        ? (await this.teamQuotes.activeFor(phone)).filter((q) =>
+            treatments.includes(q.treatmentId),
+          )
+        : [];
     try {
-      return await this.createReservation.execute(
+      const result = await this.createReservation.execute(
         {
           client: dto.client,
           treatments,
           scheduledStart: dto.scheduledStart,
           channel: ReservationChannel.WHATSAPP,
         },
-        { trustedIdentity: hasVerifiedIdentity(req) },
+        {
+          trustedIdentity: hasVerifiedIdentity(req),
+          priceOverrides: new Map(quotes.map((q) => [q.treatmentId, q.price])),
+        },
       );
+      await this.teamQuotes.markUsed(
+        quotes.flatMap((q) => {
+          const reservation = result.reservations.find(
+            (r) => r.treatmentId === q.treatmentId,
+          );
+          return reservation
+            ? [{ quoteId: q.id, reservationId: reservation.id }]
+            : [];
+        }),
+      );
+      return result;
     } catch (error) {
       throw await this.withAlternatives(error, treatments, dto.scheduledStart);
     }
@@ -272,7 +302,9 @@ export class ConduitBookingToolsController {
         .slice(0, 3)
         .map((day) => ({
           date: day.date,
-          times: day.slots.slice(0, 4).map((slot) => slot.localTime),
+          times: onePerHour(day.slots)
+            .slice(0, 4)
+            .map((slot) => slot.localTime),
         }));
       if (alternatives.length === 0) return error;
       return new AppException(error.code, {
