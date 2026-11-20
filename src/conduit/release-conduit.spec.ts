@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   GUIDANCE_RELEASE,
+  HAIR_PHOTO_RELEASE,
   SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
@@ -268,7 +269,7 @@ describe('entrega de orientación (solo el prompt)', () => {
 
   it('por defecto se usa la entrega más reciente', async () => {
     const state = productionLike();
-    state.prompt = guidance.prompt;
+    state.prompt = loadBaseline(HAIR_PHOTO_RELEASE.id).prompt;
     const { request, writes } = fakeConduit(state);
     const out = await releaseConduit({
       env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
@@ -322,5 +323,43 @@ describe('entrega de orientación (solo el prompt)', () => {
         log: () => undefined,
       }),
     ).rejects.toThrow('No existe la entrega no-existe');
+  });
+});
+
+describe('entrega de la foto del cabello (solo el prompt)', () => {
+  const previous = loadBaseline(HAIR_PHOTO_RELEASE.id);
+
+  it('su foto anterior es el prompt de la entrega de orientación', () => {
+    expect(previous.prompt).not.toBe(loadBaseline(GUIDANCE_RELEASE.id).prompt);
+    expect(previous.prompt).toContain(
+      'pasar_a_persona (motivo: orientación sobre su tratamiento)',
+    );
+    expect(previous.prompt).toContain(
+      'pasar_a_persona (motivo: foto de su cabello).',
+    );
+    expect(previous.prompt).toContain('si tiene un anticipo pendiente');
+    expect(previous.prompt).not.toBe(CONDUIT_BOT_PROMPT_TEMPLATE);
+  });
+
+  it('con el prompt de orientación en producción solo actualiza el prompt', async () => {
+    const state = productionLike();
+    state.prompt = previous.prompt;
+    const { request, writes } = fakeConduit(state);
+    const out = await releaseConduit({
+      manifest: HAIR_PHOTO_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan).toEqual([
+      expect.objectContaining({ kind: 'prompt', state: 'pristine' }),
+    ]);
+    expect(writes).toEqual([
+      {
+        method: 'PUT',
+        path: 'bots/bot/prompts/CONVERSATION',
+        body: { content: CONDUIT_BOT_PROMPT_TEMPLATE },
+      },
+    ]);
   });
 });

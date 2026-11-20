@@ -68,4 +68,49 @@ describe('TeamHandoffService', () => {
     await service.request(team);
     expect(publishAsync).toHaveBeenCalledTimes(2);
   });
+
+  describe('aviso de la foto del cabello', () => {
+    const photo = {
+      ...team,
+      reason: 'Te envió una foto de su cabello para que la examines',
+      summary: 'Vista previa automática, por confirmar al ver la foto.',
+      kind: 'HAIR_PHOTO' as const,
+    };
+    const bot = { ...team, reason: 'foto de su cabello para examinar' };
+
+    it('si la foto llega primero, el traspaso del bot no repite el aviso', async () => {
+      const { service, publishAsync } = build();
+      await service.request(photo);
+      await service.request(bot);
+      expect(publishAsync).toHaveBeenCalledTimes(1);
+      expect(publishAsync.mock.calls[0][1]).toMatchObject({
+        summary: photo.summary,
+      });
+    });
+
+    it('si el bot avisó primero, la vista previa de la foto igual llega', async () => {
+      const { service, publishAsync } = build();
+      await service.request(bot);
+      await service.request(photo);
+      expect(publishAsync).toHaveBeenCalledTimes(2);
+      expect(publishAsync.mock.calls[1][1]).toMatchObject({
+        summary: photo.summary,
+      });
+    });
+
+    it('varias fotos seguidas del mismo chat avisan una vez', async () => {
+      const { service, publishAsync } = build();
+      await service.request(photo);
+      await service.request(photo);
+      expect(publishAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('si no se pudo avisar, no deja bloqueado ni la foto ni el traspaso', async () => {
+      const { service, publishAsync } = build([false]);
+      await service.request(photo);
+      await service.request(photo);
+      await service.request(bot);
+      expect(publishAsync).toHaveBeenCalledTimes(3);
+    });
+  });
 });

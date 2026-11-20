@@ -349,7 +349,12 @@ describe('prompt del asistente de Leonice', () => {
       t.indexOf('Otra imagen puede ser el comprobante'),
     );
     expect(t).toContain('no un comprobante: no registres pago');
-    expect(t).toContain('pasar_a_persona (motivo: foto de su cabello)');
+    expect(t).toContain(
+      'pasar_a_persona (motivo: foto de su cabello para examinar)',
+    );
+    expect(t).toContain(
+      'El sistema ya le envió al equipo una vista previa: no la describas.',
+    );
   });
 
   it('la orientación sobre su propio tratamiento va a una persona; una pregunta general de producto no', () => {
@@ -374,7 +379,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(14100);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(14200);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

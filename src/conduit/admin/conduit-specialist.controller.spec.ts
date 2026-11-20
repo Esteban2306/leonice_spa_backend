@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ValidationPipe } from '@nestjs/common';
+import { HAIR_SPECIALIST_DEFINITION } from '../specialists/hair-photo-specialist';
 import { AppException } from '../../common/errors/app.exception';
 import { ConduitAdminError } from '../client/conduit-api.client';
 import { ConduitSpecialistController } from './conduit-specialist.controller';
@@ -599,7 +600,10 @@ describe('ConduitSpecialistController: fotos del cabello', () => {
             verdict: 'VALID',
             mode: 'SHADOW',
             createdAt: '2026-11-20T10:00:00.000Z',
-            fields: { descripcion: 'Cabello largo castaño, puntas resecas' },
+            fields: {
+              descripcion: 'Cabello largo castaño',
+              senales: 'puntas resecas',
+            },
           },
         ],
       },
@@ -613,7 +617,7 @@ describe('ConduitSpecialistController: fotos del cabello', () => {
         createdAt: '2026-11-20T10:00:00.000Z',
         verdict: 'VALID',
         mode: 'SHADOW',
-        description: 'Cabello largo castaño, puntas resecas',
+        description: 'Cabello largo castaño · puntas resecas',
       },
     ]);
     expect(JSON.stringify(status)).not.toContain('sk-ant');
@@ -719,6 +723,42 @@ describe('ConduitSpecialistController: fotos del cabello', () => {
     expect(order.indexOf(`PATCH specialists/${HAIR}`)).toBeLessThan(
       order.indexOf(`PUT bots/${BOT}/specialists/foto-cabello`),
     );
+  });
+
+  it('un especialista sin tocar se pone al día con la vista previa nueva', async () => {
+    const { controller, admin } = build({
+      'GET specialists/by-key/foto-cabello': hair(),
+      [`GET specialists/${HAIR}`]: {
+        ...hair(),
+        promptTemplate: 'versión anterior',
+        outputSchema: { version: 1, variables: [], uniqueBy: [] },
+        rules: HAIR_SPECIALIST_DEFINITION.rules,
+      },
+      [`PATCH specialists/${HAIR}`]: hair(),
+      [`PUT bots/${BOT}/specialists/foto-cabello`]: { mode: 'ACTIVE' },
+    });
+    await controller.setHairPhotoMode({ mode: 'ACTIVE' });
+    const [patch] = calls(admin, 'PATCH', `specialists/${HAIR}`);
+    expect(patch[2]?.body).toMatchObject({
+      promptTemplate: HAIR_SPECIALIST_DEFINITION.promptTemplate,
+      outputSchema: HAIR_SPECIALIST_DEFINITION.outputSchema,
+    });
+  });
+
+  it('si ya está al día no se crea otra versión', async () => {
+    const { controller, admin } = build({
+      'GET specialists/by-key/foto-cabello': hair(),
+      [`GET specialists/${HAIR}`]: {
+        ...hair(),
+        ...(JSON.parse(JSON.stringify(HAIR_SPECIALIST_DEFINITION)) as Record<
+          string,
+          unknown
+        >),
+      },
+      [`PUT bots/${BOT}/specialists/foto-cabello`]: { mode: 'ACTIVE' },
+    });
+    await controller.setHairPhotoMode({ mode: 'ACTIVE' });
+    expect(calls(admin, 'PATCH', `specialists/${HAIR}`)).toHaveLength(0);
   });
 
   it('si ya tiene reglas no se le cambian', async () => {

@@ -48,6 +48,21 @@ import {
 } from '../specialists/hair-photo-specialist';
 import { HairPhotoStatus, buildHairPhotoStatus } from './hair-photo-status';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) =>
+    isRecord(inner)
+      ? Object.fromEntries(
+          Object.keys(inner)
+            .sort()
+            .map((k) => [k, inner[k]]),
+        )
+      : inner,
+  );
+}
+
 const RECENT_LIMIT = 10;
 const PENDING_LIMIT = 50;
 const DEFAULT_TIMEOUT_MS = 12000;
@@ -265,7 +280,7 @@ export class ConduitSpecialistController {
       if (!created) throw new AppException('CONDUIT_UNAVAILABLE');
       specialist = created;
     } else {
-      await this.ensureHairRules(specialist.id);
+      await this.ensureHairDefinition(specialist.id);
     }
     if (specialist.status !== 'ACTIVE') {
       await this.call('PATCH', `specialists/${specialist.id}`, {
@@ -317,7 +332,7 @@ export class ConduitSpecialistController {
           'El especialista de fotos del cabello no existe todavía: actívalo con tu clave.',
       });
     }
-    if (body.mode !== 'OFF') await this.ensureHairRules(specialist.id);
+    if (body.mode !== 'OFF') await this.ensureHairDefinition(specialist.id);
     return this.bindHairPhoto(specialist.id, body.mode);
   }
 
@@ -365,22 +380,31 @@ export class ConduitSpecialistController {
     );
   }
 
-  private async ensureHairRules(specialistId: string): Promise<void> {
+  private async ensureHairDefinition(specialistId: string): Promise<void> {
     const current = await this.call<Record<string, unknown>>(
       'GET',
       `specialists/${specialistId}`,
     );
-    const rules =
-      current && typeof current.rules === 'object' && current.rules !== null
-        ? (current.rules as { rules?: unknown }).rules
-        : undefined;
-    if (Array.isArray(rules) && rules.length > 0) return;
+    const wanted = HAIR_SPECIALIST_DEFINITION;
+    const rules = isRecord(current?.rules) ? current.rules.rules : undefined;
+    const untouched =
+      !Array.isArray(rules) ||
+      rules.length === 0 ||
+      canonical(current?.rules) === canonical(wanted.rules);
+    if (!untouched) return;
+    if (
+      current?.promptTemplate === wanted.promptTemplate &&
+      canonical(current?.outputSchema) === canonical(wanted.outputSchema) &&
+      canonical(current?.rules) === canonical(wanted.rules)
+    ) {
+      return;
+    }
     await this.call('PATCH', `specialists/${specialistId}`, {
       body: {
-        promptTemplate: HAIR_SPECIALIST_DEFINITION.promptTemplate,
-        outputSchema: HAIR_SPECIALIST_DEFINITION.outputSchema,
-        rules: HAIR_SPECIALIST_DEFINITION.rules,
-        changeNote: 'Regla es_cabello para poder avisar al equipo',
+        promptTemplate: wanted.promptTemplate,
+        outputSchema: wanted.outputSchema,
+        rules: wanted.rules,
+        changeNote: 'Vista previa del cabello y regla es_cabello',
       },
     });
   }

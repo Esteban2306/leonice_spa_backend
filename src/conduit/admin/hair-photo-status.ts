@@ -25,7 +25,7 @@ export interface HairPhotoStatus {
 }
 
 const MODES: readonly string[] = ['OFF', 'SHADOW', 'ACTIVE'];
-const MAX_DESCRIPTION = 160;
+const MAX_DESCRIPTION = 400;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -44,7 +44,10 @@ function bindingMode(bindings: unknown): VerificationMode | null {
 function toRecentHairPhoto(value: unknown): RecentHairPhoto | null {
   if (!isRecord(value) || typeof value.id !== 'string') return null;
   const fields = isRecord(value.fields) ? value.fields : {};
-  const description = text(fields.descripcion);
+  const description =
+    [text(fields.descripcion), text(fields.senales)]
+      .filter(Boolean)
+      .join(' · ') || null;
   return {
     id: value.id,
     createdAt: text(value.createdAt),
