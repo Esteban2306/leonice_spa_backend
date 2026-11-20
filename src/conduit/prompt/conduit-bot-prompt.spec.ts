@@ -369,6 +369,12 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain('si trae teamPricesInChat');
   });
 
+  it('si hay horarios especiales configurados, los informa cuando preguntan', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('Si "Datos del negocio" trae horarios_especiales');
+    expect(t).toContain('para agendar, igual consulta los cupos');
+  });
+
   it('un comprobante sin anticipo pendiente no se registra: va a una persona', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
@@ -415,7 +421,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(15300);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(15600);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

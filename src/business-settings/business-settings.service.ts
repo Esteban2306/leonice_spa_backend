@@ -4,6 +4,9 @@ import { UpdateBusinessSettingsDto } from './dto/update-business-settings.dto';
 import { EventBusService } from '../common/events/event.service';
 import { EVENT_TYPES } from '../common/events/constants/event.types';
 import { BUSINESS_DAY_NAMES, buildBotBusinessInfo } from './business-info';
+import { SPECIAL_HOURS_HORIZON_DAYS } from './special-hours';
+import { getCalendarDayKey } from '../reservations/domain/calendar-day-key';
+import { toOverrideWindows } from '../reservations/repositories/operating-schedule.repository';
 
 const SETTINGS_ID = 'default';
 const DAY_NAMES = BUSINESS_DAY_NAMES;
@@ -81,7 +84,10 @@ export class BusinessSettingsService {
    */
   async forBot() {
     const now = new Date();
-    const [settings, windows, events] = await Promise.all([
+    const today = getCalendarDayKey(now);
+    const horizon = new Date(`${today}T00:00:00.000Z`);
+    horizon.setUTCDate(horizon.getUTCDate() + SPECIAL_HOURS_HORIZON_DAYS);
+    const [settings, windows, events, overrides] = await Promise.all([
       this.get(),
       this.prisma.client.operatingWindow.findMany({
         orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
@@ -91,7 +97,24 @@ export class BusinessSettingsService {
         orderBy: { endsAt: 'asc' },
         select: { name: true, description: true, prizes: true, endsAt: true },
       }),
+      this.prisma.client.scheduleDayOverride.findMany({
+        where: {
+          date: { gte: new Date(`${today}T00:00:00.000Z`), lte: horizon },
+        },
+        orderBy: { date: 'asc' },
+        select: { date: true, windows: true, startMinutes: true, reason: true },
+      }),
     ]);
-    return buildBotBusinessInfo(settings, windows, events);
+    return buildBotBusinessInfo(
+      settings,
+      windows,
+      events,
+      overrides.map((row) => ({
+        dayKey: row.date.toISOString().slice(0, 10),
+        windows: toOverrideWindows(row.windows),
+        startMinutes: row.startMinutes,
+        reason: row.reason,
+      })),
+    );
   }
 }

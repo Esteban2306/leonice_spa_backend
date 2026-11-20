@@ -1,3 +1,5 @@
+import { describeSpecialHours, type SpecialHoursRow } from './special-hours';
+
 export const BUSINESS_DAY_NAMES = [
   'domingo',
   'lunes',
@@ -56,6 +58,7 @@ export function buildBotBusinessInfo(
   settings: BusinessSettingsRow,
   windows: readonly OperatingWindowRow[],
   events: readonly ActiveEventRow[] = [],
+  specialHours: readonly SpecialHoursRow[] = [],
 ) {
   const weeklySchedule = BUSINESS_DAY_NAMES.map((day, dayOfWeek) => {
     const ranges = windows
@@ -80,6 +83,7 @@ export function buildBotBusinessInfo(
     assessmentOffer: settings.assessmentOffer?.trim() || null,
     timeZone: 'America/Bogota',
     weeklySchedule,
+    specialHours: describeSpecialHours(specialHours),
     activeEvents: events.map((event) => ({
       name: event.name,
       description: event.description,
@@ -106,6 +110,7 @@ export function businessInfoEventPayload(info: BotBusinessInfo) {
     additional_info: info.additionalInfo ?? '',
     assessment_offer: info.assessmentOffer ?? '',
     schedule: info.weeklySchedule.map((d) => `${d.day} ${d.hours}`).join('; '),
+    special_hours: info.specialHours,
     active_events: info.activeEvents
       .map(
         (event) =>
@@ -125,5 +130,6 @@ export const BUSINESS_INFO_MAPPING_RULES: Record<string, string> = {
   additional_info: 'negocio.informacion_adicional',
   assessment_offer: 'negocio.valoracion',
   schedule: 'negocio.horario',
+  special_hours: 'negocio.horarios_especiales',
   active_events: 'negocio.eventos_vigentes',
 };

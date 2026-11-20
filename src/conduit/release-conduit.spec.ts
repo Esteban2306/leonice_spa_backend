@@ -280,6 +280,7 @@ describe('entrega de orientación (solo el prompt)', () => {
     expect(out.plan.map((p) => [p.name, p.state])).toEqual([
       ['guardar_precio_del_equipo', 'new'],
       ['prompt de conversación', 'pristine'],
+      ['business.info.updated', 'customized'],
     ]);
   });
 
@@ -387,7 +388,7 @@ describe('entrega de la foto del cabello y la valoración (prompt y mapeo)', () 
   });
 });
 
-describe('entrega del precio del equipo (herramienta y prompt)', () => {
+describe('entrega del precio del equipo y los horarios especiales', () => {
   const previous = loadBaseline(TEAM_PRICE_RELEASE.id);
 
   it('su foto anterior es el prompt de la entrega de la foto del cabello y la valoración', () => {
@@ -398,9 +399,10 @@ describe('entrega del precio del equipo (herramienta y prompt)', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('guardar_precio_del_equipo');
   });
 
-  it('crea la herramienta activa con su ruta pública y actualiza el prompt', async () => {
+  it('crea la herramienta activa, actualiza el prompt y agrega los horarios especiales al mapeo', async () => {
     const state = productionLike();
     state.prompt = previous.prompt;
+    state.mapping.rules = previous.mappingRules;
     const { request, writes } = fakeConduit(state);
     await releaseConduit({
       manifest: TEAM_PRICE_RELEASE,
@@ -411,7 +413,13 @@ describe('entrega del precio del equipo (herramienta y prompt)', () => {
     expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
       'POST bots/bot/tools',
       'PUT bots/bot/prompts/CONVERSATION',
+      'POST api/external-data/bot/mappings/business.info.updated',
     ]);
+    expect(writes[2].body).toMatchObject({
+      rules: expect.objectContaining({
+        special_hours: 'negocio.horarios_especiales',
+      }) as unknown,
+    });
     expect(writes[0].body).toMatchObject({
       name: 'guardar_precio_del_equipo',
       endpointUrl: 'https://spa/api/v1/conduit/team-quotes',

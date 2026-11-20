@@ -76,12 +76,12 @@ export const HAIR_PHOTO_RELEASE: ReleaseManifest = {
 };
 
 export const TEAM_PRICE_RELEASE: ReleaseManifest = {
-  id: '2026-11-21-precio-equipo',
+  id: '2026-11-21-precio-y-horarios',
   intents: [],
   tools: ['guardar_precio_del_equipo'],
   templates: [],
   prompt: true,
-  mapping: false,
+  mapping: true,
   retiredVariables: [],
   strayIntents: [],
 };

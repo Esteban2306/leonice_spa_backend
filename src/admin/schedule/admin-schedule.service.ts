@@ -290,6 +290,9 @@ export class AdminScheduleService {
       extended.push(...dayExtended);
     }
 
+    this.eventBus.publish(EVENT_TYPES.BUSINESS_INFO_CHANGED, {
+      source: 'schedule',
+    });
     return {
       overrides: await this.listOverrides({
         from: dayKeys[0],
