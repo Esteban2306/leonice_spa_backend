@@ -268,24 +268,25 @@ describe('entrega de orientación (solo el prompt)', () => {
   const guidance = loadBaseline(GUIDANCE_RELEASE.id);
 
   it('por defecto se usa la entrega más reciente', async () => {
+    const latest = loadBaseline(HAIR_PHOTO_RELEASE.id);
     const state = productionLike();
-    state.prompt = loadBaseline(HAIR_PHOTO_RELEASE.id).prompt;
+    state.prompt = latest.prompt;
+    state.mapping.rules = latest.mappingRules;
     const { request, writes } = fakeConduit(state);
     const out = await releaseConduit({
       env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
       request: request as never,
       log: () => undefined,
     });
-    expect(out.plan).toEqual([
-      expect.objectContaining({ kind: 'prompt', state: 'pristine' }),
+    expect(out.plan.map((p) => [p.kind, p.state])).toEqual([
+      ['prompt', 'pristine'],
+      ['mapeo', 'pristine'],
     ]);
-    expect(writes).toEqual([
-      {
-        method: 'PUT',
-        path: 'bots/bot/prompts/CONVERSATION',
-        body: { content: CONDUIT_BOT_PROMPT_TEMPLATE },
-      },
-    ]);
+    expect(writes[0]).toEqual({
+      method: 'PUT',
+      path: 'bots/bot/prompts/CONVERSATION',
+      body: { content: CONDUIT_BOT_PROMPT_TEMPLATE },
+    });
   });
 
   it('su foto anterior es el prompt de la entrega Sofía y el nuevo lo cambia', () => {
@@ -326,7 +327,7 @@ describe('entrega de orientación (solo el prompt)', () => {
   });
 });
 
-describe('entrega de la foto del cabello (solo el prompt)', () => {
+describe('entrega de la foto del cabello y la valoración (prompt y mapeo)', () => {
   const previous = loadBaseline(HAIR_PHOTO_RELEASE.id);
 
   it('su foto anterior es el prompt de la entrega de orientación', () => {
@@ -341,9 +342,17 @@ describe('entrega de la foto del cabello (solo el prompt)', () => {
     expect(previous.prompt).not.toBe(CONDUIT_BOT_PROMPT_TEMPLATE);
   });
 
-  it('con el prompt de orientación en producción solo actualiza el prompt', async () => {
+  it('su foto anterior del mapeo es la de producción, sin la valoración', () => {
+    expect(previous.mappingRules).not.toHaveProperty('assessment_offer');
+    expect(BUSINESS_INFO_MAPPING_RULES.assessment_offer).toBe(
+      'negocio.valoracion',
+    );
+  });
+
+  it('con lo de producción actualiza solo el prompt y el mapeo', async () => {
     const state = productionLike();
     state.prompt = previous.prompt;
+    state.mapping.rules = previous.mappingRules;
     const { request, writes } = fakeConduit(state);
     const out = await releaseConduit({
       manifest: HAIR_PHOTO_RELEASE,
@@ -353,13 +362,32 @@ describe('entrega de la foto del cabello (solo el prompt)', () => {
     });
     expect(out.plan).toEqual([
       expect.objectContaining({ kind: 'prompt', state: 'pristine' }),
+      expect.objectContaining({
+        name: 'business.info.updated',
+        state: 'pristine',
+      }),
     ]);
-    expect(writes).toEqual([
-      {
-        method: 'PUT',
-        path: 'bots/bot/prompts/CONVERSATION',
-        body: { content: CONDUIT_BOT_PROMPT_TEMPLATE },
-      },
+    expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
+      'PUT bots/bot/prompts/CONVERSATION',
+      'POST api/external-data/bot/mappings/business.info.updated',
     ]);
+    expect(writes[0].body).toEqual({ content: CONDUIT_BOT_PROMPT_TEMPLATE });
+    expect(writes[1].body).toMatchObject({
+      rules: BUSINESS_INFO_MAPPING_RULES,
+    });
+  });
+
+  it('un mapeo editado en el panel no se toca', async () => {
+    const state = productionLike();
+    state.prompt = previous.prompt;
+    state.mapping.rules = { address: 'negocio.mi_direccion' };
+    const { request, writes } = fakeConduit(state);
+    await releaseConduit({
+      manifest: HAIR_PHOTO_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(writes.some((w) => w.path.includes('/mappings/'))).toBe(false);
   });
 });

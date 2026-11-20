@@ -65,12 +65,12 @@ export const GUIDANCE_RELEASE: ReleaseManifest = {
 };
 
 export const HAIR_PHOTO_RELEASE: ReleaseManifest = {
-  id: '2026-11-20-foto-cabello',
+  id: '2026-11-20-foto-cabello-valoracion',
   intents: [],
   tools: [],
   templates: [],
   prompt: true,
-  mapping: false,
+  mapping: true,
   retiredVariables: [],
   strayIntents: [],
 };

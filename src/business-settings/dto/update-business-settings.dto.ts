@@ -42,6 +42,12 @@ export class UpdateBusinessSettingsDto {
   @MaxLength(2000)
   additionalInfo?: string | null;
 
+  /** Lo que el bot dice de la valoración capilar; vacío = no la menciona. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  assessmentOffer?: string | null;
+
   @IsOptional()
   @IsString()
   @MaxLength(30)

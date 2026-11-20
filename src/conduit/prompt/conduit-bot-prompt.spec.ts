@@ -357,6 +357,30 @@ describe('prompt del asistente de Leonice', () => {
     );
   });
 
+  it('un comprobante sin anticipo pendiente no se registra: va a una persona', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain(
+      'sin anticipo pendiente, un comprobante es de otro pago (saldo, producto, deuda): no llames registrar_comprobante_automatico',
+    );
+    expect(t).toContain(
+      'pasar_a_persona (motivo: comprobante de un pago que no es anticipo)',
+    );
+    expect(t.indexOf('sin anticipo pendiente, un comprobante')).toBeLessThan(
+      t.indexOf('· VALID, NEEDS_REVIEW, ERROR'),
+    );
+  });
+
+  it('la valoración y lo gratis solo se dicen si el administrador lo configuró', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('solo si "Datos del negocio" trae valoracion');
+    expect(t).toContain(
+      'Nunca digas que algo es gratis o sin costo si no lo dice "Datos del negocio" o una herramienta.',
+    );
+    expect(t.toLowerCase()).not.toMatch(
+      /valoraci[oó]n (es )?gratis|no tiene costo/,
+    );
+  });
+
   it('la orientación sobre su propio tratamiento va a una persona; una pregunta general de producto no', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
@@ -379,7 +403,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(14200);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(14800);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
