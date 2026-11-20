@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ReservationChannel } from '@prisma/client';
 import { AppException } from '../common/errors/app.exception';
+import { onePerHour, onePerHourByDay } from './tools/bot-slots';
 import { ConduitTool } from './decorators/conduit-tool.decorator';
 import { VerifiedPhone } from './decorators/verified-phone.decorator';
 import {
@@ -118,7 +119,11 @@ export class ConduitBookingToolsController {
       query.treatmentId,
       query.date,
     );
-    return { treatmentId: query.treatmentId, date: query.date, slots };
+    return {
+      treatmentId: query.treatmentId,
+      date: query.date,
+      slots: onePerHour(slots),
+    };
   }
 
   /**
@@ -127,8 +132,10 @@ export class ConduitBookingToolsController {
    */
   @ConduitToolOptionsMeta({ publicData: true })
   @Get('availability/calendar')
-  getAvailabilityCalendar(@Query() query: GetAvailabilityCalendarDto) {
-    return this.reservationsService.getAvailabilityCalendar(query);
+  async getAvailabilityCalendar(@Query() query: GetAvailabilityCalendarDto) {
+    const calendar =
+      await this.reservationsService.getAvailabilityCalendar(query);
+    return { ...calendar, days: onePerHourByDay(calendar.days) };
   }
 
   @Post('reservations')
@@ -295,7 +302,9 @@ export class ConduitBookingToolsController {
         .slice(0, 3)
         .map((day) => ({
           date: day.date,
-          times: day.slots.slice(0, 4).map((slot) => slot.localTime),
+          times: onePerHour(day.slots)
+            .slice(0, 4)
+            .map((slot) => slot.localTime),
         }));
       if (alternatives.length === 0) return error;
       return new AppException(error.code, {

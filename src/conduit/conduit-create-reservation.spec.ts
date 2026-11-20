@@ -159,13 +159,24 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
       date,
       available: times.length > 0,
       reason: null,
-      slots: times.map((t) => ({ iso: `${date}T${t}`, localTime: t })),
+      slots: times.map((t) => ({
+        iso: new Date(`${date}T${t.padStart(5, '0')}:00-05:00`).toISOString(),
+        localTime: t,
+      })),
     });
 
-    it('el error lleva los próximos horarios libres (máx. 3 días y 4 horas por día)', async () => {
+    it('el error lleva los próximos horarios libres (máx. 3 días y 4 horas por día, una por hora)', async () => {
       const { controller, getAvailabilityCalendar } = withCalendar([
         day('2026-11-02', []),
-        day('2026-11-03', ['9:00', '9:30', '10:00', '10:30', '11:00']),
+        day('2026-11-03', [
+          '9:00',
+          '9:30',
+          '10:00',
+          '10:30',
+          '11:00',
+          '12:00',
+          '13:00',
+        ]),
         day('2026-11-04', ['8:00']),
         day('2026-11-05', ['2:00']),
         day('2026-11-06', ['3:00']),
@@ -178,7 +189,7 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
       expect((error as AppException).details).toMatchObject({
         date: '2026-11-02',
         alternatives: [
-          { date: '2026-11-03', times: ['9:00', '9:30', '10:00', '10:30'] },
+          { date: '2026-11-03', times: ['9:00', '10:00', '11:00', '12:00'] },
           { date: '2026-11-04', times: ['8:00'] },
           { date: '2026-11-05', times: ['2:00'] },
         ],
