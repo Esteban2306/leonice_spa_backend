@@ -28,9 +28,10 @@ import { OperatingScheduleService } from '../service/operating-schedule.service'
 import { generateAvailableSlots } from '../domain/availability-calculator';
 import { minuteOfDay } from '../domain/operating-hours';
 import {
-  sequenceComboTreatments,
+  scheduleComboTreatments,
   TreatmentTimingInput,
-} from '../domain/sequence-combo-treatments';
+} from '../domain/schedule-combo-treatments';
+import { formatLocalTime } from '../domain/format-local-time';
 import {
   overlapsAny,
   latestConflictEnd,
@@ -128,7 +129,7 @@ export class CreateReservationOrchestrator {
       };
     });
 
-    const draftSegments = sequenceComboTreatments(timingInputs, requestedStart);
+    const draftSegments = scheduleComboTreatments(timingInputs, requestedStart);
     const comboGroupId = draftSegments.length > 1 ? randomUUID() : null;
 
     const categoryIds = [...new Set(treatments.map((t) => t.categoryId))];
@@ -163,26 +164,29 @@ export class CreateReservationOrchestrator {
               (t) => t.id === draft.treatmentId,
             )!;
 
-            const conflictIntervals: TimeInterval[] = [
-              ...existingIntervals,
-              ...created.map((r) => ({
-                start: r.scheduledStart,
-                end: r.scheduledEnd,
-              })),
-            ];
-
-            const placement = await this.resolvePlacement({
-              tx,
-              clientId: client.id,
-              categoryId: draft.categoryId,
-              categoryName: draft.categoryName,
-              durationMinutes: draft.durationMinutes,
-              idealStart: draft.scheduledStart,
-              dayStart,
-              dayEnd,
-              conflictIntervals,
-              firstSegment: index === 0,
-            });
+            const placement =
+              index === 0 || comboGroupId === null
+                ? await this.resolvePlacement({
+                    tx,
+                    clientId: client.id,
+                    categoryId: draft.categoryId,
+                    categoryName: draft.categoryName,
+                    durationMinutes: draft.durationMinutes,
+                    idealStart: draft.scheduledStart,
+                    dayStart,
+                    dayEnd,
+                    conflictIntervals: existingIntervals,
+                    firstSegment: true,
+                  })
+                : await this.placeAlongside({
+                    tx,
+                    clientId: client.id,
+                    categoryId: draft.categoryId,
+                    categoryName: draft.categoryName,
+                    durationMinutes: draft.durationMinutes,
+                    start: created[0].scheduledStart,
+                    comboGroupId,
+                  });
 
             const hasCategoryConflict =
               await this.reservationsRepository.hasActiveReservationInCategoryOnDay(
@@ -297,6 +301,48 @@ export class CreateReservationOrchestrator {
       summary: buildBookingSummary(resolvedSegments),
       creditAppliedReservationIds: creditAppliedIds,
     };
+  }
+
+  private async placeAlongside(params: {
+    tx: Prisma.TransactionClient;
+    clientId: string;
+    categoryId: string;
+    categoryName: string;
+    durationMinutes: number;
+    start: Date;
+    comboGroupId: string;
+  }): Promise<{
+    scheduledStart: Date;
+    scheduledEnd: Date;
+    wasAdjusted: boolean;
+    adjustmentReason?: string;
+  }> {
+    const { tx, clientId, categoryId, categoryName, start, comboGroupId } =
+      params;
+    const end = new Date(start.getTime() + params.durationMinutes * 60_000);
+    const decision = await this.placementCheck.evaluate(tx, {
+      clientId,
+      categoryId,
+      start,
+      end,
+      comboGroupId,
+    });
+    if (decision.ok) {
+      return { scheduledStart: start, scheduledEnd: end, wasAdjusted: false };
+    }
+    if (decision.reason === 'CATEGORY_DAY_CONFLICT') {
+      assertNoSameDayCategoryConflict(categoryName, true);
+    }
+    if (
+      decision.reason === 'NO_CAPACITY' ||
+      decision.reason === 'OUTSIDE_OPERATING_HOURS'
+    ) {
+      throw new AppException('PLACEMENT_NO_SLOT_THAT_DAY', {
+        message: `No hay cupo para ${categoryName} a las ${formatLocalTime(start)}, a la misma hora que el resto del combo. Elige otra hora.`,
+        details: { categoryId, date: getCalendarDayKey(start) },
+      });
+    }
+    throw placementRejectionException(decision.reason);
   }
 
   private async resolvePlacement(params: {

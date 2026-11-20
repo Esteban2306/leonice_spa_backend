@@ -82,7 +82,7 @@ describe('Horario especial de una fecha (horarios de diciembre)', () => {
     expect(created[0].scheduledStart.getMinutes()).toBe(0);
   });
 
-  it('en un combo solo el primer servicio empieza a una hora fija; el siguiente va enseguida', async () => {
+  it('en un combo todos los servicios empiezan a la hora fija, al mismo tiempo', async () => {
     const { reservations: created } = await create.execute({
       client: newClientDto('combo'),
       treatments: [
@@ -95,7 +95,7 @@ describe('Horario especial de una fecha (horarios de diciembre)', () => {
       .map((r) => r.scheduledStart)
       .sort((a, b) => a.getTime() - b.getTime())
       .map((d) => `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`);
-    expect(starts).toEqual(['14:00', '15:00']);
+    expect(starts).toEqual(['14:00', '14:00']);
   });
 
   it('no deja cerrar una fecha que ya tiene reservas dentro', async () => {

@@ -15,6 +15,7 @@ export interface PlacementCheckParams {
   start: Date;
   end: Date;
   excludeReservationId?: string;
+  comboGroupId?: string | null;
   now?: Date;
 }
 
@@ -53,6 +54,7 @@ export class PlacementCheckService {
         dayEnd,
         tx,
         excludeReservationId,
+        params.comboGroupId ?? undefined,
       );
     const hasCategoryDayConflict =
       await this.reservationsRepository.hasActiveReservationInCategoryOnDay(

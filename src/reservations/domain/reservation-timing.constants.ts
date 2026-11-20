@@ -1,4 +1,4 @@
-export const MIN_ADVANCE_DAYS = 1;
+export const MIN_LEAD_MINUTES = 30;
 export const MAX_ADVANCE_DAYS = 90;
 
 export const VALORACION_TIMEOUT_MS = 30 * 60 * 1000;

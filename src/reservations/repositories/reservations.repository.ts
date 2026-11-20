@@ -463,6 +463,7 @@ export class ReservationsRepository {
     dayEnd: Date,
     client: PrismaClientOrTx = this.prisma.client,
     excludeReservationId?: string,
+    excludeComboGroupId?: string,
   ): Promise<{ start: Date; end: Date }[]> {
     const rows = await client.reservation.findMany({
       where: {
@@ -471,6 +472,14 @@ export class ReservationsRepository {
         scheduledStart: { lt: dayEnd },
         scheduledEnd: { gt: dayStart },
         ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
+        ...(excludeComboGroupId
+          ? {
+              OR: [
+                { comboGroupId: null },
+                { NOT: { comboGroupId: excludeComboGroupId } },
+              ],
+            }
+          : {}),
       },
       select: { scheduledStart: true, scheduledEnd: true },
     });

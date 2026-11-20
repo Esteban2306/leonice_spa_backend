@@ -75,6 +75,7 @@ export class ReservationRescheduler {
           start: newScheduledStart,
           end: newScheduledEnd,
           excludeReservationId: current.id,
+          comboGroupId: current.comboGroupId,
         });
         if (!decision.ok) throw placementRejectionException(decision.reason);
 

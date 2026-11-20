@@ -13,7 +13,7 @@ describe('findComboStarts', () => {
     ).toEqual([at(9), at(10)]);
   });
 
-  it('el combo solo cabe si cada servicio siguiente empieza donde termina el anterior', () => {
+  it('el combo cabe donde todos los servicios tienen cupo a la misma hora, porque se hacen al mismo tiempo', () => {
     const starts = findComboStarts(
       [
         { durationMinutes: 60, slotIsos: [at(8), at(9), at(10)] },
@@ -21,7 +21,7 @@ describe('findComboStarts', () => {
       ],
       new Date(at(0)),
     );
-    expect(starts).toEqual([at(8)]);
+    expect(starts).toEqual([at(9)]);
   });
 
   it('sin horarios del segundo servicio el día no tiene combo', () => {

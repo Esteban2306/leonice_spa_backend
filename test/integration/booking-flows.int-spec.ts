@@ -107,8 +107,8 @@ describe('1. Flujos de reserva de principio a fin', () => {
       expect(await prisma.client.reservation.count()).toBe(before);
     });
 
-    it('rechaza fechas con menos de 1 día o más de 90 días de anticipación', async () => {
-      const soon = new Date(Date.now() + 2 * 3_600_000);
+    it('rechaza fechas con menos de 30 minutos o más de 90 días de anticipación', async () => {
+      const soon = new Date(Date.now() + 10 * 60_000);
       await expect(
         create.execute({
           client: newClientDto(),
@@ -149,7 +149,7 @@ describe('1. Flujos de reserva de principio a fin', () => {
   });
 
   describe('combos', () => {
-    it('encadena principal + secundario con el mismo comboGroupId, sin cruces y con un solo plazo', async () => {
+    it('principal + secundario empiezan a la misma hora, con el mismo comboGroupId y un solo plazo', async () => {
       const client = newClientDto('combo');
       const start = futureSlot(6, 9);
       const { reservations } = await create.execute({
@@ -165,9 +165,7 @@ describe('1. Flujos de reserva de principio a fin', () => {
       const [first, second] = reservations;
       expect(first.categoryId).toBe(world.principal.categoryId);
       expect(first.scheduledStart.getTime()).toBe(start.getTime());
-      expect(second.scheduledStart.getTime()).toBe(
-        first.scheduledEnd.getTime(),
-      );
+      expect(second.scheduledStart.getTime()).toBe(start.getTime());
       expect(first.comboGroupId).not.toBeNull();
       expect(second.comboGroupId).toBe(first.comboGroupId);
       expect(first.depositExpiresAt?.getTime()).toBe(
@@ -176,7 +174,7 @@ describe('1. Flujos de reserva de principio a fin', () => {
       expect(Number(first.finalPrice) + Number(second.finalPrice)).toBe(170000);
     });
 
-    it('combo de tres categorías queda contiguo y sin solapes', async () => {
+    it('combo de tres categorías: los tres servicios empiezan a la misma hora', async () => {
       const { reservations } = await create.execute({
         client: newClientDto('combo3'),
         treatments: [
@@ -187,10 +185,9 @@ describe('1. Flujos de reserva de principio a fin', () => {
         scheduledStart: futureSlot(7, 9).toISOString(),
       });
       expect(reservations).toHaveLength(3);
-      for (let i = 1; i < reservations.length; i++) {
-        expect(reservations[i].scheduledStart.getTime()).toBe(
-          reservations[i - 1].scheduledEnd.getTime(),
-        );
+      const start = futureSlot(7, 9).getTime();
+      for (const reservation of reservations) {
+        expect(reservation.scheduledStart.getTime()).toBe(start);
       }
     });
 
