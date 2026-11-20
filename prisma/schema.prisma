@@ -171,11 +171,34 @@ model Treatment {
   hairColorSurcharges     TreatmentHairColorSurcharge[]
   hairLengthPricing       TreatmentHairLengthPricing[]
   recommendations         TreatmentProductRecommendation[]
+  teamQuotes              TeamQuote[]
   category                Category                         @relation(fields: [categoryId], references: [id])
 
   @@unique([categoryId, name])
   @@unique([categoryId, slug])
   @@map("treatments")
+}
+
+/// Precio que una persona del equipo le dio a una clienta en el chat de
+/// WhatsApp para un servicio de precio variable. Se verifica contra el
+/// mensaje real del equipo y se aplica al agendar ese servicio.
+model TeamQuote {
+  id            String    @id @default(uuid())
+  phone         String
+  treatmentId   String    @map("treatment_id")
+  amount        Decimal   @db.Decimal(10, 2)
+  sourceText    String    @map("source_text") @db.Text
+  quotedAt      DateTime  @map("quoted_at")
+  expiresAt     DateTime  @map("expires_at")
+  usedAt        DateTime? @map("used_at")
+  reservationId String?   @map("reservation_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  treatment     Treatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+
+  @@unique([phone, treatmentId])
+  @@index([phone])
+  @@map("team_quotes")
 }
 
 model TreatmentStep {

@@ -23,6 +23,7 @@ import { ConduitUpdateClientDto } from './dto/conduit-update-client.dto';
 import { ConduitCreateClientDto } from './dto/conduit-create-client.dto';
 import { ConsentService } from 'src/clients/consent/consent.service';
 import { toBotClient } from './tools/bot-client-view';
+import { TeamQuoteService, toBotTeamQuote } from './quotes/team-quote.service';
 
 @Controller({ path: 'conduit/clients', version: '1' })
 @ConduitTool()
@@ -31,6 +32,7 @@ export class ConduitToolsController {
     private readonly clientsRepository: ClientsRepository,
     private readonly clientsService: ClientsService,
     private readonly consentService: ConsentService,
+    private readonly teamQuotes: TeamQuoteService,
   ) {}
 
   @Get('me')
@@ -39,10 +41,14 @@ export class ConduitToolsController {
     const client = phone
       ? await this.clientsRepository.findByPhone(phone)
       : null;
-    const termsAccepted = client
-      ? await this.consentService.hasTermsConsent(client.id)
-      : false;
-    return toBotClient(client, termsAccepted);
+    const [termsAccepted, quotes] = await Promise.all([
+      client ? this.consentService.hasTermsConsent(client.id) : false,
+      phone ? this.teamQuotes.activeFor(phone) : [],
+    ]);
+    const view = toBotClient(client, termsAccepted);
+    return quotes.length > 0
+      ? { ...view, teamQuotes: quotes.map(toBotTeamQuote) }
+      : view;
   }
 
   @Post()

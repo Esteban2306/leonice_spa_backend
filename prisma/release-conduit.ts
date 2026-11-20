@@ -75,10 +75,22 @@ export const HAIR_PHOTO_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const TEAM_PRICE_RELEASE: ReleaseManifest = {
+  id: '2026-11-21-precio-equipo',
+  intents: [],
+  tools: ['guardar_precio_del_equipo'],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
   HAIR_PHOTO_RELEASE,
+  TEAM_PRICE_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

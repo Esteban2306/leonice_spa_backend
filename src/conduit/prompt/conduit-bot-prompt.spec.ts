@@ -357,6 +357,17 @@ describe('prompt del asistente de Leonice', () => {
     );
   });
 
+  it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain(
+      '"[Persona del equipo]" marca lo que escribió alguien del equipo',
+    );
+    expect(t).toContain('nunca escribas esa marca');
+    expect(t).toContain('guardar_precio_del_equipo con ese servicio y precio');
+    expect(t).toContain('y si no, no lo uses');
+    expect(t).toContain('Si consultar_cliente trae teamQuotes');
+  });
+
   it('un comprobante sin anticipo pendiente no se registra: va a una persona', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
@@ -403,7 +414,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(14800);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(15300);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

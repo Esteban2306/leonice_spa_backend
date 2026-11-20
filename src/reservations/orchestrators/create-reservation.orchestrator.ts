@@ -49,6 +49,10 @@ import { applyPromotionDiscount } from 'src/clients/domain/compute-treatment-pri
 import { DepositCreditService } from '../service/deposit-credit.service';
 import { AppException } from '../../common/errors/app.exception';
 
+export interface CreateReservationOptions extends ResolveClientOptions {
+  priceOverrides?: ReadonlyMap<string, number>;
+}
+
 export interface CreateReservationResult {
   reservations: Reservation[];
   summary: string;
@@ -72,7 +76,7 @@ export class CreateReservationOrchestrator {
 
   async execute(
     dto: CreateReservationDto,
-    options: ResolveClientOptions = { trustedIdentity: false },
+    options: CreateReservationOptions = { trustedIdentity: false },
   ): Promise<CreateReservationResult> {
     const client = await this.clientService.resolveOrCreateForBooking(
       dto.client,
@@ -110,6 +114,7 @@ export class CreateReservationOrchestrator {
         categoryId: t.categoryId,
       });
       const finalPricing = applyPromotionDiscount(pricing, promo);
+      const agreedPrice = options.priceOverrides?.get(t.id);
       return {
         treatmentId: t.id,
         treatmentName: t.name,
@@ -117,7 +122,7 @@ export class CreateReservationOrchestrator {
         categoryName: t.category.name,
         isPrincipal: t.category.isPrincipal,
         durationMinutes: finalPricing.durationMinutes,
-        price: finalPricing.price,
+        price: agreedPrice ?? finalPricing.price,
         forcesAssessment: t.requiresPriorAssessment || pricing.forcesAssessment,
         needsHairProfile: pricing.needsHairProfile,
       };

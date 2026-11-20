@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   GUIDANCE_RELEASE,
   HAIR_PHOTO_RELEASE,
+  TEAM_PRICE_RELEASE,
   SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
@@ -268,25 +269,18 @@ describe('entrega de orientación (solo el prompt)', () => {
   const guidance = loadBaseline(GUIDANCE_RELEASE.id);
 
   it('por defecto se usa la entrega más reciente', async () => {
-    const latest = loadBaseline(HAIR_PHOTO_RELEASE.id);
     const state = productionLike();
-    state.prompt = latest.prompt;
-    state.mapping.rules = latest.mappingRules;
-    const { request, writes } = fakeConduit(state);
+    state.prompt = loadBaseline(TEAM_PRICE_RELEASE.id).prompt;
+    const { request } = fakeConduit(state);
     const out = await releaseConduit({
-      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      env: env(),
       request: request as never,
       log: () => undefined,
     });
-    expect(out.plan.map((p) => [p.kind, p.state])).toEqual([
-      ['prompt', 'pristine'],
-      ['mapeo', 'pristine'],
+    expect(out.plan.map((p) => [p.name, p.state])).toEqual([
+      ['guardar_precio_del_equipo', 'new'],
+      ['prompt de conversación', 'pristine'],
     ]);
-    expect(writes[0]).toEqual({
-      method: 'PUT',
-      path: 'bots/bot/prompts/CONVERSATION',
-      body: { content: CONDUIT_BOT_PROMPT_TEMPLATE },
-    });
   });
 
   it('su foto anterior es el prompt de la entrega Sofía y el nuevo lo cambia', () => {
@@ -301,6 +295,7 @@ describe('entrega de orientación (solo el prompt)', () => {
     state.prompt = 'Prompt propio del administrador';
     const { request, writes } = fakeConduit(state);
     const out = await releaseConduit({
+      manifest: GUIDANCE_RELEASE,
       env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
       request: request as never,
       log: () => undefined,
@@ -389,5 +384,38 @@ describe('entrega de la foto del cabello y la valoración (prompt y mapeo)', () 
       log: () => undefined,
     });
     expect(writes.some((w) => w.path.includes('/mappings/'))).toBe(false);
+  });
+});
+
+describe('entrega del precio del equipo (herramienta y prompt)', () => {
+  const previous = loadBaseline(TEAM_PRICE_RELEASE.id);
+
+  it('su foto anterior es el prompt de la entrega de la foto del cabello y la valoración', () => {
+    expect(previous.prompt).toContain(
+      'solo si "Datos del negocio" trae valoracion',
+    );
+    expect(previous.prompt).not.toContain('guardar_precio_del_equipo');
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('guardar_precio_del_equipo');
+  });
+
+  it('crea la herramienta activa con su ruta pública y actualiza el prompt', async () => {
+    const state = productionLike();
+    state.prompt = previous.prompt;
+    const { request, writes } = fakeConduit(state);
+    await releaseConduit({
+      manifest: TEAM_PRICE_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
+      'POST bots/bot/tools',
+      'PUT bots/bot/prompts/CONVERSATION',
+    ]);
+    expect(writes[0].body).toMatchObject({
+      name: 'guardar_precio_del_equipo',
+      endpointUrl: 'https://spa/api/v1/conduit/team-quotes',
+      isActive: true,
+    });
   });
 });

@@ -16,7 +16,7 @@ const schemaAt = (
     );
 
 describe('CONDUIT_TOOL_CATALOG', () => {
-  it('trae las 18 herramientas que revisa el panel', () => {
+  it('trae las herramientas que revisa el panel', () => {
     expect(CONDUIT_TOOL_CATALOG.map((t) => t.name).sort()).toEqual(
       [
         'consultar_cliente',
@@ -39,6 +39,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
         'pasar_a_persona',
         'avisar_a_leo',
         'recomendar_para',
+        'guardar_precio_del_equipo',
       ].sort(),
     );
   });

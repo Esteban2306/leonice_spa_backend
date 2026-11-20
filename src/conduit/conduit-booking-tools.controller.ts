@@ -27,6 +27,7 @@ import {
 } from './tools/bot-treatment-view';
 import { matchTreatment } from './tools/treatment-matcher';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
+import { TeamQuoteService } from './quotes/team-quote.service';
 import { ClientsRepository } from '../clients/repositories/clients.repository';
 import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationOrchestrator } from '../reservations/orchestrators/create-reservation.orchestrator';
@@ -58,6 +59,7 @@ export class ConduitBookingToolsController {
     private readonly rescheduleReservation: RescheduleReservationOrchestrator,
     private readonly clientsRepository: ClientsRepository,
     private readonly cancellationLinks: CancellationLinkService,
+    private readonly teamQuotes: TeamQuoteService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -135,16 +137,37 @@ export class ConduitBookingToolsController {
     @Req() req: RequestWithConduitContact,
   ) {
     const treatments = await this.resolveTreatmentIds(dto);
+    const phone = req.conduitContact?.phone;
+    const quotes =
+      phone && hasVerifiedIdentity(req)
+        ? (await this.teamQuotes.activeFor(phone)).filter((q) =>
+            treatments.includes(q.treatmentId),
+          )
+        : [];
     try {
-      return await this.createReservation.execute(
+      const result = await this.createReservation.execute(
         {
           client: dto.client,
           treatments,
           scheduledStart: dto.scheduledStart,
           channel: ReservationChannel.WHATSAPP,
         },
-        { trustedIdentity: hasVerifiedIdentity(req) },
+        {
+          trustedIdentity: hasVerifiedIdentity(req),
+          priceOverrides: new Map(quotes.map((q) => [q.treatmentId, q.price])),
+        },
       );
+      await this.teamQuotes.markUsed(
+        quotes.flatMap((q) => {
+          const reservation = result.reservations.find(
+            (r) => r.treatmentId === q.treatmentId,
+          );
+          return reservation
+            ? [{ quoteId: q.id, reservationId: reservation.id }]
+            : [];
+        }),
+      );
+      return result;
     } catch (error) {
       throw await this.withAlternatives(error, treatments, dto.scheduledStart);
     }

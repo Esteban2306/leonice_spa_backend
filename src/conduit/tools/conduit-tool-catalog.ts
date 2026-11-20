@@ -139,6 +139,34 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
     },
   },
   {
+    name: 'guardar_precio_del_equipo',
+    description:
+      'Guarda el precio que una persona del equipo ([Persona del equipo] en el historial) le dio a esta clienta para un servicio de precio variable. Se verifica contra el mensaje real del equipo y, al agendar ese servicio, se cobra ese precio. Nunca la uses con un precio que dijiste tú o que diga la clienta.',
+    httpMethod: 'POST',
+    path: '/conduit/team-quotes',
+    injectPhoneParamName: 'phone',
+    parametersSchema: {
+      type: 'object',
+      required: ['treatmentName', 'price'],
+      properties: {
+        phone: PHONE,
+        treatmentName: {
+          type: 'string',
+          minLength: 2,
+          maxLength: 80,
+          description: 'El servicio al que se refiere el precio',
+        },
+        price: {
+          type: 'integer',
+          minimum: 10000,
+          maximum: 10000000,
+          description:
+            'El precio que escribió el equipo, en pesos y solo dígitos (350000)',
+        },
+      },
+    },
+  },
+  {
     name: 'info_tratamiento',
     description:
       'Ficha de UN tratamiento por su nombre: qué es, para quién, beneficios, precio (con la aclaración de rango o precio propio), duración y si requiere valoración. Si el nombre es ambiguo devuelve las opciones.',

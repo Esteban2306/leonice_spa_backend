@@ -18,6 +18,8 @@ import { ConduitBookingToolsController } from './conduit-booking-tools.controlle
 import { ReservationsModule } from '../reservations/reservations.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { ConduitSupportToolsController } from './conduit-support-tools.controller';
+import { ConduitTeamQuotesController } from './conduit-team-quotes.controller';
+import { TeamQuoteService } from './quotes/team-quote.service';
 import { ConduitAdminController } from './admin/conduit-admin.controller';
 import { ConduitSpecialistController } from './admin/conduit-specialist.controller';
 import { ConduitVerificationEventsController } from './conduit-verification-events.controller';
@@ -40,11 +42,13 @@ import { ConduitSystemPauseService } from './pause/conduit-system-pause.service'
     ConduitToolsController,
     ConduitBookingToolsController,
     ConduitSupportToolsController,
+    ConduitTeamQuotesController,
     ConduitAdminController,
     ConduitSpecialistController,
     ConduitVerificationEventsController,
   ],
   providers: [
+    TeamQuoteService,
     ConduitApiClient,
     ConduitSystemPauseService,
     ConduitTemplateResolver,
