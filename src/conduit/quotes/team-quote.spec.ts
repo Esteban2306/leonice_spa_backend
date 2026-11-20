@@ -207,3 +207,62 @@ describe('TeamQuoteService.save', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 });
+
+describe('TeamQuoteService.unsavedTeamPrices', () => {
+  const BOT = '11111111-1111-4111-8111-111111111111';
+  const NOW = new Date('2026-11-20T15:00:00Z');
+
+  function build(messages: Array<Record<string, unknown>>, fails = false) {
+    const admin = jest.fn((_method: string, path: string) =>
+      fails
+        ? Promise.reject(new Error('Conduit caído'))
+        : Promise.resolve(
+            path.endsWith('/messages')
+              ? messages
+              : { data: [{ id: 'c1', phoneNumber: '573001112233' }] },
+          ),
+    );
+    return new TeamQuoteService(
+      {} as never,
+      {} as never,
+      { admin } as never,
+      { get: () => BOT } as never,
+    );
+  }
+
+  const team = (content: string) => ({
+    direction: 'OUTBOUND',
+    processedBy: 'human',
+    content,
+    createdAt: '2026-11-20T14:00:00Z',
+  });
+
+  it('trae los precios que escribió el equipo y que aún no se guardaron', async () => {
+    const service = build([
+      team('El alisado te queda en 350.000'),
+      team('Y la hidratación 120 mil'),
+    ]);
+    expect(
+      await service.unsavedTeamPrices(
+        '+573001112233',
+        [
+          {
+            id: 'q',
+            treatmentId: 't',
+            treatment: 'Terapia de hidratación',
+            price: 120000,
+            quotedAt: NOW,
+            expiresAt: NOW,
+          },
+        ],
+        NOW,
+      ),
+    ).toEqual([{ price: 350000, said: 'El alisado te queda en 350.000' }]);
+  });
+
+  it('si no puede leer el chat no trae nada y no falla', async () => {
+    expect(
+      await build([], true).unsavedTeamPrices('+573001112233', [], NOW),
+    ).toEqual([]);
+  });
+});

@@ -13,6 +13,7 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MESSAGE_PAGE = 100;
+const MAX_UNSAVED_PRICES = 3;
 
 interface ChatMessage {
   direction?: unknown;
@@ -151,6 +152,30 @@ export class TeamQuoteService {
       quotedAt: row.quotedAt,
       expiresAt: row.expiresAt,
     }));
+  }
+
+  async unsavedTeamPrices(
+    phone: string,
+    saved: readonly ActiveTeamQuote[],
+    now = new Date(),
+  ): Promise<Array<{ price: number; said: string }>> {
+    let messages: Array<{ text: string; at: Date }>;
+    try {
+      messages = await this.teamMessages(phone, now);
+    } catch {
+      return [];
+    }
+    const savedPrices = new Set(saved.map((q) => q.price));
+    const seen = new Set<number>();
+    const found: Array<{ price: number; said: string }> = [];
+    for (const message of [...messages].reverse()) {
+      for (const price of amountsInText(message.text)) {
+        if (savedPrices.has(price) || seen.has(price)) continue;
+        seen.add(price);
+        found.push({ price, said: message.text.slice(0, 160) });
+      }
+    }
+    return found.slice(0, MAX_UNSAVED_PRICES);
   }
 
   async markUsed(

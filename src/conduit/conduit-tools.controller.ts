@@ -45,10 +45,19 @@ export class ConduitToolsController {
       client ? this.consentService.hasTermsConsent(client.id) : false,
       phone ? this.teamQuotes.activeFor(phone) : [],
     ]);
-    const view = toBotClient(client, termsAccepted);
-    return quotes.length > 0
-      ? { ...view, teamQuotes: quotes.map(toBotTeamQuote) }
-      : view;
+    const unsaved = phone
+      ? await this.teamQuotes.unsavedTeamPrices(phone, quotes)
+      : [];
+    return {
+      ...toBotClient(client, termsAccepted),
+      ...(quotes.length > 0 && { teamQuotes: quotes.map(toBotTeamQuote) }),
+      ...(unsaved.length > 0 && {
+        teamPricesInChat: unsaved.map((p) => ({
+          price: p.price,
+          said: p.said,
+        })),
+      }),
+    };
   }
 
   @Post()

@@ -366,6 +366,7 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain('guardar_precio_del_equipo con ese servicio y precio');
     expect(t).toContain('y si no, no lo uses');
     expect(t).toContain('Si consultar_cliente trae teamQuotes');
+    expect(t).toContain('si trae teamPricesInChat');
   });
 
   it('un comprobante sin anticipo pendiente no se registra: va a una persona', () => {
