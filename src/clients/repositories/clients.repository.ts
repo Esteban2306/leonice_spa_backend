@@ -206,6 +206,7 @@ export class ClientsRepository {
         name: data.name,
         birthDate: data.birthDate,
         isPregnant: data.isPregnant,
+        depositExempt: data.depositExempt,
         allergies:
           data.allergies !== undefined
             ? this.encryption.encrypt(data.allergies)

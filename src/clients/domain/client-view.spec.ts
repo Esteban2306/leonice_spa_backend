@@ -20,6 +20,7 @@ const client: Client = {
   hairDensity: null,
   hairProfileUpdatedAt: null,
   whatsappJid: null,
+  depositExempt: false,
 };
 
 describe('toClientView', () => {

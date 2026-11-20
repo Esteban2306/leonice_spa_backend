@@ -58,7 +58,10 @@ export class ConfirmDepositOrchestrator {
     return updated;
   }
 
-  async afterConfirmed(updated: Reservation): Promise<void> {
+  async afterConfirmed(
+    updated: Reservation,
+    options: { withoutDeposit?: boolean } = {},
+  ): Promise<void> {
     await this.scheduleNoShowCheck(updated.id, updated.scheduledStart);
 
     this.eventBus.publish(EVENT_TYPES.RESERVATION_CONFIRMED, {
@@ -66,6 +69,7 @@ export class ConfirmDepositOrchestrator {
       clientId: updated.clientId,
       scheduledStart: updated.scheduledStart,
       comboGroupId: updated.comboGroupId,
+      ...(options.withoutDeposit && { withoutDeposit: true }),
     });
   }
 

@@ -10,6 +10,7 @@ interface BotClientSource {
   hairColor: HairColor | null;
   hairDensity?: HairDensity | null;
   hairProfileUpdatedAt: Date | null;
+  depositExempt?: boolean;
 }
 
 export const NEW_CLIENT_INTRO =
@@ -21,6 +22,7 @@ export interface BotClientView {
   name?: string;
   firstName?: string;
   termsAccepted?: boolean;
+  noDepositNeeded?: true;
   hairProfile?: {
     status: HairProfileStatus;
     hairLength?: HairLength;
@@ -70,6 +72,7 @@ export function toBotClient(
     name,
     firstName: name.split(/\s+/)[0],
     termsAccepted,
+    ...(client.depositExempt && { noDepositNeeded: true as const }),
     hairProfile:
       status === 'VALID'
         ? {

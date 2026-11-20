@@ -103,6 +103,7 @@ export interface EventPayloadMap {
     clientId: string;
     scheduledStart: Date;
     comboGroupId?: string | null;
+    withoutDeposit?: boolean;
   };
 
   [EVENT_TYPES.DEPOSIT_SUBMITTED_FOR_REVIEW]: {

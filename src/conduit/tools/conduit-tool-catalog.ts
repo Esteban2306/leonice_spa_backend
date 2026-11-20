@@ -53,7 +53,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'consultar_cliente',
     description:
-      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING) y su última visita (lastVisit: fecha y servicio). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
+      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING) su última visita (lastVisit: fecha y servicio) y noDepositNeeded si es clienta de confianza (no se le pide anticipo). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
     httpMethod: 'GET',
     path: '/conduit/clients/me',
     pinResultInMemory: true,

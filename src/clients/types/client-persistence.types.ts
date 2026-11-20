@@ -12,4 +12,5 @@ export interface UpdateClientData {
   birthDate?: Date;
   allergies?: string;
   isPregnant?: boolean;
+  depositExempt?: boolean;
 }

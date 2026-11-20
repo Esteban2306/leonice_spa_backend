@@ -45,6 +45,7 @@ model Client {
   hairDensity          HairDensity?     @map("hair_density")
   hairProfileUpdatedAt DateTime?        @map("hair_profile_updated_at")
   whatsappJid          String?          @unique @map("whatsapp_jid")
+  depositExempt        Boolean          @default(false) @map("deposit_exempt")
   consentRecords       ConsentRecord[]
   productViewLogs      ProductViewLog[]
   reservations         Reservation[]

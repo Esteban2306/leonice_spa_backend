@@ -100,3 +100,22 @@ describe('última visita de la clienta', () => {
     expect(toBotLastVisit(null)).toBeUndefined();
   });
 });
+
+describe('clienta de confianza', () => {
+  const client = {
+    name: 'Mabel Ruiz',
+    hairLength: null,
+    hairColor: null,
+    hairProfileUpdatedAt: null,
+  };
+
+  it('le avisa al bot que no le pida anticipo', () => {
+    expect(toBotClient({ ...client, depositExempt: true }, true)).toMatchObject(
+      { noDepositNeeded: true },
+    );
+  });
+
+  it('a las demás no les dice nada', () => {
+    expect(toBotClient(client, true)).not.toHaveProperty('noDepositNeeded');
+  });
+});

@@ -49,6 +49,7 @@ import { resolveApplicablePromotion } from 'src/promotions/domain/resolve-applic
 import { applyPromotionDiscount } from 'src/clients/domain/compute-treatment-pricing';
 import { DepositCreditService } from '../service/deposit-credit.service';
 import { AppException } from '../../common/errors/app.exception';
+import { ConfirmDepositOrchestrator } from './confirm-deposit.orchestrator';
 
 export interface CreateReservationOptions extends ResolveClientOptions {
   priceOverrides?: ReadonlyMap<string, number>;
@@ -73,6 +74,7 @@ export class CreateReservationOrchestrator {
     private readonly depositCredit: DepositCreditService,
     private readonly operatingSchedule: OperatingScheduleService,
     private readonly depositDeadline: DepositDeadlineService,
+    private readonly confirmDeposit: ConfirmDepositOrchestrator,
   ) {}
 
   async execute(
@@ -132,6 +134,7 @@ export class CreateReservationOrchestrator {
     const draftSegments = scheduleComboTreatments(timingInputs, requestedStart);
     const comboGroupId = draftSegments.length > 1 ? randomUUID() : null;
 
+    const withoutDeposit = options.trustedIdentity && client.depositExempt;
     const categoryIds = [...new Set(treatments.map((t) => t.categoryId))];
     const { dayStart, dayEnd } = getDayBoundaries(requestedStart);
     const depositClockStartedAt = new Date();
@@ -153,10 +156,12 @@ export class CreateReservationOrchestrator {
           const created: Reservation[] = [];
 
           const creditAppliedIds: string[] = [];
-          const availableCredits =
-            await this.depositCredit.findAvailableForClient(client.id, tx);
+          const availableCredits = withoutDeposit
+            ? []
+            : await this.depositCredit.findAvailableForClient(client.id, tx);
           const credit = availableCredits[0] ?? null;
           const hasCredit = credit !== null;
+          const startsDepositClock = !hasCredit && !withoutDeposit;
           let depositExpiresAt: Date | null = null;
 
           for (const [index, draft] of draftSegments.entries()) {
@@ -202,8 +207,10 @@ export class CreateReservationOrchestrator {
               hasCategoryConflict,
             );
 
-            const initialStatus = ReservationStatus.PENDIENTE_DEPOSITO;
-            if (!hasCredit && depositExpiresAt === null) {
+            const initialStatus = withoutDeposit
+              ? ReservationStatus.CONFIRMADA
+              : ReservationStatus.PENDIENTE_DEPOSITO;
+            if (startsDepositClock && depositExpiresAt === null) {
               depositExpiresAt = await this.depositDeadline.computeExpiry(
                 depositClockStartedAt,
                 placement.scheduledStart,
@@ -223,7 +230,9 @@ export class CreateReservationOrchestrator {
                 finalPrice: draft.price,
                 finalDurationMinutes: draft.durationMinutes,
                 comboGroupId,
-                depositClockStartedAt: hasCredit ? null : depositClockStartedAt,
+                depositClockStartedAt: startsDepositClock
+                  ? depositClockStartedAt
+                  : null,
                 depositExpiresAt,
               },
             });
@@ -283,6 +292,12 @@ export class CreateReservationOrchestrator {
         scheduledStart: reservation.scheduledStart,
         channel: reservation.channel,
       });
+
+      if (reservation.status === ReservationStatus.CONFIRMADA) {
+        await this.confirmDeposit.afterConfirmed(reservation, {
+          withoutDeposit: true,
+        });
+      }
 
       if (draft.needsHairProfile) {
         this.eventBus.publish(EVENT_TYPES.RESERVATION_NEEDS_HAIR_PROFILE, {

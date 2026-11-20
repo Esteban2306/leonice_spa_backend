@@ -17,6 +17,7 @@ export interface ClientView {
   birthDate: string;
   allergies: string | null;
   isPregnant: boolean;
+  depositExempt: boolean;
   hairProfile: HairProfileView;
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +62,7 @@ export function toClientView(client: Client, now = new Date()): ClientView {
     birthDate: utcMidnightToCalendarDate(client.birthDate),
     allergies: client.allergies,
     isPregnant: client.isPregnant,
+    depositExempt: client.depositExempt,
     hairProfile: toHairProfileView(client, now),
     createdAt: client.createdAt,
     updatedAt: client.updatedAt,

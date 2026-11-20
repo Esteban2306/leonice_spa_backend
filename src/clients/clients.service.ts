@@ -278,6 +278,14 @@ export class ClientsService {
     return client;
   }
 
+  async setDepositExempt(
+    id: string,
+    depositExempt: boolean,
+  ): Promise<ClientView> {
+    await this.requireClient(id);
+    return toClientView(await this.repository.update(id, { depositExempt }));
+  }
+
   async update(id: string, dto: UpdateClientDto): Promise<ClientView> {
     await this.requireClient(id);
 
