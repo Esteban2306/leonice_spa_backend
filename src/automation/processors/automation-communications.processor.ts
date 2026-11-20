@@ -1,3 +1,4 @@
+import { LeadFollowUpService } from '../lead-follow-up.service';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job, UnrecoverableError } from 'bullmq';
@@ -41,6 +42,7 @@ import {
   ClientCancelledByAdminNoticeJobData,
   ClientDepositRejectedNoticeJobData,
   ClientReservationConfirmedNoticeJobData,
+  ClientDepositReminderJobData,
   RescheduleNoticeJobData,
 } from '../domain/operational-notifications.constants';
 import { OperationalNotificationsService } from '../operational-notifications.service';
@@ -67,13 +69,16 @@ type AutomationJobData =
   | AdminProductPurchaseNoticeJobData
   | AdminReceiptNoticeJobData
   | AdminInProgressNoticeJobData
-  | ClientEventTicketNoticeJobData;
+  | ClientEventTicketNoticeJobData
+  | ClientDepositReminderJobData;
 
 const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
   JOB_NAMES.RESERVATION_REMINDER_CHECK,
   JOB_NAMES.REACTIVATION_CHECK,
   JOB_NAMES.NOTIFY_CLIENT_DEPOSIT_REJECTED,
   JOB_NAMES.NOTIFY_CLIENT_RESERVATION_CONFIRMED,
+  JOB_NAMES.SEND_CLIENT_DEPOSIT_REMINDER,
+  JOB_NAMES.LEAD_FOLLOW_UP_SWEEP,
   JOB_NAMES.NOTIFY_CLIENT_CANCELLED_BY_ADMIN,
   JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED,
   JOB_NAMES.NOTIFY_CLIENT_CANCELLATION_CONFIRMED,
@@ -99,6 +104,7 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
     private readonly retention: ClientRetentionService,
     private readonly frequency: MarketingFrequencyService,
     private readonly systemPause: ConduitSystemPauseService,
+    private readonly leadFollowUp: LeadFollowUpService,
   ) {
     super();
   }
@@ -145,6 +151,14 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
           job.data as ClientReservationConfirmedNoticeJobData,
           ctx,
         );
+      case JOB_NAMES.SEND_CLIENT_DEPOSIT_REMINDER:
+        return this.notifications.notifyClientDepositReminder(
+          job.data as ClientDepositReminderJobData,
+          ctx,
+        );
+      case JOB_NAMES.LEAD_FOLLOW_UP_SWEEP:
+        await this.leadFollowUp.sweep(ctx);
+        return;
       case JOB_NAMES.NOTIFY_CLIENT_CANCELLED_BY_ADMIN:
         return this.notifications.notifyClientCancelledByAdmin(
           job.data as ClientCancelledByAdminNoticeJobData,
@@ -269,6 +283,8 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.CLIENT_DEPOSIT_REJECTED_NOTICE;
       case JOB_NAMES.NOTIFY_CLIENT_RESERVATION_CONFIRMED:
         return AutomationExecutionType.CLIENT_RESERVATION_CONFIRMED_NOTICE;
+      case JOB_NAMES.SEND_CLIENT_DEPOSIT_REMINDER:
+        return AutomationExecutionType.CLIENT_DEPOSIT_REMINDER;
       case JOB_NAMES.NOTIFY_CLIENT_CANCELLED_BY_ADMIN:
         return AutomationExecutionType.CLIENT_CANCELLED_BY_ADMIN_NOTICE;
       case JOB_NAMES.NOTIFY_CLIENT_RESCHEDULED:

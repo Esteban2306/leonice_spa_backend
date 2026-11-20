@@ -39,6 +39,8 @@ export class BusinessSettingsService {
         additionalInfo: null,
         assessmentOffer: null,
         ownerContactPhone: null,
+        depositReminderEnabled: true,
+        leadFollowUpEnabled: false,
         updatedByUserId: null,
         updatedAt: null,
       }

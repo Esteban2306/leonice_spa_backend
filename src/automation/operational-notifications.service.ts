@@ -21,6 +21,8 @@ import { assertMessageDelivered } from './utils/assert-message-delivered';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { ANONYMIZED_PHONE_PREFIX } from '../client-privacy/anonymized-client';
 import { formatNotificationDateTime } from './utils/format-notification-date';
+import { isProofUnderReview } from 'src/reservations/domain/group-reservations-for-display';
+import { remindsForCombo } from 'src/reservations/domain/deposit-reminder';
 import {
   OPERATIONAL_EMAIL_TEMPLATE_ENV_KEYS,
   OPERATIONAL_TEMPLATE_ENV_KEYS,
@@ -38,6 +40,7 @@ import {
   type ClientCancelledByAdminNoticeJobData,
   type ClientDepositRejectedNoticeJobData,
   type ClientReservationConfirmedNoticeJobData,
+  type ClientDepositReminderJobData,
   type OperationalTemplate,
   type RescheduleNoticeJobData,
 } from './domain/operational-notifications.constants';
@@ -221,6 +224,106 @@ export class OperationalNotificationsService {
       nombre: first.client.name,
       tratamiento: confirmed.map((r) => r.treatment.name).join(', '),
       fecha: formatNotificationDateTime(first.scheduledStart),
+    });
+    await this.executed(type, reservationId);
+  }
+
+  async notifyClientDepositReminder(
+    data: ClientDepositReminderJobData,
+    ctx: ConduitSendContext,
+    now: Date = new Date(),
+  ): Promise<void> {
+    const type = AutomationExecutionType.CLIENT_DEPOSIT_REMINDER;
+    const { reservationId } = data;
+
+    const settings = await this.prisma.client.businessSettings.findUnique({
+      where: { id: 'default' },
+      select: { depositReminderEnabled: true },
+    });
+    if (settings && !settings.depositReminderEnabled) {
+      await this.skip(
+        type,
+        reservationId,
+        'Recordatorio de anticipo apagado en el panel',
+      );
+      return;
+    }
+
+    const reservation = await this.loadWithDetails(reservationId);
+    if (!reservation) {
+      await this.skip(type, reservationId, RESERVATION_GONE_REASON);
+      return;
+    }
+    if (reservation.status !== ReservationStatus.PENDIENTE_DEPOSITO) {
+      await this.skip(
+        type,
+        reservationId,
+        `Ya no espera anticipo (está en ${reservation.status})`,
+      );
+      return;
+    }
+    const expiresAt = reservation.depositExpiresAt;
+    if (!expiresAt || expiresAt.toISOString() !== data.expiresAt) {
+      await this.skip(
+        type,
+        reservationId,
+        'El plazo del anticipo cambió; se recuerda con el plazo nuevo',
+      );
+      return;
+    }
+    if (expiresAt.getTime() <= now.getTime()) {
+      await this.skip(type, reservationId, 'El plazo del anticipo ya venció');
+      return;
+    }
+    if (reservation.client.phone.startsWith(ANONYMIZED_PHONE_PREFIX)) {
+      await this.skip(type, reservationId, 'Clienta anonimizada');
+      return;
+    }
+
+    const members = reservation.comboGroupId
+      ? await this.reservations.findManyByIdsWithDetails(
+          (
+            await this.reservations.findByComboGroupId(reservation.comboGroupId)
+          ).map((r) => r.id),
+        )
+      : [reservation];
+    const pending = members.filter(
+      (r) => r.status === ReservationStatus.PENDIENTE_DEPOSITO,
+    );
+    if (remindsForCombo(pending)?.id !== reservation.id) {
+      await this.skip(
+        type,
+        reservationId,
+        'El recordatorio del combo va con su primer servicio',
+      );
+      return;
+    }
+
+    const [latestProof] = await this.prisma.client.depositRecord.findMany({
+      where: { reservationId: { in: members.map((r) => r.id) } },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+      select: { status: true, imageUrl: true },
+    });
+    if (
+      isProofUnderReview(reservation.status, latestProof ? [latestProof] : [])
+    ) {
+      await this.skip(
+        type,
+        reservationId,
+        'Ya envió el comprobante y está en revisión',
+      );
+      return;
+    }
+
+    const ordered = [...pending].sort(
+      (a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime(),
+    );
+    await this.send(ctx, 'CLIENT_DEPOSIT_REMINDER', reservation.client.phone, {
+      nombre: reservation.client.name.split(/\s+/)[0],
+      tratamiento: ordered.map((r) => r.treatment.name).join(', '),
+      fecha: formatNotificationDateTime(ordered[0].scheduledStart),
+      plazo: `el ${formatNotificationDateTime(expiresAt)}`,
     });
     await this.executed(type, reservationId);
   }

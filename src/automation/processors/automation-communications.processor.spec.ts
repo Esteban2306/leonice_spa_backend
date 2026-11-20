@@ -24,6 +24,7 @@ function build(paused: boolean) {
     {} as never,
     {} as never,
     { isPaused: jest.fn().mockResolvedValue(paused) } as never,
+    {} as never,
   );
   return { processor, executions, notifications, conduit };
 }

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -55,4 +56,12 @@ export class UpdateBusinessSettingsDto {
     message: 'El WhatsApp de Leo solo admite dígitos, espacios y un + inicial',
   })
   ownerContactPhone?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  depositReminderEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  leadFollowUpEnabled?: boolean;
 }

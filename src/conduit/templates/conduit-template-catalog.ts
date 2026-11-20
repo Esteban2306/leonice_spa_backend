@@ -231,6 +231,38 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     ].join('\n'),
   },
   {
+    code: 'CLIENT_DEPOSIT_REMINDER',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_DEPOSIT_REMINDER',
+    name: 'leonice_recordatorio_anticipo',
+    description:
+      'Recuerda a la clienta, poco antes de que venza el plazo, que su cita sigue apartada y falta el anticipo.',
+    audience: 'CLIENT',
+    variables: ['nombre', 'tratamiento', 'fecha', 'plazo'],
+    body: [
+      'Hola {{nombre}} 🌿',
+      '',
+      'Tu cita de *{{tratamiento}}* del *{{fecha}}* sigue apartada. Para dejarla firme falta el anticipo, y el plazo vence {{plazo}}.',
+      '',
+      'Si ya lo pagaste, envíanos por aquí la foto del comprobante. Si necesitas otra fecha, cuéntanos y te ayudamos.',
+    ].join('\n'),
+  },
+  {
+    code: 'CLIENT_LEAD_FOLLOW_UP',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_LEAD_FOLLOW_UP',
+    name: 'leonice_seguimiento_interesada',
+    description:
+      'Un solo mensaje a quien dejó sus datos por WhatsApp y todavía no agendó.',
+    audience: 'CLIENT',
+    variables: ['nombre'],
+    body: [
+      'Hola {{nombre}} 🌿',
+      '',
+      'Te escribimos de Leonice Arenas Spa Capilar por si quieres agendar tu cita. Cuando quieras, respóndenos por aquí y te mostramos los horarios disponibles.',
+      '',
+      'Si prefieres que no te escribamos, dínoslo y no volvemos a hacerlo.',
+    ].join('\n'),
+  },
+  {
     code: 'CLIENT_RESERVATION_CONFIRMED',
     envKey: 'CONDUIT_TEMPLATE_CLIENT_RESERVATION_CONFIRMED',
     name: 'leonice_cita_aceptada',

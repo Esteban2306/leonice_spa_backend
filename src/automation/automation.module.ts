@@ -1,3 +1,5 @@
+import { LeadFollowUpService } from './lead-follow-up.service';
+import { LeadFollowUpScheduler } from './lead-follow-up.scheduler';
 import { AutomaticMessagesController } from './automatic-messages.controller';
 import { AutomaticMessagesService } from './automatic-messages.service';
 import { MarketingFrequencyModule } from '../marketing/marketing-frequency.module';
@@ -43,6 +45,8 @@ import { ReservationSweepsScheduler } from './reservation-sweeps.scheduler';
     AutomationRulesRepository,
     AutomationRulesService,
     ReservationSweepsScheduler,
+    LeadFollowUpService,
+    LeadFollowUpScheduler,
   ],
 })
 export class AutomationModule {}

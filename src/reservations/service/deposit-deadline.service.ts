@@ -16,7 +16,12 @@ import {
 import { DEPOSIT_OPERATING_WINDOW_MS } from '../domain/reservation-timing.constants';
 import { OperatingScheduleRepository } from '../repositories/operating-schedule.repository';
 import { enqueueWithin } from '../../infrastructure/queue/enqueue-within';
+import { NOTICE_JOB_OPTIONS } from '../../automation/domain/operational-notifications.constants';
 import { ReservationsRepository } from '../repositories/reservations.repository';
+import {
+  depositReminderAt,
+  depositReminderJobId,
+} from '../domain/deposit-reminder';
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 
@@ -36,6 +41,8 @@ export class DepositDeadlineService {
     private readonly reservationsRepository: ReservationsRepository,
     @InjectQueue(QUEUE_NAMES.RESERVATION_TIMEOUTS)
     private readonly timeoutsQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.AUTOMATION_COMMUNICATIONS)
+    private readonly communicationsQueue: Queue,
   ) {}
 
   async computeExpiry(
@@ -158,6 +165,37 @@ export class DepositDeadlineService {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
         `No se pudo encolar deposito-timeout de ${reservationId}; lo cubrirá el barrido: ${message}`,
+      );
+    }
+    await this.scheduleReminder(reservationId, expiresAt);
+  }
+
+  private async scheduleReminder(
+    reservationId: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    const at = depositReminderAt(expiresAt, new Date());
+    if (!at) return;
+    const lateFailure = (error: unknown) =>
+      this.logger.warn(
+        `El recordatorio de anticipo de ${reservationId} no se encoló al volver Redis: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    try {
+      await enqueueWithin(
+        this.communicationsQueue.add(
+          JOB_NAMES.SEND_CLIENT_DEPOSIT_REMINDER,
+          { reservationId, expiresAt: expiresAt.toISOString() },
+          {
+            ...NOTICE_JOB_OPTIONS,
+            delay: Math.max(at.getTime() - Date.now(), 0),
+            jobId: depositReminderJobId(reservationId, expiresAt),
+          },
+        ),
+        lateFailure,
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `No se pudo encolar el recordatorio de anticipo de ${reservationId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

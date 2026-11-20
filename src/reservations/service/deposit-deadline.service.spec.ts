@@ -63,6 +63,7 @@ const buildFixture = (options: {
     scheduleRepository as unknown as OperatingScheduleRepository,
     reservationsRepository as unknown as ReservationsRepository,
     queue as unknown as Queue,
+    { add: () => Promise.resolve({}) } as unknown as Queue,
   );
   return { service, updates, enqueued };
 };
