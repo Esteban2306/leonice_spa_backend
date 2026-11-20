@@ -4,6 +4,9 @@ import { PrismaService } from 'src/infrastructure/database/prisma.service';
 import { CreateReservationOrchestrator } from 'src/reservations/orchestrators/create-reservation.orchestrator';
 import { ClientsService } from 'src/clients/clients.service';
 import { JOB_NAMES } from 'src/infrastructure/queue/queue.constants';
+import { CheckInReservationOrchestrator } from 'src/reservations/orchestrators/check-in-reservation.orchestrator';
+import { CompleteReservationOrchestrator } from 'src/reservations/orchestrators/complete-reservation.orchestrator';
+import { ReservationSettlementService } from 'src/reservations/service/reservation-settlement.service';
 import {
   createHarnessModule,
   fakeQueues,
@@ -95,5 +98,40 @@ describe('Clientas de confianza sin anticipo', () => {
       { trustedIdentity: true },
     );
     expect(reservations[0].status).toBe(ReservationStatus.PENDIENTE_DEPOSITO);
+  });
+
+  it('su cita sin anticipo se atiende y se cobra completa en el spa', async () => {
+    const dto = await trustedClient('atendida');
+    const { reservations } = await create.execute(
+      {
+        client: dto,
+        treatments: [world.secondary.treatmentId],
+        scheduledStart: futureSlot(4, 16).toISOString(),
+      },
+      { trustedIdentity: true },
+    );
+    const [reservation] = reservations;
+    await moduleRef
+      .get(CheckInReservationOrchestrator)
+      .execute(
+        reservation.id,
+        new Date(reservation.scheduledStart.getTime() + 60_000),
+      );
+    const settlement = await moduleRef
+      .get(ReservationSettlementService)
+      .compute(reservation.id);
+    expect(settlement.balanceDue ?? settlement.price).toBe(
+      Number(reservation.finalPrice),
+    );
+    await moduleRef.get(CompleteReservationOrchestrator).execute({
+      reservationId: reservation.id,
+      adminUserId: world.admin.id,
+      cashAmount: settlement.balanceDue ?? settlement.price,
+      transferAmount: 0,
+    });
+    const done = await prisma.client.reservation.findUniqueOrThrow({
+      where: { id: reservation.id },
+    });
+    expect(done.status).toBe(ReservationStatus.COMPLETADA);
   });
 });

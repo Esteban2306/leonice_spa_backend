@@ -4,10 +4,14 @@ import { JOB_NAMES } from '../../infrastructure/queue/queue.constants';
 import { AutomationCommunicationsProcessor } from './automation-communications.processor';
 
 function build(paused: boolean) {
+  const leadFollowUp = {
+    sweep: jest.fn().mockResolvedValue({ sent: 0, skipped: 0 }),
+  };
   const executions = { log: jest.fn().mockResolvedValue(undefined) };
   const notifications = {
     notifyClientRescheduled: jest.fn().mockResolvedValue(undefined),
     notifyClientReservationConfirmed: jest.fn().mockResolvedValue(undefined),
+    notifyClientDepositReminder: jest.fn().mockResolvedValue(undefined),
     notifyAdminHandoff: jest.fn().mockResolvedValue(undefined),
     notifyAdminReceiptIssue: jest.fn().mockResolvedValue(undefined),
     notifyAdminProductPurchase: jest.fn().mockResolvedValue(undefined),
@@ -24,9 +28,9 @@ function build(paused: boolean) {
     {} as never,
     {} as never,
     { isPaused: jest.fn().mockResolvedValue(paused) } as never,
-    {} as never,
+    leadFollowUp as never,
   );
-  return { processor, executions, notifications, conduit };
+  return { processor, executions, notifications, conduit, leadFollowUp };
 }
 
 const job = (name: string, data: object = { reservationId: 'r1' }) =>
@@ -51,6 +55,28 @@ describe('AutomationCommunicationsProcessor con el sistema en pausa', () => {
         reason: expect.stringContaining('pausa') as string,
       }),
     );
+  });
+
+  it('no recuerda el anticipo ni le escribe a interesadas mientras está en pausa', async () => {
+    const { processor, executions, notifications, leadFollowUp } = build(true);
+
+    await processor.process(
+      job(JOB_NAMES.SEND_CLIENT_DEPOSIT_REMINDER, {
+        reservationId: 'r1',
+        expiresAt: new Date().toISOString(),
+      }),
+    );
+    await processor.process(job(JOB_NAMES.LEAD_FOLLOW_UP_SWEEP, {}));
+
+    expect(notifications.notifyClientDepositReminder).not.toHaveBeenCalled();
+    expect(leadFollowUp.sweep).not.toHaveBeenCalled();
+    expect(executions.log).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin pausa el barrido de interesadas se ejecuta', async () => {
+    const { processor, leadFollowUp } = build(false);
+    await processor.process(job(JOB_NAMES.LEAD_FOLLOW_UP_SWEEP, {}));
+    expect(leadFollowUp.sweep).toHaveBeenCalledTimes(1);
   });
 
   it('omite los recordatorios sin consultar la reserva ni enviar', async () => {

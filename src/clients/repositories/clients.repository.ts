@@ -105,6 +105,7 @@ export class ClientsRepository {
           name: true,
           phone: true,
           createdAt: true,
+          birthDate: true,
           hairLength: true,
           hairColor: true,
           hairProfileUpdatedAt: true,

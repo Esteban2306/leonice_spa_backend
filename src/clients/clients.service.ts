@@ -149,6 +149,7 @@ export class ClientsService {
         phone: client.phone,
         createdAt: client.createdAt,
         reservationCount: client._count.reservations,
+        missingBirthDate: client.birthDate === null,
         lastReservation: client.reservations[0] ?? null,
         hairProfileStatus: getHairProfileStatus(client, now),
         tags: (tagsByClient.get(client.id) ?? []).map(({ key, detail }) => ({

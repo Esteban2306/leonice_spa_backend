@@ -121,7 +121,13 @@ export class LeadFollowUpService {
         'GET',
         `bots/${botId}/muted-contacts`,
       );
-      return mutedPhones(Array.isArray(rows) ? rows : []);
+      if (!Array.isArray(rows)) {
+        this.logger.warn(
+          'La lista de números silenciados llegó con un formato inesperado; el seguimiento queda para mañana',
+        );
+        return null;
+      }
+      return mutedPhones(rows);
     } catch (error) {
       this.logger.warn(
         `No se pudo leer los números silenciados; el seguimiento queda para mañana: ${error instanceof Error ? error.message : String(error)}`,

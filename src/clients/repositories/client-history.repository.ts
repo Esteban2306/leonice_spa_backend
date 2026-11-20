@@ -58,7 +58,10 @@ export class clientsHistoryRepository {
   async getLastCompletedReservation(clientId: string) {
     return this.prisma.client.reservation.findFirst({
       where: { clientId, status: ReservationStatus.COMPLETADA },
-      orderBy: { completedAt: 'desc' },
+      orderBy: [
+        { completedAt: { sort: 'desc', nulls: 'last' } },
+        { scheduledStart: 'desc' },
+      ],
       include: { treatment: true, category: true },
     });
   }
