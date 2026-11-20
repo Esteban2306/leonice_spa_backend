@@ -92,6 +92,9 @@ jobs:
       CLOUDINARY_CLOUD_NAME: ci
       CLOUDINARY_API_KEY: '0'
       CLOUDINARY_API_SECRET: ci
+      GOOGLE_CLIENT_ID: ci
+      GOOGLE_CLIENT_SECRET: ci
+      GOOGLE_CALLBACK_URL: http://localhost:3920/api/v1/auth/google/callback
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

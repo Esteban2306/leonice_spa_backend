@@ -2,7 +2,8 @@ import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  RELEASE,
+  GUIDANCE_RELEASE,
+  SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
   releaseConduit,
@@ -117,6 +118,7 @@ describe('despliegue selectivo de Conduit', () => {
     const { request, writes } = fakeConduit();
     const lines: string[] = [];
     const out = await releaseConduit({
+      manifest: RELEASE,
       env: env(),
       request: request as never,
       log: (l) => lines.push(l),
@@ -144,6 +146,7 @@ describe('despliegue selectivo de Conduit', () => {
     const { request, writes } = fakeConduit();
     const vars = env({ CONDUIT_RELEASE_APPLY: 'true' });
     const out = await releaseConduit({
+      manifest: RELEASE,
       env: vars,
       request: request as never,
       log: () => undefined,
@@ -175,7 +178,7 @@ describe('despliegue selectivo de Conduit', () => {
       writes.find(
         (w) => w.path === 'templates/tpl-leonice_aviso_atencion_humana',
       )?.body,
-    ).toMatchObject({ bodyHandlebars: template.body });
+    ).toEqual(templateDefinition(template));
 
     expect(
       writes.find((w) => w.path === 'bots/bot/prompts/CONVERSATION')?.body,
@@ -229,6 +232,7 @@ describe('despliegue selectivo de Conduit', () => {
     state.variables = [];
     const { request, writes } = fakeConduit(state);
     const out = await releaseConduit({
+      manifest: RELEASE,
       env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
       request: request as never,
       log: () => undefined,
@@ -240,6 +244,7 @@ describe('despliegue selectivo de Conduit', () => {
   it('una personalizada solo se reemplaza si se nombra', async () => {
     const { request, writes } = fakeConduit();
     await releaseConduit({
+      manifest: RELEASE,
       env: env({
         CONDUIT_RELEASE_APPLY: 'true',
         CONDUIT_RELEASE_FORCE: 'pasar_a_persona',
@@ -255,5 +260,67 @@ describe('despliegue selectivo de Conduit', () => {
         (t) => t.name === 'pasar_a_persona',
       )!.description,
     });
+  });
+});
+
+describe('entrega de orientación (solo el prompt)', () => {
+  const guidance = loadBaseline(GUIDANCE_RELEASE.id);
+
+  it('por defecto se usa la entrega más reciente', async () => {
+    const state = productionLike();
+    state.prompt = guidance.prompt;
+    const { request, writes } = fakeConduit(state);
+    const out = await releaseConduit({
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan).toEqual([
+      expect.objectContaining({ kind: 'prompt', state: 'pristine' }),
+    ]);
+    expect(writes).toEqual([
+      {
+        method: 'PUT',
+        path: 'bots/bot/prompts/CONVERSATION',
+        body: { content: CONDUIT_BOT_PROMPT_TEMPLATE },
+      },
+    ]);
+  });
+
+  it('su foto anterior es el prompt de la entrega Sofía y el nuevo lo cambia', () => {
+    expect(guidance.prompt).not.toBe(CONDUIT_BOT_PROMPT_TEMPLATE);
+    expect(guidance.prompt).toContain(
+      'NOT_APPLICABLE: no parece un comprobante; pídelo.',
+    );
+  });
+
+  it('un prompt editado en el panel no se toca', async () => {
+    const state = productionLike();
+    state.prompt = 'Prompt propio del administrador';
+    const { request, writes } = fakeConduit(state);
+    const out = await releaseConduit({
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan[0].state).toBe('customized');
+    expect(writes).toEqual([]);
+  });
+
+  it('se puede elegir una entrega anterior por su nombre y una inexistente se rechaza', async () => {
+    const { request } = fakeConduit();
+    const out = await releaseConduit({
+      env: env({ CONDUIT_RELEASE_ID: '2026-11-19-sofia' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.length).toBeGreaterThan(1);
+    await expect(
+      releaseConduit({
+        env: env({ CONDUIT_RELEASE_ID: 'no-existe' }),
+        request: request as never,
+        log: () => undefined,
+      }),
+    ).rejects.toThrow('No existe la entrega no-existe');
   });
 });

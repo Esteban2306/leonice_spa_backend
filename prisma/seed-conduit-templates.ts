@@ -92,7 +92,8 @@ export async function seedConduitTemplates(
       (current.bodyHandlebars !== template.body ||
         !sameVariants(current.bodyVariants, template.variants))
     ) {
-      await request('PUT', `templates/${current.id}`, payload);
+      const { variadblesSchema: _schema, ...changes } = payload;
+      await request('PUT', `templates/${current.id}`, changes);
       results.push({
         template,
         id: current.id,

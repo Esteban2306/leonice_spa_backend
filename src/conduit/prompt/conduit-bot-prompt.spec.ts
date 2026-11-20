@@ -345,13 +345,36 @@ describe('prompt del asistente de Leonice', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     const rule = t.indexOf('foto-cabello');
     expect(rule).toBeGreaterThan(0);
-    expect(rule).toBeLessThan(t.indexOf('Otra imagen es el comprobante'));
+    expect(rule).toBeLessThan(
+      t.indexOf('Otra imagen puede ser el comprobante'),
+    );
     expect(t).toContain('no un comprobante: no registres pago');
     expect(t).toContain('pasar_a_persona (motivo: foto de su cabello)');
   });
 
+  it('la orientación sobre su propio tratamiento va a una persona; una pregunta general de producto no', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain(
+      'pasar_a_persona (motivo: orientación sobre su tratamiento)',
+    );
+    expect(t).toContain('por texto, audio o foto');
+    expect(t).toContain(
+      'Una pregunta general de un producto (para qué sirve, precio) la respondes tú.',
+    );
+  });
+
+  it('una foto que no es comprobante solo se toma como pago si hay un anticipo pendiente', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).not.toContain(
+      'NOT_APPLICABLE: no parece un comprobante; pídelo.',
+    );
+    expect(t).toContain(
+      'si tiene un anticipo pendiente (depositos_pendientes), pídeselo; si no, pregúntale en una frase en qué la ayudas con esa foto.',
+    );
+  });
+
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(13650);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(14100);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
