@@ -9,6 +9,10 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import {
+  ContentList,
+  NullableTrimmed,
+} from '../../../products/dto/product-content.decorators';
 
 export class CreateTreatmentDto {
   @IsUUID()
@@ -46,4 +50,40 @@ export class CreateTreatmentDto {
   @IsInt()
   @Min(1)
   baseDurationMaxMinutes?: number;
+
+  @NullableTrimmed()
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  tagline?: string | null;
+
+  @NullableTrimmed()
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  summary?: string | null;
+
+  @ContentList()
+  idealFor?: string[];
+
+  @ContentList()
+  benefits?: string[];
+
+  @NullableTrimmed()
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  results?: string | null;
+
+  @ContentList()
+  aftercare?: string[];
+
+  @ContentList()
+  considerations?: string[];
+
+  @NullableTrimmed()
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  recommendedFrequency?: string | null;
 }
