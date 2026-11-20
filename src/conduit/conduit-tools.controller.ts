@@ -95,9 +95,9 @@ export class ConduitToolsController {
     }
 
     if (!client) {
-      if (!dto.name || !dto.birthDate) {
+      if (!dto.name) {
         throw new ConflictException(
-          'Para crear un nuevo cliente se requieren nombre y fecha de nacimiento',
+          'Para registrar a una clienta nueva se requiere su nombre completo',
         );
       }
 
@@ -117,7 +117,9 @@ export class ConduitToolsController {
       client = await this.clientsRepository.create({
         phone: normalizedPhone,
         name: dto.name,
-        birthDate: calendarDateToUtcMidnight(dto.birthDate),
+        birthDate: dto.birthDate
+          ? calendarDateToUtcMidnight(dto.birthDate)
+          : null,
         whatsappJid: dto.whatsappJid,
         allergies: dto.allergies,
         isPregnant: dto.isPregnant || false,
@@ -138,10 +140,13 @@ export class ConduitToolsController {
       phone: _phone,
       whatsappJid: _jid,
       name: _name,
-      birthDate: _birthDate,
+      birthDate,
       ...updates
     } = dto;
-    return this.clientsService.update(client.id, updates);
+    return this.clientsService.update(client.id, {
+      ...updates,
+      ...(client.birthDate === null && birthDate && { birthDate }),
+    });
   }
   @ConduitToolOptionsMeta({ requiresVerifiedContact: true })
   @Patch()

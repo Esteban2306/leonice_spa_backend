@@ -84,7 +84,9 @@ describe('prompt del asistente de Leonice', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toMatch(/Lo primero.*consultar_cliente/);
     expect(t).toMatch(/con su primer nombre \("Hola, Diana, soy/);
-    expect(t).toMatch(/registered true, ya los tenemos; no le pidas nombre/);
+    expect(t).toMatch(
+      /registered true, ya los tenemos \(si missingBirthDate, pide solo la fecha\); no le pidas nombre/,
+    );
     expect(t).toMatch(/termsAccepted/);
   });
 

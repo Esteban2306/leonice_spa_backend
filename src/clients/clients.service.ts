@@ -94,6 +94,12 @@ export class ClientsService {
       return created;
     }
 
+    if (client.birthDate === null && !dto.birthDate) {
+      throw new AppException('CLIENT_REQUIRED_FIELDS', {
+        details: { missing: ['birthDate'] },
+      });
+    }
+
     if (!options.trustedIdentity) {
       return client;
     }
@@ -103,6 +109,9 @@ export class ClientsService {
     }
 
     return this.repository.fillMissingFields(client, {
+      birthDate: dto.birthDate
+        ? calendarDateToUtcMidnight(dto.birthDate)
+        : undefined,
       whatsappJid,
       allergies: dto.allergies,
       isPregnant: dto.isPregnant,

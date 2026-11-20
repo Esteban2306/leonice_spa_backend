@@ -14,7 +14,7 @@ export interface ClientView {
   name: string;
   phone: string;
   whatsappJid: string | null;
-  birthDate: string;
+  birthDate: string | null;
   allergies: string | null;
   isPregnant: boolean;
   depositExempt: boolean;
@@ -59,7 +59,9 @@ export function toClientView(client: Client, now = new Date()): ClientView {
     name: client.name,
     phone: client.phone,
     whatsappJid: client.whatsappJid,
-    birthDate: utcMidnightToCalendarDate(client.birthDate),
+    birthDate: client.birthDate
+      ? utcMidnightToCalendarDate(client.birthDate)
+      : null,
     allergies: client.allergies,
     isPregnant: client.isPregnant,
     depositExempt: client.depositExempt,

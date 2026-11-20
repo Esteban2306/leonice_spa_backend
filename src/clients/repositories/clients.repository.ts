@@ -165,9 +165,14 @@ export class ClientsRepository {
       whatsappJid?: string;
       allergies?: string;
       isPregnant?: boolean;
+      birthDate?: Date;
     },
   ): Promise<Client> {
     const data: Record<string, unknown> = {};
+
+    if (current.birthDate === null && incoming.birthDate) {
+      data.birthDate = incoming.birthDate;
+    }
 
     if (!current.whatsappJid && incoming.whatsappJid) {
       data.whatsappJid = incoming.whatsappJid;
