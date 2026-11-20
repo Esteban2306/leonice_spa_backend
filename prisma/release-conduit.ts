@@ -64,9 +64,21 @@ export const GUIDANCE_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const HAIR_PHOTO_RELEASE: ReleaseManifest = {
+  id: '2026-11-20-foto-cabello-valoracion',
+  intents: [],
+  tools: [],
+  templates: [],
+  prompt: true,
+  mapping: true,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
+  HAIR_PHOTO_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

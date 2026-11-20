@@ -20,6 +20,7 @@ const SETTINGS = {
   cancellationPolicy: 'Cancelar con 24 horas.',
   address: 'Calle 1 # 2-3',
   additionalInfo: null,
+  assessmentOffer: null,
 };
 
 const WINDOWS = [
@@ -52,6 +53,26 @@ describe('payload del hook business.info.updated', () => {
     expect(Object.values(BUSINESS_INFO_MAPPING_RULES)).not.toContain(
       'negocio.whatsapp_de_leo',
     );
+  });
+
+  it('la valoración solo llega al bot si el administrador la escribió', () => {
+    expect(payload.assessment_offer).toBe('');
+    expect(
+      businessInfoEventPayload(
+        buildBotBusinessInfo({ ...SETTINGS, assessmentOffer: '   ' }, WINDOWS),
+      ).assessment_offer,
+    ).toBe('');
+    expect(
+      businessInfoEventPayload(
+        buildBotBusinessInfo(
+          {
+            ...SETTINGS,
+            assessmentOffer: ' La valoración capilar no tiene costo. ',
+          },
+          WINDOWS,
+        ),
+      ).assessment_offer,
+    ).toBe('La valoración capilar no tiene costo.');
   });
 
   it('un dato borrado viaja como cadena vacía para que Conduit no conserve el anterior', () => {

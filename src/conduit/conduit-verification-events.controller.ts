@@ -16,13 +16,16 @@ import {
   ReceiptAlertsService,
 } from './verification/receipt-alerts.service';
 import { TeamHandoffService } from './handoff/team-handoff.service';
-import { HAIR_CAPABILITY as HAIR_PHOTO_CAPABILITY } from './specialists/hair-photo-specialist';
+import {
+  HAIR_CAPABILITY as HAIR_PHOTO_CAPABILITY,
+  hairPhotoPreview,
+} from './specialists/hair-photo-specialist';
 
 const LIMIT_PER_MINUTE = 600;
 const VERIFICATION_CAPABILITY = 'image-analysis';
 const HAIR_PHOTO_VERDICTS = new Set(['VALID', 'NEEDS_REVIEW']);
 export const HAIR_PHOTO_REASON =
-  'Envió una foto de su cabello: una persona del equipo debe atender este chat.';
+  'Te envió una foto de su cabello para que la examines: búscala en el chat y atiéndela por ahí.';
 
 /**
  * Resultados de verificación de comprobantes que Conduit avisa por webhook.
@@ -91,12 +94,10 @@ export class ConduitVerificationEventsController {
       phone: contact.phone,
       lid: contact.phone ? null : (data.contact ?? null),
       reason: HAIR_PHOTO_REASON,
-      summary:
-        typeof data.variables?.descripcion === 'string'
-          ? data.variables.descripcion.slice(0, 160)
-          : null,
+      summary: hairPhotoPreview(data.variables),
       requestId: `foto-cabello-${data.verificationId}`,
       target: 'TEAM',
+      kind: 'HAIR_PHOTO',
     });
     return { received: true, teamNotified: notified };
   }

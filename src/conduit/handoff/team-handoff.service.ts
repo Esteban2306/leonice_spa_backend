@@ -6,6 +6,7 @@ import { EVENT_TYPES } from '../../common/events/constants/event.types';
 import { SafeCacheService } from '../../infrastructure/redis/safe-cache.service';
 
 export const TEAM_NOTICE_WINDOW_SECONDS = 30 * 60;
+export const HAIR_PHOTO_NOTICE_WINDOW_SECONDS = 10 * 60;
 
 export interface HandoffRequest {
   phone: string | null;
@@ -14,6 +15,7 @@ export interface HandoffRequest {
   summary?: string | null;
   requestId?: string;
   target: 'TEAM' | 'OWNER';
+  kind?: 'HANDOFF' | 'HAIR_PHOTO';
 }
 
 @Injectable()
@@ -27,15 +29,27 @@ export class TeamHandoffService {
   ) {}
 
   async request(input: HandoffRequest): Promise<boolean> {
+    const hairPhoto = input.kind === 'HAIR_PHOTO';
     const noticeKey = this.noticeKey(input);
-    if (noticeKey) {
+    const claimKey = hairPhoto ? this.hairPhotoKey(input) : noticeKey;
+    if (claimKey) {
       const claimed = await this.cache.setIfAbsent(
-        noticeKey,
+        claimKey,
         true,
-        TEAM_NOTICE_WINDOW_SECONDS,
+        hairPhoto
+          ? HAIR_PHOTO_NOTICE_WINDOW_SECONDS
+          : TEAM_NOTICE_WINDOW_SECONDS,
       );
       if (claimed === false) return true;
     }
+    const heldTeamWindow =
+      hairPhoto && noticeKey
+        ? (await this.cache.setIfAbsent(
+            noticeKey,
+            true,
+            TEAM_NOTICE_WINDOW_SECONDS,
+          )) === true
+        : false;
 
     let notified = false;
     try {
@@ -56,7 +70,10 @@ export class TeamHandoffService {
       );
       notified = results.some(Boolean);
     } finally {
-      if (noticeKey && !notified) await this.cache.delete(noticeKey);
+      if (!notified) {
+        if (claimKey) await this.cache.delete(claimKey);
+        if (heldTeamWindow && noticeKey) await this.cache.delete(noticeKey);
+      }
     }
     if (!notified) {
       this.logger.warn('No se pudo avisar al equipo de un traspaso.');
@@ -66,7 +83,16 @@ export class TeamHandoffService {
 
   private noticeKey(input: HandoffRequest): string | null {
     if (input.target !== 'TEAM') return null;
-    const contact = input.phone ?? (input.lid ? `lid:${input.lid}` : null);
+    const contact = this.contact(input);
     return contact ? `conduit:team-notice:${contact}` : null;
+  }
+
+  private hairPhotoKey(input: HandoffRequest): string | null {
+    const contact = this.contact(input);
+    return contact ? `conduit:hair-photo-notice:${contact}` : null;
+  }
+
+  private contact(input: HandoffRequest): string | null {
+    return input.phone ?? (input.lid ? `lid:${input.lid}` : null);
   }
 }

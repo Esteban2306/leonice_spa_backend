@@ -18,6 +18,7 @@ export interface BusinessSettingsRow {
   cancellationPolicy: string | null;
   address: string | null;
   additionalInfo: string | null;
+  assessmentOffer: string | null;
 }
 
 export interface ActiveEventRow {
@@ -76,6 +77,7 @@ export function buildBotBusinessInfo(
     cancellationPolicy: settings.cancellationPolicy,
     address: settings.address,
     additionalInfo: settings.additionalInfo,
+    assessmentOffer: settings.assessmentOffer?.trim() || null,
     timeZone: 'America/Bogota',
     weeklySchedule,
     activeEvents: events.map((event) => ({
@@ -102,6 +104,7 @@ export function businessInfoEventPayload(info: BotBusinessInfo) {
     cancellation_policy: info.cancellationPolicy ?? '',
     address: info.address ?? '',
     additional_info: info.additionalInfo ?? '',
+    assessment_offer: info.assessmentOffer ?? '',
     schedule: info.weeklySchedule.map((d) => `${d.day} ${d.hours}`).join('; '),
     active_events: info.activeEvents
       .map(
@@ -120,6 +123,7 @@ export const BUSINESS_INFO_MAPPING_RULES: Record<string, string> = {
   cancellation_policy: 'negocio.politica_cancelacion',
   address: 'negocio.direccion',
   additional_info: 'negocio.informacion_adicional',
+  assessment_offer: 'negocio.valoracion',
   schedule: 'negocio.horario',
   active_events: 'negocio.eventos_vigentes',
 };

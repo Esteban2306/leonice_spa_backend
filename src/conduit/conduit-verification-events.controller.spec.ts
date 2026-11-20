@@ -127,7 +127,11 @@ describe('foto del cabello', () => {
         verdict: 'VALID',
         verificationId: 'v9',
         humanSummary: 'Imagen legible y sin reglas configuradas.',
-        variables: { descripcion: 'Cabello largo con frizz en las puntas' },
+        variables: {
+          es_cabello: true,
+          descripcion: 'Largo, castaño, ondulado, parece tinturado.',
+          senales: 'frizz y puntas abiertas',
+        },
         reasonCodes: [],
       }),
       'evt-9',
@@ -137,12 +141,27 @@ describe('foto del cabello', () => {
       phone: '+573001112233',
       lid: null,
       reason:
-        'Envió una foto de su cabello: una persona del equipo debe atender este chat.',
-      summary: 'Cabello largo con frizz en las puntas',
+        'Te envió una foto de su cabello para que la examines: búscala en el chat y atiéndela por ahí.',
+      summary:
+        'Vista previa automática, por confirmar al ver la foto. Se ve: Largo, castaño, ondulado, parece tinturado. Se nota: frizz y puntas abiertas.',
       requestId: 'foto-cabello-v9',
       target: 'TEAM',
+      kind: 'HAIR_PHOTO',
     });
     expect(alerts.invalid).not.toHaveBeenCalled();
+  });
+
+  it('sin descripción el aviso pide revisar la foto en el chat', async () => {
+    const { controller, handoffs } = build();
+    await controller.receive(
+      event({ capability: 'foto-cabello', verdict: 'VALID', variables: {} }),
+      'evt-14',
+    );
+    expect(handoffs.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: 'Sin vista previa: revisa la foto en el chat.',
+      }),
+    );
   });
 
   it('una foto dudosa también se pasa al equipo', async () => {
