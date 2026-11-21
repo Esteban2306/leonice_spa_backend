@@ -106,12 +106,24 @@ export const FOLLOW_UPS_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const CANT_MAKE_IT_RELEASE: ReleaseManifest = {
+  id: '2026-11-23-no-puedo-llegar',
+  intents: [],
+  tools: [],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
   HAIR_PHOTO_RELEASE,
   TEAM_PRICE_RELEASE,
   FOLLOW_UPS_RELEASE,
+  CANT_MAKE_IT_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

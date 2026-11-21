@@ -6,6 +6,7 @@ import {
   HAIR_PHOTO_RELEASE,
   TEAM_PRICE_RELEASE,
   FOLLOW_UPS_RELEASE,
+  CANT_MAKE_IT_RELEASE,
   SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
@@ -271,7 +272,7 @@ describe('entrega de orientación (solo el prompt)', () => {
 
   it('por defecto se usa la entrega más reciente', async () => {
     const state = productionLike();
-    state.prompt = loadBaseline(FOLLOW_UPS_RELEASE.id).prompt;
+    state.prompt = loadBaseline(CANT_MAKE_IT_RELEASE.id).prompt;
     const { request } = fakeConduit(state);
     const out = await releaseConduit({
       env: env(),
@@ -279,8 +280,6 @@ describe('entrega de orientación (solo el prompt)', () => {
       log: () => undefined,
     });
     expect(out.plan.map((p) => [p.name, p.state])).toEqual([
-      ...FOLLOW_UPS_RELEASE.tools.map((name) => [name, 'new']),
-      ...FOLLOW_UPS_RELEASE.templates.map((name) => [name, 'new']),
       ['prompt de conversación', 'pristine'],
     ]);
   });
@@ -487,5 +486,30 @@ describe('entrega de seguimientos, fichas y horarios por hora', () => {
     expect(
       writes.some((w) => w.path === 'bots/bot/tools/t-consultar_cliente'),
     ).toBe(false);
+  });
+});
+
+describe('entrega de la clienta que no puede llegar (solo el prompt)', () => {
+  const previous = loadBaseline(CANT_MAKE_IT_RELEASE.id);
+
+  it('su foto anterior es el prompt de la entrega de seguimientos', () => {
+    expect(previous.prompt).not.toContain('no podrá llegar');
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('no podrá llegar');
+    expect(previous.prompt).toContain('missingBirthDate');
+  });
+
+  it('solo actualiza el prompt si nadie lo editó en el panel', async () => {
+    const state = productionLike();
+    state.prompt = previous.prompt;
+    const { request, writes } = fakeConduit(state);
+    await releaseConduit({
+      manifest: CANT_MAKE_IT_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
+      'PUT bots/bot/prompts/CONVERSATION',
+    ]);
   });
 });

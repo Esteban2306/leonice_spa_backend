@@ -49,6 +49,17 @@ describe('prompt del asistente de Leonice', () => {
     expect(used.filter((v) => !SUPPORTED_VARIABLES.includes(v))).toEqual([]);
   });
 
+  it('si no puede llegar le ofrece mover la cita sin cancelarla ni hablar del anticipo', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    const rule = t.split('\n').find((line) => line.includes('no podrá llegar'));
+    expect(rule).toBeDefined();
+    expect(rule).toContain('va tarde');
+    expect(rule).toContain('no es retraso ni cancelación');
+    expect(rule).toContain('sin hablar del anticipo');
+    expect(rule).toContain('purpose=RESCHEDULE');
+    expect(rule).toContain('Solo cancelas si lo pide');
+  });
+
   it('refleja las reglas del negocio', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toMatch(/no pidas|no lo pidas/i);
@@ -423,7 +434,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(15600);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(15900);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
