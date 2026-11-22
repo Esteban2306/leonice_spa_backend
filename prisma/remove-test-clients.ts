@@ -93,25 +93,30 @@ export async function removeTestClients(
 
   if (!options.apply) return { clients, counts, deleted: false };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.reservationPayment.deleteMany({ where: byReservation });
-    await tx.siigoSync.deleteMany({ where: byReservation });
-    await tx.depositRecord.deleteMany({ where: byReservation });
-    await tx.eventTicket.deleteMany({ where: byClient });
-    await tx.automationExecution.deleteMany({
-      where: { OR: [byClient, byReservation] },
-    });
-    await tx.campaignRecipient.deleteMany({ where: byClient });
-    if (quotes) await tx.teamQuote.deleteMany({ where: quoteWhere });
-    await tx.reservation.updateMany({
-      where: { rescheduledFromId: { in: reservationIds } },
-      data: { rescheduledFromId: null },
-    });
-    await tx.reservation.deleteMany({ where: { id: { in: reservationIds } } });
-    await tx.consentRecord.deleteMany({ where: byClient });
-    await tx.productViewLog.deleteMany({ where: byClient });
-    await tx.client.deleteMany({ where: { id: { in: clientIds } } });
-  });
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.reservationPayment.deleteMany({ where: byReservation });
+      await tx.siigoSync.deleteMany({ where: byReservation });
+      await tx.depositRecord.deleteMany({ where: byReservation });
+      await tx.eventTicket.deleteMany({ where: byClient });
+      await tx.automationExecution.deleteMany({
+        where: { OR: [byClient, byReservation] },
+      });
+      await tx.campaignRecipient.deleteMany({ where: byClient });
+      if (quotes) await tx.teamQuote.deleteMany({ where: quoteWhere });
+      await tx.reservation.updateMany({
+        where: { rescheduledFromId: { in: reservationIds } },
+        data: { rescheduledFromId: null },
+      });
+      await tx.reservation.deleteMany({
+        where: { id: { in: reservationIds } },
+      });
+      await tx.consentRecord.deleteMany({ where: byClient });
+      await tx.productViewLog.deleteMany({ where: byClient });
+      await tx.client.deleteMany({ where: { id: { in: clientIds } } });
+    },
+    { maxWait: 15_000, timeout: 60_000 },
+  );
   return { clients, counts, deleted: true };
 }
 
