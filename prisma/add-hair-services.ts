@@ -103,6 +103,11 @@ async function main() {
   const apply = process.argv.includes(APPLY_FLAG);
   const prisma = new PrismaClient();
   try {
+    await prisma.$connect();
+    const target = new URL(process.env.DATABASE_URL ?? '');
+    console.log(
+      `[servicios] Base de datos: ${target.hostname}:${target.port}${target.pathname}`,
+    );
     const outcome = await addHairServices(prisma, { apply });
     if (apply && outcome.created.length > 0) await invalidateCache();
   } finally {
