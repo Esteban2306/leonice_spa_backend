@@ -108,6 +108,19 @@ async function main() {
     console.log(
       `[servicios] Base de datos: ${target.hostname}:${target.port}${target.pathname}`,
     );
+    const [clients, reservations, treatments] = await Promise.all([
+      prisma.client.count(),
+      prisma.reservation.count(),
+      prisma.treatment.count(),
+    ]);
+    console.log(
+      `[servicios] Tiene ${clients} clientas, ${reservations} reservas y ${treatments} servicios.`,
+    );
+    if (apply && clients === 0) {
+      throw new Error(
+        '[servicios] Esta base no tiene clientas: no parece la de producción. No se crea nada.',
+      );
+    }
     const outcome = await addHairServices(prisma, { apply });
     if (apply && outcome.created.length > 0) await invalidateCache();
   } finally {
