@@ -7,6 +7,7 @@ import {
   TEAM_PRICE_RELEASE,
   FOLLOW_UPS_RELEASE,
   CANT_MAKE_IT_RELEASE,
+  FOLLOW_UP_TEMPLATES_RELEASE,
   SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
@@ -511,5 +512,52 @@ describe('entrega de la clienta que no puede llegar (solo el prompt)', () => {
     expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
       'PUT bots/bot/prompts/CONVERSATION',
     ]);
+  });
+});
+
+describe('entrega de solo las dos plantillas de seguimiento', () => {
+  it('crea únicamente el recordatorio del anticipo y el seguimiento, sin tocar prompt ni herramientas', async () => {
+    const { request, writes } = fakeConduit(productionLike());
+    const out = await releaseConduit({
+      manifest: FOLLOW_UP_TEMPLATES_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.map((p) => [p.name, p.state])).toEqual([
+      ['leonice_recordatorio_anticipo', 'new'],
+      ['leonice_seguimiento_interesada', 'new'],
+    ]);
+    expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
+      'POST templates',
+      'POST templates',
+    ]);
+    expect(writes.map((w) => (w.body as { name: string }).name)).toEqual([
+      'leonice_recordatorio_anticipo',
+      'leonice_seguimiento_interesada',
+    ]);
+  });
+
+  it('si ya existen y nadie las editó, no hace nada', async () => {
+    const state = productionLike();
+    (state.templates as Array<Record<string, unknown>>).push(
+      ...FOLLOW_UP_TEMPLATES_RELEASE.templates.map((name) => ({
+        id: `tpl-${name}`,
+        name,
+        channel: 'WHATSAPP',
+        ...templateDefinition(
+          CONDUIT_TEMPLATE_CATALOG.find((t) => t.name === name)!,
+        ),
+      })),
+    );
+    const { request, writes } = fakeConduit(state);
+    const out = await releaseConduit({
+      manifest: FOLLOW_UP_TEMPLATES_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.every((p) => p.state === 'current')).toBe(true);
+    expect(writes).toEqual([]);
   });
 });

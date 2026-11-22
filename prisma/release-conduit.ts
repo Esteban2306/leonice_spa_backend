@@ -106,6 +106,20 @@ export const FOLLOW_UPS_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const FOLLOW_UP_TEMPLATES_RELEASE: ReleaseManifest = {
+  id: '2026-11-22-plantillas-seguimiento',
+  intents: [],
+  tools: [],
+  templates: [
+    'leonice_recordatorio_anticipo',
+    'leonice_seguimiento_interesada',
+  ],
+  prompt: false,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const CANT_MAKE_IT_RELEASE: ReleaseManifest = {
   id: '2026-11-23-no-puedo-llegar',
   intents: [],
@@ -123,6 +137,7 @@ export const RELEASES: readonly ReleaseManifest[] = [
   HAIR_PHOTO_RELEASE,
   TEAM_PRICE_RELEASE,
   FOLLOW_UPS_RELEASE,
+  FOLLOW_UP_TEMPLATES_RELEASE,
   CANT_MAKE_IT_RELEASE,
 ];
 
