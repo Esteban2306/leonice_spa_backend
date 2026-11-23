@@ -6,14 +6,8 @@ import {
   JOB_NAMES,
   QUEUE_NAMES,
 } from '../../infrastructure/queue/queue.constants';
-import { getCalendarDayKey } from '../domain/calendar-day-key';
 import { getDayBoundaries } from '../domain/day-boundaries';
-import { computeDepositExpiry } from '../domain/deposit-expiry';
-import {
-  getOperatingWindowsForDate,
-  type DayException,
-} from '../domain/operating-hours';
-import { DEPOSIT_OPERATING_WINDOW_MS } from '../domain/reservation-timing.constants';
+import { DEPOSIT_WINDOW_MS } from '../domain/reservation-timing.constants';
 import { OperatingScheduleRepository } from '../repositories/operating-schedule.repository';
 import { enqueueWithin } from '../../infrastructure/queue/enqueue-within';
 import { NOTICE_JOB_OPTIONS } from '../../automation/domain/operational-notifications.constants';
@@ -45,46 +39,16 @@ export class DepositDeadlineService {
     private readonly communicationsQueue: Queue,
   ) {}
 
-  async computeExpiry(
+  computeExpiry(
     startedAt: Date,
     notAfter: Date,
-    client?: PrismaClientOrTx,
+    _client?: PrismaClientOrTx,
   ): Promise<Date> {
-    const fromDayKey = getCalendarDayKey(startedAt);
-    const toDayKey = getCalendarDayKey(notAfter);
-    const [base, exceptions, overrides] = await Promise.all([
-      this.scheduleRepository.findWeeklyWindows(client),
-      this.scheduleRepository.findGlobalExceptionsBetween(
-        fromDayKey,
-        toDayKey,
-        client,
+    return Promise.resolve(
+      new Date(
+        Math.min(startedAt.getTime() + DEPOSIT_WINDOW_MS, notAfter.getTime()),
       ),
-      this.scheduleRepository.findOverridesBetween(
-        fromDayKey,
-        toDayKey,
-        client,
-      ),
-    ]);
-    const overrideByDay = new Map(
-      overrides.map((override) => [override.dayKey, override]),
     );
-
-    const byDay = new Map<string, DayException[]>();
-    for (const { dayKey, ...exception } of exceptions) {
-      byDay.set(dayKey, [...(byDay.get(dayKey) ?? []), exception]);
-    }
-
-    return computeDepositExpiry({
-      startedAt,
-      operatingMs: DEPOSIT_OPERATING_WINDOW_MS,
-      notAfter,
-      windowsForDay: (day) =>
-        getOperatingWindowsForDate(day, {
-          base,
-          exceptions: byDay.get(getCalendarDayKey(day)) ?? [],
-          override: overrideByDay.get(getCalendarDayKey(day)) ?? null,
-        }),
-    });
   }
 
   async extendForScheduleChange(

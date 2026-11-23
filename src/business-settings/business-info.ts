@@ -11,7 +11,7 @@ export const BUSINESS_DAY_NAMES = [
 ] as const;
 
 export const DEPOSIT_DEADLINE_TEXT =
-  'El anticipo debe pagarse y enviarse el comprobante dentro de 2 horas de atención; si no, la reserva se cancela.';
+  'El anticipo debe pagarse y enviarse el comprobante dentro de las 24 horas siguientes a agendar (antes, si la cita es más pronto); si no, la reserva se cancela.';
 
 export interface BusinessSettingsRow {
   depositAmount: number | null;
