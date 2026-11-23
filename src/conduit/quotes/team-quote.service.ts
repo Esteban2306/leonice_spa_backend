@@ -222,7 +222,7 @@ export class TeamQuoteService {
     if (!botId) throw new Error('CONDUIT_DEFAULT_BOT_ID sin configurar');
     const digits = phone.replace(/\D/g, '');
     const page = await this.conduit.admin<{
-      data?: Array<{ id?: unknown; phoneNumber?: unknown }>;
+      data?: Array<{ id?: unknown; phoneNumber?: unknown; closedAt?: unknown }>;
     }>('GET', `bots/${botId}/conversations`, {
       query: { search: digits, limit: 5 },
     });
@@ -236,7 +236,14 @@ export class TeamQuoteService {
       `bots/${botId}/conversations/${conversation.id}/messages`,
       { query: { limit: MESSAGE_PAGE } },
     );
-    const since = now.getTime() - TEAM_QUOTE_LOOKBACK_DAYS * DAY_MS;
+    const closedAt =
+      typeof conversation.closedAt === 'string'
+        ? new Date(conversation.closedAt).getTime()
+        : Number.NaN;
+    const since = Math.max(
+      now.getTime() - TEAM_QUOTE_LOOKBACK_DAYS * DAY_MS,
+      Number.isNaN(closedAt) ? 0 : closedAt,
+    );
     return (Array.isArray(rows) ? rows : []).flatMap((row) => {
       if (row.processedBy !== 'human' || row.direction !== 'OUTBOUND') {
         return [];

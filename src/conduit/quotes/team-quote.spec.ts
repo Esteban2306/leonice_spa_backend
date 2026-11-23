@@ -210,6 +210,28 @@ describe('TeamQuoteService.save', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
+  it('lo que el equipo escribió antes de cerrar el chat ya no cuenta', async () => {
+    const { service, upsert } = build(
+      [team('Serán 300 para tu cabello', '2026-11-20T13:00:00Z')],
+      [
+        {
+          id: 'c1',
+          phoneNumber: '573001112233',
+          closedAt: '2026-11-20T14:00:00Z',
+        } as never,
+      ],
+    );
+    await expect(
+      service.save({
+        phone: PHONE,
+        treatmentName: 'Alisado',
+        amount: 300000,
+        now: NOW,
+      }),
+    ).resolves.toMatchObject({ saved: false, reason: 'NOT_IN_CHAT' });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('un mensaje del equipo de hace más de 14 días ya no cuenta', async () => {
     const { service } = build([
       team('Tiene un costo de 350,000 pesos', '2026-10-01T14:00:00Z'),
