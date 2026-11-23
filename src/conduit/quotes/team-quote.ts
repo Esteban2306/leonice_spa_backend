@@ -6,6 +6,8 @@ export const MAX_QUOTE_COP = 10_000_000;
 const GROUPED = /\d{1,3}(?:[.,\s]\d{3})+/g;
 const PLAIN = /\b\d{5,8}\b/g;
 const THOUSANDS = /\b(\d{1,4})\s*(?:mil|k)\b/gi;
+const SHORTHAND =
+  /(?<![\d:/.,$])(?<!\blas\s)(?<!\bel\s)(?<!\bde\s)\b(\d{2,4})\b(?![:/.,]\d|\s*(?:mil|k|h|hrs?|horas?|min|minutos?|a\.?\s?m|p\.?\s?m|de\s))/gi;
 
 export function amountsInText(text: string): number[] {
   const found = new Set<number>();
@@ -18,6 +20,9 @@ export function amountsInText(text: string): number[] {
   }
   for (const match of lower.matchAll(PLAIN)) {
     found.add(Number(match[0]));
+  }
+  for (const match of lower.matchAll(SHORTHAND)) {
+    found.add(Number(match[1]) * 1000);
   }
   return [...found].filter(
     (value) => value >= MIN_QUOTE_COP && value <= MAX_QUOTE_COP,
@@ -41,6 +46,7 @@ const money = (value: unknown): number | null => {
 
 export function quoteBounds(
   treatment: PricedTreatment,
+  discountPercent = 0,
 ): { min: number; max: number } | null {
   const lengthPrices = treatment.hasHairVariablePricing
     ? treatment.hairLengthPricing
@@ -65,7 +71,9 @@ export function quoteBounds(
     treatment.hasHairVariablePricing ||
     treatment.requiresPriorAssessment ||
     max > min;
-  return variable ? { min, max } : null;
+  if (!variable) return null;
+  const discount = Math.min(Math.max(discountPercent, 0), 100);
+  return { min: Math.floor((min * (100 - discount)) / 100), max };
 }
 
 export type QuoteCheck =
@@ -76,8 +84,9 @@ export function checkTeamQuote(params: {
   amount: number;
   treatment: PricedTreatment;
   teamMessages: readonly string[];
+  discountPercent?: number;
 }): QuoteCheck {
-  const bounds = quoteBounds(params.treatment);
+  const bounds = quoteBounds(params.treatment, params.discountPercent);
   if (!bounds) return { ok: false, reason: 'FIXED_PRICE' };
   if (params.amount < bounds.min || params.amount > bounds.max) {
     return { ok: false, reason: 'OUT_OF_RANGE' };

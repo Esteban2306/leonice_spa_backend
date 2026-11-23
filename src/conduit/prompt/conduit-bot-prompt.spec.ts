@@ -381,7 +381,7 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain('Nunca des datos de otras clientas');
   });
 
-  it('una foto del cabello va a una persona y nunca se toma por comprobante', () => {
+  it('una foto del cabello la revisa el equipo sin pausar el chat y nunca se toma por comprobante', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     const rule = t.indexOf('foto-cabello');
     expect(rule).toBeGreaterThan(0);
@@ -389,12 +389,19 @@ describe('prompt del asistente de Leonice', () => {
       t.indexOf('Otra imagen puede ser el comprobante'),
     );
     expect(t).toContain('no un comprobante: no registres pago');
+    expect(t).toContain('no la describas ni uses pasar_a_persona');
     expect(t).toContain(
-      'pasar_a_persona (motivo: foto de su cabello para examinar)',
+      'Cuando "[Persona del equipo]" se lo dé, guardar_precio_del_equipo',
     );
-    expect(t).toContain(
-      'El sistema ya le envió al equipo una vista previa: no la describas.',
-    );
+  });
+
+  it('un servicio con valoración ofrece hacerla en el spa o por WhatsApp con una foto desde atrás', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('ofrece dos opciones');
+    expect(t).toContain('el precio podría cambiar');
+    expect(t).toContain('tomada desde atrás');
+    expect(t).toContain('que se vea todo el largo');
+    expect(t).toContain('"serán 200" es $200.000');
   });
 
   it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
@@ -462,7 +469,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(16800);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(17400);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
