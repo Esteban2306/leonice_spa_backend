@@ -3,7 +3,7 @@ import { orderCode } from '../../product-orders/domain/order-pricing';
 import { formatPesos } from '../../product-orders/domain/order-text';
 
 export const ORDER_READY_HINT =
-  'Dile en un solo mensaje: el pedido con su código, cada producto con su precio (con promoción si la trae) y el total; luego cómo pagar, copiando paymentInstructions tal cual, y que te envíe por aquí la foto del comprobante. Si paymentInstructions viene vacío, dile que el equipo le enviará los datos de pago. No digas que está pagado.';
+  'Dile en un solo mensaje: el pedido con su código, cada producto con su precio (con promoción si la trae) y el total; luego cómo pagar, copiando paymentInstructions tal cual, y que te envíe por aquí la foto del comprobante. Si paymentInstructions viene vacío, dile que el equipo le enviará los datos de pago. No digas que está pagado. Cuando llegue la foto del comprobante, llama registrar_pago_pedido en ese mismo turno; nunca digas que lo registraste si esa herramienta no respondió received.';
 
 export const ORDER_MISSING_HINT =
   'Al pedido le falta un dato: pregunta en una sola frase lo que indica missing (la presentación entre options, o cuál producto es). Cuando responda, llama otra vez a solicitar_compra_producto con el pedido completo. No inventes precios.';

@@ -672,6 +672,17 @@ function beforeProductOrders() {
   const previous = loadBaseline(PRODUCT_ORDERS_RELEASE.id);
   const state = productionLike();
   state.prompt = previous.prompt;
+  state.templates = [
+    ...state.templates,
+    ...Object.keys(previous.templates).map((name) => ({
+      id: `tpl-${name}`,
+      name,
+      channel: templateChannel(
+        CONDUIT_TEMPLATE_CATALOG.find((t) => t.name === name)!,
+      ),
+      ...previous.templates[name],
+    })),
+  ] as never;
   state.intents = state.intents.map((intent) =>
     previous.intents[intent.key]
       ? { ...intent, ...previous.intents[intent.key] }
@@ -712,6 +723,7 @@ describe('entrega de pedidos de productos', () => {
         ['solicitar_compra_producto', 'pristine'],
         ['depositos_pendientes', 'pristine'],
         ['leonice_aviso_pago_pedido', 'new'],
+        ['leonice_aviso_compra_producto', 'pristine'],
         ['prompt de conversación', 'pristine'],
       ]),
     );
@@ -721,6 +733,8 @@ describe('entrega de pedidos de productos', () => {
     expect(createTool).toBeGreaterThan(-1);
     expect(createTool).toBeLessThan(putPrompt);
     expect(calls.filter((c) => c === 'POST templates')).toHaveLength(3);
+    expect(calls).toContain('PUT templates/tpl-leonice_aviso_compra_producto');
+    expect(calls).toContain('PUT templates/tpl-leonice_correo_compra_producto');
   });
 
   it('una entrega anterior que sube el prompt crea también las herramientas que el prompt nombra y faltan', async () => {

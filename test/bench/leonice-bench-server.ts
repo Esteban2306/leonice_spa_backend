@@ -296,6 +296,8 @@ async function main(): Promise<void> {
         Promise.resolve(fakeUpload(reservationId)),
       uploadDepositProofFromBase64: (_data: string, reservationId: string) =>
         Promise.resolve(fakeUpload(reservationId)),
+      uploadProductPaymentProofFromBase64: (_data: string, orderId: string) =>
+        Promise.resolve(fakeUpload(orderId)),
       destroyImage: () => Promise.resolve(),
     })
     .compile();
@@ -352,7 +354,9 @@ async function main(): Promise<void> {
   await app.get(BusinessSettingsService).update({
     depositAmount: 50,
     depositInstructions:
-      'Transferencia Nequi o Bancolombia (datos de prueba del banco de conversaciones).',
+      'Nequi 3100001122 a nombre de Leonice Arenas (datos de prueba del banco de conversaciones).',
+    productPaymentInstructions:
+      'Nequi 3100001122 a nombre de Leonice Arenas (datos de prueba del banco de conversaciones).',
     depositPolicy:
       'El anticipo separa el cupo y se descuenta del valor del servicio.',
     cancellationPolicy:

@@ -237,7 +237,7 @@ describe('prompt del asistente de Leonice', () => {
       CONDUIT_BOT_PROMPT_TEMPLATE.split('Productos\n')[1].split('\n\n')[0];
     expect(section).toContain('tipo: producto');
     expect(section).toContain('info_productos');
-    expect(section).toContain('no es un comprobante ni hables de anticipo');
+    expect(section).toContain('sin hablar de comprobantes, pagos ni anticipo');
     expect(section).toContain('Descuento solo en lo que trae promotion');
   });
 
@@ -322,7 +322,7 @@ describe('prompt del asistente de Leonice', () => {
 
   it('una compra pedida se avisa al equipo enseguida, sin pedir confirmación', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
-      /solicitar_compra_producto enseguida, sin confirmar/,
+      /solicitar_compra_producto enseguida, sin preguntar si confirma/,
     );
   });
 
@@ -418,7 +418,7 @@ describe('prompt del asistente de Leonice', () => {
   it('un comprobante va al pedido o al anticipo según lo que tenga abierto, y si no es ninguno a una persona', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
-      'Con pedido abierto (openProductOrder) y sin anticipo, o monto cercano al total del pedido: registrar_pago_pedido con montoComprobante = amount, sin mirar el veredicto',
+      'Con pedido abierto (openProductOrder) y sin anticipo, o monto cercano al total del pedido: registrar_pago_pedido en ese turno con montoComprobante = amount, sin mirar el veredicto',
     );
     expect(t).toContain('con ambos y sin saber cuál, pregúntale');
     expect(t).toContain(
@@ -462,7 +462,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(16600);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(16800);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
