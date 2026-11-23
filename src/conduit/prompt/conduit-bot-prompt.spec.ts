@@ -402,6 +402,9 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain('tomada desde atrás');
     expect(t).toContain('que se vea todo el largo');
     expect(t).toContain('"serán 200" es $200.000');
+    expect(t).toContain(
+      'no agendes con el rango hasta que el equipo dé el precio',
+    );
   });
 
   it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
