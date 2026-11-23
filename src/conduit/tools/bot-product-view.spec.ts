@@ -2,6 +2,7 @@ import type { CatalogProductRecord } from '../../products/catalog/product-catalo
 import {
   ALSO_IN_RITUAL_HINT,
   BOT_PRODUCTS_LIMIT,
+  PROMOTION_HINT,
   RITUAL_ITEM_HINT,
   toBotProducts,
 } from './bot-product-view';
@@ -16,6 +17,17 @@ const variant = (presentation: string, price: number) => ({
   imagePublicId: null,
   isActive: true,
   createdAt: new Date(),
+});
+
+const promo = (
+  target: { productId?: string; productCategoryId?: string },
+  discountPercentage = 20,
+) => ({
+  name: 'Semana del cuidado',
+  discountPercentage,
+  endsAt: new Date('2026-11-30T23:59:59-05:00'),
+  productId: target.productId ?? null,
+  productCategoryId: target.productCategoryId ?? null,
 });
 
 const record = (over: Record<string, unknown> = {}): CatalogProductRecord =>
@@ -194,6 +206,58 @@ describe('toBotProducts', () => {
       });
     });
 
+    it('un kit en promoción calcula el ahorro con el precio rebajado', () => {
+      const result = toBotProducts([ritual, shampoo, mascarilla], 'ritual', [
+        promo({ productId: 'r1' }),
+      ]);
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products[0]).toMatchObject({
+        type: 'ritual',
+        promotion: {
+          discount: '20 %',
+          priceFrom: 68000,
+          priceTo: 68000,
+          validUntil: '30 de noviembre',
+        },
+        ritual: { separatePrice: 100000, savings: 32000, savingsPercent: 32 },
+      });
+      expect(result.products[0].hint).toContain(PROMOTION_HINT);
+      expect(result.products[0].hint).toContain(RITUAL_ITEM_HINT);
+    });
+
+    it('al ofrecer el kit desde un producto usa el precio con promoción', () => {
+      const result = toBotProducts([ritual, shampoo, mascarilla], 'shampoo', [
+        promo({ productId: 'r1' }),
+      ]);
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products[0].alsoInRituals[0]).toMatchObject({
+        price: 68000,
+        savings: 32000,
+      });
+    });
+
+    it('si un producto del kit tiene su propia promoción, el ahorro se calcula con ese precio', () => {
+      const result = toBotProducts([ritual, shampoo, mascarilla], 'ritual', [
+        promo({ productId: 'r1' }),
+        promo({ productId: 'p2' }, 10),
+      ]);
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products[0].ritual).toMatchObject({
+        separatePrice: 94000,
+        savings: 26000,
+      });
+    });
+
+    it('un kit sin ahorro real no dice que ahorra', () => {
+      const costly = { ...ritual, variants: [variant('Ritual', 120000)] };
+      const result = toBotProducts(
+        [costly as unknown as CatalogProductRecord, shampoo, mascarilla],
+        'ritual',
+      );
+      if (result.status !== 'found') throw new Error('sin resultados');
+      expect(result.products[0].hint).toBeNull();
+    });
+
     it('encuentra el Ritual por el nombre de sus productos', () => {
       const result = toBotProducts([ritual, mascarilla], 'mascarilla');
       if (result.status !== 'found') throw new Error('sin resultados');
@@ -227,5 +291,66 @@ describe('toBotProducts', () => {
         hint: null,
       });
     });
+  });
+});
+
+describe('toBotProducts con promociones de productos', () => {
+  it('da el precio con promoción por presentación y la vigencia', () => {
+    const result = toBotProducts([record()], 'shampoo', [
+      promo({ productId: 'p1' }, 15),
+    ]);
+    if (result.status !== 'found') throw new Error('sin resultados');
+    expect(result.products[0].variants).toEqual([
+      {
+        brand: 'Kerastase',
+        presentation: '250 ml',
+        price: 40000,
+        promoPrice: 34000,
+      },
+      {
+        brand: 'Kerastase',
+        presentation: '500 ml',
+        price: 90000,
+        promoPrice: 76500,
+      },
+    ]);
+    expect(result.products[0].promotion).toEqual({
+      name: 'Semana del cuidado',
+      discount: '15 %',
+      priceFrom: 34000,
+      priceTo: 76500,
+      validUntil: '30 de noviembre',
+    });
+    expect(result.products[0].hint).toBe(PROMOTION_HINT);
+  });
+
+  it('la promoción de la categoría de productos alcanza a sus productos', () => {
+    const result = toBotProducts([record({ productCategoryId: 'c1' })], '', [
+      promo({ productCategoryId: 'c1' }),
+    ]);
+    if (result.status !== 'found') throw new Error('sin resultados');
+    expect(result.products[0].promotion?.priceFrom).toBe(32000);
+  });
+
+  it('sin búsqueda muestra primero lo que está en promoción', () => {
+    const result = toBotProducts(
+      [record(), record({ id: 'p9', name: 'Aceite capilar' })],
+      '',
+      [promo({ productId: 'p9' })],
+    );
+    if (result.status !== 'found') throw new Error('sin resultados');
+    expect(result.products.map((p) => p.name)).toEqual([
+      'Aceite capilar',
+      'Shampoo hidratante',
+    ]);
+  });
+
+  it('sin promoción no agrega precio rebajado', () => {
+    const result = toBotProducts([record()], 'shampoo', [
+      promo({ productId: 'otro' }),
+    ]);
+    if (result.status !== 'found') throw new Error('sin resultados');
+    expect(result.products[0].promotion).toBeNull();
+    expect(result.products[0].variants[0]).not.toHaveProperty('promoPrice');
   });
 });

@@ -22,6 +22,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
         'consultar_cliente',
         'info_negocio',
         'info_productos',
+        'promociones_vigentes',
         'solicitar_compra_producto',
         'listar_tratamientos',
         'info_tratamiento',

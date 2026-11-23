@@ -131,6 +131,22 @@ export const CANT_MAKE_IT_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const PRODUCT_PROMOTIONS_RELEASE: ReleaseManifest = {
+  id: '2026-11-24-promociones-productos',
+  intents: ['treatment_question', 'booking'],
+  tools: [
+    'promociones_vigentes',
+    'info_productos',
+    'solicitar_compra_producto',
+    'crear_reserva_whatsapp',
+  ],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
@@ -139,6 +155,7 @@ export const RELEASES: readonly ReleaseManifest[] = [
   FOLLOW_UPS_RELEASE,
   FOLLOW_UP_TEMPLATES_RELEASE,
   CANT_MAKE_IT_RELEASE,
+  PRODUCT_PROMOTIONS_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

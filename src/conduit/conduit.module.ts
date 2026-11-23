@@ -28,6 +28,8 @@ import { TeamHandoffService } from './handoff/team-handoff.service';
 import { BusinessSettingsModule } from '../business-settings/business-settings.module';
 import { ProductsModule } from '../products/products.module';
 import { ConduitSystemPauseService } from './pause/conduit-system-pause.service';
+import { PromotionsModule } from '../promotions/promotions.module';
+import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
 
 @Module({
   imports: [
@@ -36,6 +38,7 @@ import { ConduitSystemPauseService } from './pause/conduit-system-pause.service'
     CatalogModule,
     BusinessSettingsModule,
     ProductsModule,
+    PromotionsModule,
   ],
   controllers: [
     ConduitWebhooksController,
@@ -64,6 +67,7 @@ import { ConduitSystemPauseService } from './pause/conduit-system-pause.service'
     ConduitOutboxSweepScheduler,
     ReceiptAlertsService,
     TeamHandoffService,
+    ConduitPromotionOffersService,
   ],
   exports: [
     ConduitApiClient,

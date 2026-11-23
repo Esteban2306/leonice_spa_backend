@@ -34,4 +34,12 @@ export class CreatePromotionDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productCategoryId?: string;
 }

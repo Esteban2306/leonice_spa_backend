@@ -22,6 +22,7 @@ function build(days: unknown[]) {
       activeFor: jest.fn(() => Promise.resolve([])),
       markUsed: jest.fn(() => Promise.resolve()),
     } as never,
+    { afterBooking: jest.fn(() => Promise.resolve(null)) } as never,
   );
   return { controller, issue };
 }

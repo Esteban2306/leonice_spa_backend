@@ -17,6 +17,13 @@ export enum PromotionValidity {
 export enum PromotionTarget {
   TREATMENT = 'TREATMENT',
   CATEGORY = 'CATEGORY',
+  PRODUCT = 'PRODUCT',
+  PRODUCT_CATEGORY = 'PRODUCT_CATEGORY',
+}
+
+export enum PromotionDomain {
+  SERVICES = 'SERVICES',
+  PRODUCTS = 'PRODUCTS',
 }
 
 export class FindPromotionsQueryDto {
@@ -54,4 +61,16 @@ export class FindPromotionsQueryDto {
   @IsOptional()
   @IsUUID()
   withinCategoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productCategoryId?: string;
+
+  @IsOptional()
+  @IsEnum(PromotionDomain)
+  domain?: PromotionDomain;
 }

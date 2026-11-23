@@ -20,6 +20,11 @@ function build(results: boolean[]) {
       clients as never,
       { publishAsync } as never,
     ),
+    { findAllCurrentlyValid: jest.fn(() => Promise.resolve([])) } as never,
+    {
+      afterPurchase: jest.fn(() => Promise.resolve(null)),
+      current: jest.fn(() => Promise.resolve([])),
+    } as never,
   );
   return { controller, publishAsync };
 }

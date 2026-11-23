@@ -34,6 +34,13 @@ import {
 import { toBotTreatmentListItem } from './tools/bot-treatment-view';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
 import { TeamHandoffService } from './handoff/team-handoff.service';
+import { PromotionsService } from '../promotions/promotions.service';
+import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
+import {
+  MAX_PROMOTION_OFFERS,
+  NO_PROMOTIONS_HINT,
+  PROMOTIONS_HINT,
+} from './promotions/bot-promotion-offers';
 
 @Controller({ path: 'conduit', version: '1' })
 @ConduitTool()
@@ -45,6 +52,8 @@ export class ConduitSupportToolsController {
     private readonly productCatalog: ProductCatalogService,
     private readonly treatments: TreatmentsService,
     private readonly handoffs: TeamHandoffService,
+    private readonly promotions: PromotionsService,
+    private readonly promotionOffers: ConduitPromotionOffersService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -59,10 +68,11 @@ export class ConduitSupportToolsController {
       return { status: 'need_unclear', hint: NEED_UNCLEAR_HINT };
     }
     const phone = req.conduitContact?.phone;
-    const [treatments, catalog, client] = await Promise.all([
+    const [treatments, catalog, client, promotions] = await Promise.all([
       this.treatments.findAll(),
       this.productCatalog.listRecords(),
       phone ? this.clients.findByPhone(phone) : null,
+      this.promotions.findAllCurrentlyValid(),
     ]);
     const needs = concerns.map((concern) => ({
       need: concern.label,
@@ -72,7 +82,7 @@ export class ConduitSupportToolsController {
           ...toBotTreatmentListItem(item, client),
           why,
         })),
-      products: matchProducts(catalog, [concern]).slice(0, 3),
+      products: matchProducts(catalog, [concern], promotions).slice(0, 3),
     }));
     if (
       needs.every((n) => n.services.length === 0 && n.products.length === 0)
@@ -107,8 +117,30 @@ export class ConduitSupportToolsController {
   @ConduitToolOptionsMeta({ publicData: true })
   @Get('products')
   async products(@Query('query') query?: string) {
-    const catalog = await this.productCatalog.listRecords();
-    return toBotProducts(catalog, query?.slice(0, 80));
+    const [catalog, promotions] = await Promise.all([
+      this.productCatalog.listRecords(),
+      this.promotions.findAllCurrentlyValid(),
+    ]);
+    return toBotProducts(catalog, query?.slice(0, 80), promotions);
+  }
+
+  @ConduitToolOptionsMeta({ publicData: true })
+  @Get('promotions')
+  async currentPromotions(@Req() req: RequestWithConduitContact) {
+    const phone = req.conduitContact?.phone;
+    const client = phone ? await this.clients.findByPhone(phone) : null;
+    const offers = await this.promotionOffers.current(client);
+    if (offers.length === 0) {
+      return { status: 'none' as const, hint: NO_PROMOTIONS_HINT };
+    }
+    return {
+      status: 'found' as const,
+      total: offers.length,
+      offers: offers
+        .slice(0, MAX_PROMOTION_OFFERS)
+        .map(({ recommendedForTreatments: _, ...offer }) => offer),
+      hint: PROMOTIONS_HINT,
+    };
   }
 
   /**
@@ -140,12 +172,16 @@ export class ConduitSupportToolsController {
     );
 
     const teamNotified = results.some(Boolean);
+    const closingOffer = teamNotified
+      ? await this.promotionOffers.afterPurchase(dto.request)
+      : null;
     return {
       requested: teamNotified,
       teamNotified,
       message: teamNotified
         ? 'Se avisó al equipo: se comunicará con la clienta para coordinar la compra.'
         : 'No hay nadie del equipo a quien avisar en este momento; no prometas que alguien escribirá.',
+      ...(closingOffer && { closingOffer }),
     };
   }
 
