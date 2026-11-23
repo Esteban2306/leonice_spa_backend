@@ -30,15 +30,10 @@ describe('prompt del asistente de Leonice', () => {
     expect(missing).toEqual([]);
   });
 
-  it('no nombra herramientas que no existen', () => {
+  it('no nombra herramientas que no existen, con la misma regla con que Conduit rechaza la plantilla', () => {
     const mentioned =
       CONDUIT_BOT_PROMPT_TEMPLATE.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? [];
-    const toolLike = mentioned.filter((word) =>
-      /^(listar|consultar|disponibilidad|registrar|actualizar|crear|reservas|reagendar|cancelar|depositos|pasar|info|enlace)_/.test(
-        word,
-      ),
-    );
-    expect(toolLike.filter((word) => !TOOL_NAMES.includes(word))).toEqual([]);
+    expect(mentioned.filter((word) => !TOOL_NAMES.includes(word))).toEqual([]);
   });
 
   it('usa solo variables de plantilla que Conduit resuelve', () => {
@@ -384,7 +379,7 @@ describe('prompt del asistente de Leonice', () => {
 
   it('si hay horarios especiales configurados, los informa cuando preguntan', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
-    expect(t).toContain('Si "Datos del negocio" trae horarios_especiales');
+    expect(t).toContain('Si "Datos del negocio" trae horarios especiales');
     expect(t).toContain('para agendar, igual consulta los cupos');
   });
 
