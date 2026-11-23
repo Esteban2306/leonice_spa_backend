@@ -150,6 +150,37 @@ describe('ProductOrdersService', () => {
     );
   });
 
+  it('si la promoción terminó antes del comprobante, el pedido se recalcula con el precio normal', async () => {
+    const { service, repository } = build(
+      stored({ priceHeldUntil: new Date(Date.now() - 60_000) }),
+    );
+    (
+      service as unknown as { promotions: { findAllCurrentlyValid: jest.Mock } }
+    ).promotions.findAllCurrentlyValid.mockResolvedValue([]);
+    repository.update.mockImplementation(
+      (_id: string, data: Record<string, unknown>) =>
+        Promise.resolve(stored({ ...data, total: 490000 })),
+    );
+    const out = await service.registerPayment({
+      contact,
+      imageBase64: 'data:image/jpeg;base64,AAAA',
+      amountSeen: 392000,
+    });
+    expect(repository.replaceItems).toHaveBeenCalledWith(
+      'o1',
+      expect.objectContaining({ total: 490000, priceHeldUntil: null }),
+    );
+    expect(out).toMatchObject({ previousTotal: 392000, amountMatches: false });
+  });
+
+  it('con la promoción vigente el precio del pedido aplica hasta que termina', async () => {
+    const { service, repository } = build();
+    await service.place(placeInput);
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ priceHeldUntil: PROMO.endsAt }),
+    );
+  });
+
   it('sin pedido abierto no sube nada', async () => {
     const { service, repository } = build(null);
     const out = await service.registerPayment({
@@ -174,7 +205,7 @@ describe('ProductOrdersService', () => {
     expect(repository.update).not.toHaveBeenCalled();
   });
 
-  it('verificar el pago lo marca pagado y dispara el aviso a la clienta', async () => {
+  it('verificar el pago lo marca pagado sin escribirle a la clienta', async () => {
     const { service, repository, eventBus } = build(
       stored({ status: ProductOrderStatus.PAGO_EN_REVISION }),
     );
@@ -186,10 +217,7 @@ describe('ProductOrdersService', () => {
         verifiedByUserId: 'u1',
       }),
     );
-    expect(eventBus.publish).toHaveBeenCalledWith(
-      'product_order.payment_verified',
-      { orderId: 'o1' },
-    );
+    expect(eventBus.publish).not.toHaveBeenCalled();
   });
 
   it('rechazar el pago lo devuelve a pendiente con el motivo y avisa a la clienta', async () => {

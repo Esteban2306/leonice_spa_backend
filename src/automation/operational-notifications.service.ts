@@ -736,15 +736,11 @@ export class OperationalNotificationsService {
     });
   }
 
-  async notifyClientProductPayment(
+  async notifyClientProductPaymentRejected(
     data: ClientProductPaymentNoticeJobData,
-    outcome: 'VERIFIED' | 'REJECTED',
     ctx: ConduitSendContext,
   ): Promise<void> {
-    const type =
-      outcome === 'VERIFIED'
-        ? AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_VERIFIED_NOTICE
-        : AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_REJECTED_NOTICE;
+    const type = AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_REJECTED_NOTICE;
     const order = await this.loadProductOrder(data.orderId);
     if (!order?.phone) {
       await this.executions.log({
@@ -756,21 +752,11 @@ export class OperationalNotificationsService {
       });
       return;
     }
-    const nombre = order.clientName?.split(' ')[0] ?? 'hola';
-    const total = order.total === null ? null : Number(order.total);
-    if (outcome === 'VERIFIED') {
-      await this.send(ctx, 'CLIENT_PRODUCT_PAYMENT_VERIFIED', order.phone, {
-        nombre,
-        pedido: orderCode(order.number),
-        total: total === null ? 'tu pedido' : formatPesos(total),
-      });
-    } else {
-      await this.send(ctx, 'CLIENT_PRODUCT_PAYMENT_REJECTED', order.phone, {
-        nombre,
-        pedido: orderCode(order.number),
-        motivo: data.reason ?? 'no pudimos validarlo',
-      });
-    }
+    await this.send(ctx, 'CLIENT_PRODUCT_PAYMENT_REJECTED', order.phone, {
+      nombre: order.clientName?.split(' ')[0] ?? 'hola',
+      pedido: orderCode(order.number),
+      motivo: data.reason ?? 'no pudimos validarlo',
+    });
     await this.executions.log({
       type,
       result: AutomationExecutionResult.EXECUTED,

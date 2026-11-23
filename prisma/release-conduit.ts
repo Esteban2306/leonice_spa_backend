@@ -159,7 +159,6 @@ export const PRODUCT_ORDERS_RELEASE: ReleaseManifest = {
     'leonice_aviso_compra_producto',
     'leonice_correo_compra_producto',
     'leonice_aviso_pago_pedido',
-    'leonice_pago_pedido_verificado',
     'leonice_pago_pedido_rechazado',
   ],
   prompt: true,

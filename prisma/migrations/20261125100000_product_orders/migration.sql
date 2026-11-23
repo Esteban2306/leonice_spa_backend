@@ -28,7 +28,7 @@ CREATE TABLE "product_orders" (
     "request" TEXT,
     "notes" TEXT,
     "total" DECIMAL(12,2),
-    "price_held_until" TIMESTAMP(3) NOT NULL,
+    "price_held_until" TIMESTAMP(3),
     "proof_image_url" TEXT,
     "proof_cloudinary_id" TEXT,
     "proof_amount" DECIMAL(12,2),

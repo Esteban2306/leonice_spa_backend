@@ -68,7 +68,7 @@ export class ProductOrdersService {
       request: input.request,
       notes: input.notes,
       total: priced.total,
-      priceHeldUntil: priceHeldUntil(),
+      priceHeldUntil: priceHeldUntil(priced.items),
       items: priced.items,
     };
     const order = open
@@ -124,6 +124,7 @@ export class ProductOrdersService {
         : await this.repository.findOpen(input.contact, OPEN_ORDER_STATUSES);
     if (!order) return { order: null } as const;
 
+    const repriced = await this.repriceIfPromotionEnded(order);
     const uploaded = await this.cloudinary.uploadProductPaymentProofFromBase64(
       input.imageBase64,
       order.id,
@@ -132,7 +133,7 @@ export class ProductOrdersService {
       typeof input.amountSeen === 'number' && input.amountSeen > 0
         ? Math.round(input.amountSeen)
         : null;
-    const updated = await this.repository.update(order.id, {
+    const updated = await this.repository.update(repriced.order.id, {
       status: ProductOrderStatus.PAGO_EN_REVISION,
       proofImageUrl: uploaded.url,
       proofCloudinaryId: uploaded.publicId,
@@ -151,7 +152,49 @@ export class ProductOrdersService {
         proofReceivedAt: (updated.proofReceivedAt as Date).toISOString(),
       },
     );
-    return { order: updated, total, amountSeen, amountMatches } as const;
+    return {
+      order: updated,
+      total,
+      amountSeen,
+      amountMatches,
+      previousTotal: repriced.previousTotal,
+    } as const;
+  }
+
+  private async repriceIfPromotionEnded(
+    order: ProductOrderWithItems,
+    now: Date = new Date(),
+  ): Promise<{ order: ProductOrderWithItems; previousTotal: number | null }> {
+    const ended =
+      order.status === ProductOrderStatus.PENDIENTE_PAGO &&
+      order.priceHeldUntil !== null &&
+      order.priceHeldUntil.getTime() < now.getTime();
+    if (!ended) return { order, previousTotal: null };
+    const [catalog, promotions] = await Promise.all([
+      this.catalog.listRecords(),
+      this.promotions.findAllCurrentlyValid(),
+    ]);
+    const priced = priceOrder(
+      catalog,
+      promotions,
+      order.items.map((item) => ({
+        product: item.productName,
+        presentation: item.presentation,
+        quantity: item.quantity,
+      })),
+    );
+    const previousTotal = order.total === null ? null : Number(order.total);
+    const updated = await this.repository.replaceItems(order.id, {
+      request: order.request,
+      notes: order.notes,
+      total: priced.total,
+      priceHeldUntil: priceHeldUntil(priced.items),
+      items: priced.items,
+    });
+    return {
+      order: updated,
+      previousTotal: previousTotal === priced.total ? null : previousTotal,
+    };
   }
 
   list(filters: {
@@ -183,9 +226,6 @@ export class ProductOrdersService {
       verifiedAt: new Date(),
       verifiedByUserId: userId,
       rejectionReason: null,
-    });
-    this.eventBus.publish(EVENT_TYPES.PRODUCT_ORDER_PAYMENT_VERIFIED, {
-      orderId: id,
     });
     return updated;
   }

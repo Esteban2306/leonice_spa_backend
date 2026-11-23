@@ -392,32 +392,6 @@ export class OperationalNotificationsListener {
     }
   }
 
-  @OnEvent(EVENT_TYPES.PRODUCT_ORDER_PAYMENT_VERIFIED)
-  async handleProductPaymentVerified(
-    event: EventOf<
-      EventPayloadMap,
-      typeof EVENT_TYPES.PRODUCT_ORDER_PAYMENT_VERIFIED
-    >,
-  ): Promise<void> {
-    const data: ClientProductPaymentNoticeJobData = {
-      orderId: event.payload.orderId,
-    };
-    await this.guard(
-      'aviso cliente por pago de pedido',
-      data.orderId,
-      async () => {
-        await this.queue.add(
-          JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_VERIFIED,
-          data,
-          {
-            ...NOTICE_JOB_OPTIONS,
-            jobId: `client-product-paid-${data.orderId}`,
-          },
-        );
-      },
-    );
-  }
-
   @OnEvent(EVENT_TYPES.PRODUCT_ORDER_PAYMENT_REJECTED)
   async handleProductPaymentRejected(
     event: EventOf<

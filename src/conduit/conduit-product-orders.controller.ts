@@ -18,6 +18,7 @@ import {
   NO_OPEN_ORDER_HINT,
   PAYMENT_RECEIVED_HINT,
   PAYMENT_SHORT_HINT,
+  PROMOTION_ENDED_HINT,
 } from './tools/bot-order-view';
 
 @Controller({ path: 'conduit/product-orders', version: '1' })
@@ -57,10 +58,16 @@ export class ConduitProductOrdersController {
       amountSeen:
         result.amountSeen === null ? null : formatPesos(result.amountSeen),
       amountMatches: result.amountMatches,
-      hint:
-        result.amountMatches === false
-          ? `${PAYMENT_SHORT_HINT} ${PAYMENT_RECEIVED_HINT}`
-          : PAYMENT_RECEIVED_HINT,
+      ...(result.previousTotal !== null && {
+        previousTotal: formatPesos(result.previousTotal),
+      }),
+      hint: [
+        result.previousTotal !== null ? PROMOTION_ENDED_HINT : null,
+        result.amountMatches === false ? PAYMENT_SHORT_HINT : null,
+        PAYMENT_RECEIVED_HINT,
+      ]
+        .filter(Boolean)
+        .join(' '),
     };
   }
 }

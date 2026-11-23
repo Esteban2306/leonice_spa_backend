@@ -6,7 +6,6 @@ import {
 
 export const MAX_ORDER_ITEMS = 10;
 export const MAX_ITEM_QUANTITY = 20;
-export const PRICE_HOLD_HOURS = 24;
 
 export interface CatalogVariant {
   id: string;
@@ -36,6 +35,7 @@ export interface PricedItem {
   unitPrice: number | null;
   promoPrice: number | null;
   promotion: string | null;
+  promotionEndsAt: Date | null;
   missing: 'PRODUCT' | 'PRESENTATION' | null;
   options: string[];
 }
@@ -133,6 +133,7 @@ export function priceOrder(
           unitPrice: null,
           promoPrice: null,
           promotion: null,
+          promotionEndsAt: null,
           missing: 'PRODUCT',
           options: [],
         };
@@ -147,6 +148,7 @@ export function priceOrder(
           unitPrice: null,
           promoPrice: null,
           promotion: null,
+          promotionEndsAt: null,
           missing: 'PRESENTATION',
           options: product.variants.map((v) => v.presentation),
         };
@@ -163,6 +165,7 @@ export function priceOrder(
           ? discountedPesos(unitPrice, promotion.discountPercentage)
           : null,
         promotion: promotion?.name ?? null,
+        promotionEndsAt: promotion ? new Date(promotion.endsAt) : null,
         missing: null,
         options: [],
       };
@@ -187,6 +190,11 @@ export function parseOrderCode(code: string | null | undefined): number | null {
   return match ? Number(match[1]) : null;
 }
 
-export function priceHeldUntil(now: Date = new Date()): Date {
-  return new Date(now.getTime() + PRICE_HOLD_HOURS * 3_600_000);
+export function priceHeldUntil(
+  items: readonly Pick<PricedItem, 'promotionEndsAt'>[],
+): Date | null {
+  const ends = items
+    .map((item) => item.promotionEndsAt?.getTime())
+    .filter((time): time is number => typeof time === 'number');
+  return ends.length > 0 ? new Date(Math.min(...ends)) : null;
 }

@@ -732,7 +732,7 @@ describe('entrega de pedidos de productos', () => {
     const putPrompt = calls.indexOf('PUT bots/bot/prompts/CONVERSATION');
     expect(createTool).toBeGreaterThan(-1);
     expect(createTool).toBeLessThan(putPrompt);
-    expect(calls.filter((c) => c === 'POST templates')).toHaveLength(3);
+    expect(calls.filter((c) => c === 'POST templates')).toHaveLength(2);
     expect(calls).toContain('PUT templates/tpl-leonice_aviso_compra_producto');
     expect(calls).toContain('PUT templates/tpl-leonice_correo_compra_producto');
   });

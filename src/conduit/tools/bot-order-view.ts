@@ -3,7 +3,7 @@ import { orderCode } from '../../product-orders/domain/order-pricing';
 import { formatPesos } from '../../product-orders/domain/order-text';
 
 export const ORDER_READY_HINT =
-  'Dile en un solo mensaje: el pedido con su código, cada producto con su precio (con promoción si la trae) y el total; luego cómo pagar, copiando paymentInstructions tal cual, y que te envíe por aquí la foto del comprobante. Si paymentInstructions viene vacío, dile que el equipo le enviará los datos de pago. No digas que está pagado. Cuando llegue la foto del comprobante, llama registrar_pago_pedido en ese mismo turno; nunca digas que lo registraste si esa herramienta no respondió received.';
+  'Dile en un solo mensaje: el pedido con su código, cada producto con su precio (con promoción si la trae) y el total (si trae promotionValidUntil, que el precio con promoción aplica si paga antes de esa fecha); luego cómo pagar, copiando paymentInstructions tal cual, y que te envíe por aquí la foto del comprobante. Si paymentInstructions viene vacío, dile que el equipo le enviará los datos de pago. No digas que está pagado. Cuando llegue la foto del comprobante, llama registrar_pago_pedido en ese mismo turno; nunca digas que lo registraste si esa herramienta no respondió received.';
 
 export const ORDER_MISSING_HINT =
   'Al pedido le falta un dato: pregunta en una sola frase lo que indica missing (la presentación entre options, o cuál producto es). Cuando responda, llama otra vez a solicitar_compra_producto con el pedido completo. No inventes precios.';
@@ -13,6 +13,9 @@ export const PAYMENT_RECEIVED_HINT =
 
 export const PAYMENT_SHORT_HINT =
   'El monto del comprobante es menor que el total del pedido: díselo con amabilidad, con ambos valores, y que el equipo lo revisará. No lo acuses de nada.';
+
+export const PROMOTION_ENDED_HINT =
+  'La promoción del pedido terminó antes de que llegara el comprobante, así que el total ahora es el precio normal (total; antes previousTotal): díselo con amabilidad y que el equipo revisará su pago.';
 
 export const NO_OPEN_ORDER_HINT =
   'Esta clienta no tiene un pedido de productos abierto. Si el comprobante es del anticipo de una cita (depositos_pendientes), usa registrar_comprobante_automatico. Si es de productos, pregúntale en una frase qué productos pagó y crea el pedido con solicitar_compra_producto antes de registrar el pago.';
@@ -28,7 +31,7 @@ const HOLD_FORMAT = new Intl.DateTimeFormat('es-CO', {
 interface OrderLike {
   number: number;
   status: string;
-  priceHeldUntil: Date;
+  priceHeldUntil: Date | null;
 }
 
 export function toBotOrder(
@@ -55,7 +58,9 @@ export function toBotOrder(
       promocion: item.promotion,
     })),
     total: priced.total === null ? null : formatPesos(priced.total),
-    priceHeldUntil: HOLD_FORMAT.format(order.priceHeldUntil),
+    promotionValidUntil: order.priceHeldUntil
+      ? HOLD_FORMAT.format(order.priceHeldUntil)
+      : null,
     paymentInstructions: missing.length === 0 ? paymentInstructions : null,
     ...(missing.length > 0 && { missing }),
     hint: missing.length > 0 ? ORDER_MISSING_HINT : ORDER_READY_HINT,

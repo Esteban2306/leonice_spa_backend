@@ -90,7 +90,7 @@ export class ProductOrdersRepository {
     request: string | null;
     notes: string | null;
     total: number | null;
-    priceHeldUntil: Date;
+    priceHeldUntil: Date | null;
     items: readonly PricedItem[];
   }): Promise<ProductOrderWithItems> {
     return this.prisma.client.productOrder.create({
@@ -115,7 +115,7 @@ export class ProductOrdersRepository {
       request: string | null;
       notes: string | null;
       total: number | null;
-      priceHeldUntil: Date;
+      priceHeldUntil: Date | null;
       items: readonly PricedItem[];
     },
   ): Promise<ProductOrderWithItems> {

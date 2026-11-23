@@ -157,6 +157,11 @@ async function seedState(prisma: PrismaService, seed: StateSeed) {
             : null,
         depositClockStartedAt:
           r.status === 'PENDIENTE_DEPOSITO' ? new Date() : null,
+        ...(r.status === 'CANCELADA' && {
+          cancelledAt: new Date(Date.now() - 2 * 86_400_000),
+          cancellationSource: 'TIMEOUT' as never,
+          cancellationReason: 'Depósito no confirmado a tiempo',
+        }),
       },
     });
     if (r.deposit) {

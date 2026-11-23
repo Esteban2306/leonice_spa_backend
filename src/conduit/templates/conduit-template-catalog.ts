@@ -476,23 +476,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       'Pagó: {{pagado}}',
       'Comprobante: {{comprobante}}',
       '',
-      'Verifícalo con un clic en {{panel}}: al confirmarlo le avisamos a la clienta automáticamente.',
-    ].join('\n'),
-  },
-  {
-    code: 'CLIENT_PRODUCT_PAYMENT_VERIFIED',
-    envKey: 'CONDUIT_TEMPLATE_CLIENT_PRODUCT_PAYMENT_VERIFIED',
-    name: 'leonice_pago_pedido_verificado',
-    description:
-      'La clienta pagó un pedido de productos y el equipo ya verificó el comprobante.',
-    audience: 'CLIENT',
-    variables: ['nombre', 'pedido', 'total'],
-    body: [
-      'Hola {{nombre}} 🌿',
-      '',
-      'Confirmamos el pago de tu pedido *{{pedido}}* por *{{total}}*. ¡Gracias!',
-      '',
-      'Te escribimos por aquí para coordinar la entrega o la recogida en el spa.',
+      'Verifícalo con un clic en {{panel}}. Si lo rechazas, le avisamos a la clienta el motivo automáticamente.',
     ].join('\n'),
   },
   {
