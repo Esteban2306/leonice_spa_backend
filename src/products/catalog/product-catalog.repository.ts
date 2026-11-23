@@ -43,6 +43,7 @@ const catalogProductArgs = {
                 slug: true,
                 name: true,
                 isActive: true,
+                productCategoryId: true,
                 category: { select: { isActive: true } },
               },
             },

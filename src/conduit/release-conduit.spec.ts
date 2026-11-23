@@ -6,6 +6,9 @@ import {
   HAIR_PHOTO_RELEASE,
   TEAM_PRICE_RELEASE,
   FOLLOW_UPS_RELEASE,
+  CANT_MAKE_IT_RELEASE,
+  FOLLOW_UP_TEMPLATES_RELEASE,
+  PRODUCT_PROMOTIONS_RELEASE,
   SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
@@ -95,6 +98,25 @@ function fakeConduit(state = productionLike()) {
     return Promise.reject(new Error(`ruta inesperada ${path}`));
   });
   return { request, writes };
+}
+
+function beforeProductPromotions() {
+  const previous = loadBaseline(PRODUCT_PROMOTIONS_RELEASE.id);
+  const state = productionLike();
+  state.prompt = previous.prompt;
+  state.intents = state.intents.map((intent) =>
+    previous.intents[intent.key]
+      ? { ...intent, ...previous.intents[intent.key] }
+      : intent,
+  );
+  state.tools = Object.keys(previous.tools).map((name) => ({
+    id: `t-${name}`,
+    name,
+    isActive: true,
+    endpointUrl: `https://spa/api/v1/${name}`,
+    ...previous.tools[name],
+  })) as never;
+  return state;
 }
 
 const env = (extra: Record<string, string> = {}) => ({
@@ -270,19 +292,13 @@ describe('entrega de orientación (solo el prompt)', () => {
   const guidance = loadBaseline(GUIDANCE_RELEASE.id);
 
   it('por defecto se usa la entrega más reciente', async () => {
-    const state = productionLike();
-    state.prompt = loadBaseline(FOLLOW_UPS_RELEASE.id).prompt;
-    const { request } = fakeConduit(state);
+    const { request } = fakeConduit(beforeProductPromotions());
     const out = await releaseConduit({
       env: env(),
       request: request as never,
       log: () => undefined,
     });
-    expect(out.plan.map((p) => [p.name, p.state])).toEqual([
-      ...FOLLOW_UPS_RELEASE.tools.map((name) => [name, 'new']),
-      ...FOLLOW_UPS_RELEASE.templates.map((name) => [name, 'new']),
-      ['prompt de conversación', 'pristine'],
-    ]);
+    expect(out.plan.map((p) => p.name)).toContain('promociones_vigentes');
   });
 
   it('su foto anterior es el prompt de la entrega Sofía y el nuevo lo cambia', () => {
@@ -486,6 +502,139 @@ describe('entrega de seguimientos, fichas y horarios por hora', () => {
     });
     expect(
       writes.some((w) => w.path === 'bots/bot/tools/t-consultar_cliente'),
+    ).toBe(false);
+  });
+});
+
+describe('entrega de la clienta que no puede llegar (solo el prompt)', () => {
+  const previous = loadBaseline(CANT_MAKE_IT_RELEASE.id);
+
+  it('su foto anterior es el prompt de la entrega de seguimientos', () => {
+    expect(previous.prompt).not.toContain('no podrá llegar');
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('no podrá llegar');
+    expect(previous.prompt).toContain('missingBirthDate');
+  });
+
+  it('solo actualiza el prompt si nadie lo editó en el panel', async () => {
+    const state = productionLike();
+    state.prompt = previous.prompt;
+    const { request, writes } = fakeConduit(state);
+    await releaseConduit({
+      manifest: CANT_MAKE_IT_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
+      'PUT bots/bot/prompts/CONVERSATION',
+    ]);
+  });
+});
+
+describe('entrega de solo las dos plantillas de seguimiento', () => {
+  it('crea únicamente el recordatorio del anticipo y el seguimiento, sin tocar prompt ni herramientas', async () => {
+    const { request, writes } = fakeConduit(productionLike());
+    const out = await releaseConduit({
+      manifest: FOLLOW_UP_TEMPLATES_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.map((p) => [p.name, p.state])).toEqual([
+      ['leonice_recordatorio_anticipo', 'new'],
+      ['leonice_seguimiento_interesada', 'new'],
+    ]);
+    expect(writes.map((w) => `${w.method} ${w.path}`)).toEqual([
+      'POST templates',
+      'POST templates',
+    ]);
+    expect(writes.map((w) => (w.body as { name: string }).name)).toEqual([
+      'leonice_recordatorio_anticipo',
+      'leonice_seguimiento_interesada',
+    ]);
+  });
+
+  it('si ya existen y nadie las editó, no hace nada', async () => {
+    const state = productionLike();
+    (state.templates as Array<Record<string, unknown>>).push(
+      ...FOLLOW_UP_TEMPLATES_RELEASE.templates.map((name) => ({
+        id: `tpl-${name}`,
+        name,
+        channel: 'WHATSAPP',
+        ...templateDefinition(
+          CONDUIT_TEMPLATE_CATALOG.find((t) => t.name === name)!,
+        ),
+      })),
+    );
+    const { request, writes } = fakeConduit(state);
+    const out = await releaseConduit({
+      manifest: FOLLOW_UP_TEMPLATES_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.every((p) => p.state === 'current')).toBe(true);
+    expect(writes).toEqual([]);
+  });
+});
+
+describe('entrega de promociones de productos y oferta al cierre', () => {
+  const previous = loadBaseline(PRODUCT_PROMOTIONS_RELEASE.id);
+
+  it('su foto anterior no conoce las promociones de productos ni el cierre', () => {
+    expect(previous.prompt).toContain('no podrá llegar');
+    expect(previous.prompt).not.toContain('closingOffer');
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('closingOffer');
+    expect(Object.keys(previous.tools).sort()).toEqual([
+      'crear_reserva_whatsapp',
+      'info_productos',
+      'solicitar_compra_producto',
+    ]);
+    expect(Object.keys(previous.intents).sort()).toEqual([
+      'booking',
+      'treatment_question',
+    ]);
+  });
+
+  it('crea la herramienta de promociones y actualiza lo que nadie editó', async () => {
+    const { request, writes } = fakeConduit(beforeProductPromotions());
+    const out = await releaseConduit({
+      manifest: PRODUCT_PROMOTIONS_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.map((p) => [p.name, p.state])).toEqual(
+      expect.arrayContaining([
+        ['promociones_vigentes', 'new'],
+        ['info_productos', 'pristine'],
+        ['solicitar_compra_producto', 'pristine'],
+        ['crear_reserva_whatsapp', 'pristine'],
+        ['booking', 'pristine'],
+        ['treatment_question', 'pristine'],
+        ['prompt de conversación', 'pristine'],
+      ]),
+    );
+    const calls = writes.map((w) => `${w.method} ${w.path}`);
+    expect(calls).toContain('PUT bots/bot/prompts/CONVERSATION');
+    expect(calls.some((c) => c.includes('/mappings/'))).toBe(false);
+    expect(calls.some((c) => c.startsWith('POST templates'))).toBe(false);
+  });
+
+  it('una herramienta editada en el panel no se pisa', async () => {
+    const state = beforeProductPromotions();
+    (state.tools as Array<{ name: string; description: string }>).find(
+      (t) => t.name === 'info_productos',
+    )!.description = 'Texto propio del administrador';
+    const { request, writes } = fakeConduit(state);
+    await releaseConduit({
+      manifest: PRODUCT_PROMOTIONS_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(
+      writes.some((w) => w.path === 'bots/bot/tools/t-info_productos'),
     ).toBe(false);
   });
 });

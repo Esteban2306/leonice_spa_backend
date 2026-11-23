@@ -8,6 +8,13 @@ import { PromotionsRepository } from './promotions.repository';
 import { CreatePromotionDto } from './dto/create-promotion.dto';
 import { UpdatePromotionDto } from './dto/update-promotion.dto';
 import { FindPromotionsQueryDto } from './dto/find-promotions-query.dto';
+import {
+  PromotionTarget,
+  PromotionTargetIds,
+  promotionTargetsOf,
+  targetColumns,
+  touchesTarget,
+} from './domain/promotion-target';
 
 @Injectable()
 export class PromotionsService {
@@ -28,62 +35,36 @@ export class PromotionsService {
   }
 
   async create(dto: CreatePromotionDto) {
-    this.assertExactlyOneTarget(dto.treatmentId, dto.categoryId);
+    const target = this.exactlyOneTarget(dto);
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
     this.assertValidDateRange(startsAt, endsAt);
-    await this.assertNoOverlap({
-      treatmentId: dto.treatmentId,
-      categoryId: dto.categoryId,
-      startsAt,
-      endsAt,
-    });
+    await this.assertTargetExists(target);
+    await this.assertNoOverlap({ target, startsAt, endsAt });
 
     return this.repository.create({
       name: dto.name,
       discountPercentage: dto.discountPercentage,
       startsAt,
       endsAt,
-      treatmentId: dto.treatmentId,
-      categoryId: dto.categoryId,
+      ...targetColumns(target),
     });
   }
 
   async update(id: string, dto: UpdatePromotionDto) {
     const current = await this.findOne(id);
-
-    if (dto.treatmentId !== undefined || dto.categoryId !== undefined) {
-      const treatmentId =
-        dto.treatmentId !== undefined
-          ? dto.treatmentId
-          : (current.treatmentId ?? undefined);
-      const categoryId =
-        dto.categoryId !== undefined
-          ? dto.categoryId
-          : (current.categoryId ?? undefined);
-      this.assertExactlyOneTarget(treatmentId, categoryId);
-    }
+    const changesTarget = touchesTarget(dto);
+    const target = changesTarget
+      ? this.exactlyOneTarget(dto)
+      : this.exactlyOneTarget(current);
+    if (changesTarget) await this.assertTargetExists(target);
 
     const startsAt = dto.startsAt ? new Date(dto.startsAt) : current.startsAt;
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : current.endsAt;
     this.assertValidDateRange(startsAt, endsAt);
 
     if (dto.isActive ?? current.isActive) {
-      const treatmentId =
-        dto.treatmentId !== undefined
-          ? dto.treatmentId || null
-          : current.treatmentId;
-      const categoryId =
-        dto.categoryId !== undefined
-          ? dto.categoryId || null
-          : current.categoryId;
-      await this.assertNoOverlap({
-        treatmentId,
-        categoryId,
-        startsAt,
-        endsAt,
-        excludeId: id,
-      });
+      await this.assertNoOverlap({ target, startsAt, endsAt, excludeId: id });
     }
 
     return this.repository.update(id, {
@@ -93,16 +74,7 @@ export class PromotionsService {
       }),
       ...(dto.startsAt !== undefined && { startsAt }),
       ...(dto.endsAt !== undefined && { endsAt }),
-      ...(dto.treatmentId !== undefined && {
-        treatment: dto.treatmentId
-          ? { connect: { id: dto.treatmentId } }
-          : { disconnect: true },
-      }),
-      ...(dto.categoryId !== undefined && {
-        category: dto.categoryId
-          ? { connect: { id: dto.categoryId } }
-          : { disconnect: true },
-      }),
+      ...(changesTarget && targetColumns(target)),
       ...(dto.isActive !== undefined && { isActive: dto.isActive }),
     });
   }
@@ -132,20 +104,28 @@ export class PromotionsService {
     await this.repository.delete(id);
   }
 
-  private assertExactlyOneTarget(treatmentId?: string, categoryId?: string) {
-    if (!treatmentId && !categoryId)
+  private exactlyOneTarget(ids: PromotionTargetIds): PromotionTarget {
+    const targets = promotionTargetsOf(ids);
+    if (targets.length === 0)
       throw new BadRequestException(
-        'La promoción necesita un tratamiento o una categoría',
+        'La promoción necesita a qué aplica: un servicio, una categoría de servicios, un producto o kit, o una categoría de productos',
       );
-    if (treatmentId && categoryId)
+    if (targets.length > 1)
       throw new BadRequestException(
-        'La promoción debe apuntar a uno de los dos, no a ambos',
+        'La promoción debe aplicar a una sola cosa',
+      );
+    return targets[0];
+  }
+
+  private async assertTargetExists(target: PromotionTarget) {
+    if (!(await this.repository.targetExists(target)))
+      throw new BadRequestException(
+        'Lo que elegiste para la promoción ya no existe',
       );
   }
 
   private async assertNoOverlap(params: {
-    treatmentId?: string | null;
-    categoryId?: string | null;
+    target: PromotionTarget;
     startsAt: Date;
     endsAt: Date;
     excludeId?: string;
@@ -153,7 +133,7 @@ export class PromotionsService {
     const overlapping = await this.repository.findOverlapping(params);
     if (overlapping) {
       throw new ConflictException(
-        `Ya hay una promoción activa en esas fechas para el mismo servicio o categoría: "${overlapping.name}"`,
+        `Ya hay una promoción activa en esas fechas para lo mismo: "${overlapping.name}"`,
       );
     }
   }

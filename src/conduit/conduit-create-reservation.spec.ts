@@ -12,7 +12,11 @@ const CATALOG = [
 
 function build(
   active: Array<{ id: string; treatmentId: string; price: number }> = [],
+  closingOffer: unknown = null,
 ) {
+  const afterBooking = jest.fn((_ids: string[]) =>
+    Promise.resolve(closingOffer),
+  );
   const execute = jest.fn((_dto?: unknown, _opts?: unknown) =>
     Promise.resolve({
       reservations: [{ id: 'res-1', treatmentId: ID_A }],
@@ -33,8 +37,9 @@ function build(
     {} as never,
     {} as never,
     quotes as never,
+    { afterBooking } as never,
   );
-  return { controller, execute, quotes };
+  return { controller, execute, quotes, afterBooking };
 }
 
 const base = {
@@ -151,6 +156,7 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
           activeFor: jest.fn(() => Promise.resolve([])),
           markUsed: jest.fn(() => Promise.resolve()),
         } as never,
+        { afterBooking: jest.fn(() => Promise.resolve(null)) } as never,
       );
       return { controller, getAvailabilityCalendar };
     }
@@ -208,5 +214,21 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
         date: '2026-11-02',
       });
     });
+  });
+});
+
+describe('POST conduit/booking/reservations · promoción para el cierre', () => {
+  it('devuelve la promoción elegida para los servicios reservados', async () => {
+    const closing = { offer: { name: 'Kit post alisado' }, hint: 'cierre' };
+    const { controller, afterBooking } = build([], closing);
+    const out = await controller.create({ ...base, treatments: [ID_A] }, req);
+    expect(afterBooking).toHaveBeenCalledWith([ID_A]);
+    expect(out).toMatchObject({ closingOffer: closing });
+  });
+
+  it('sin promoción vigente la respuesta queda igual', async () => {
+    const { controller } = build();
+    const out = await controller.create({ ...base, treatments: [ID_A] }, req);
+    expect(out).not.toHaveProperty('closingOffer');
   });
 });

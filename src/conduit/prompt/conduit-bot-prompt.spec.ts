@@ -49,6 +49,33 @@ describe('prompt del asistente de Leonice', () => {
     expect(used.filter((v) => !SUPPORTED_VARIABLES.includes(v))).toEqual([]);
   });
 
+  it('ofrece promociones de productos y kits, y una sola al cerrar sin preguntar', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    const promos = t
+      .split('\n')
+      .find((line) => line.startsWith('- Promociones:'));
+    expect(promos).toContain('productos y kits en info_productos');
+    expect(promos).toContain('promociones_vigentes');
+    expect(promos).toContain('una sola vez por conversación');
+    const closing = t
+      .split('\n')
+      .find((line) => line.startsWith('- Al cerrar:'));
+    expect(closing).toContain('closingOffer');
+    expect(closing).toContain('sin pregunta');
+    expect(closing).toContain('si no hablaron ya de ella');
+  });
+
+  it('si no puede llegar le ofrece mover la cita sin cancelarla ni hablar del anticipo', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    const rule = t.split('\n').find((line) => line.includes('no podrá llegar'));
+    expect(rule).toBeDefined();
+    expect(rule).toContain('va tarde');
+    expect(rule).toContain('no es retraso ni cancelación');
+    expect(rule).toContain('sin hablar del anticipo');
+    expect(rule).toContain('purpose=RESCHEDULE');
+    expect(rule).toContain('Solo cancelas si lo pide');
+  });
+
   it('refleja las reglas del negocio', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toMatch(/no pidas|no lo pidas/i);
@@ -423,7 +450,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(15600);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(16100);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

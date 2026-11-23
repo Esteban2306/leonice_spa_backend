@@ -64,6 +64,7 @@ const CONDUIT_TOOL_ALLOW_LIST = [
   'GET /api/v1/conduit/business-info',
   'GET /api/v1/conduit/clients/me',
   'GET /api/v1/conduit/products',
+  'GET /api/v1/conduit/promotions',
   'GET /api/v1/conduit/recommendations',
   'GET /api/v1/deposits/pending',
   'PATCH /api/v1/conduit/clients',

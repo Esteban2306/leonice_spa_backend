@@ -106,12 +106,56 @@ export const FOLLOW_UPS_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const FOLLOW_UP_TEMPLATES_RELEASE: ReleaseManifest = {
+  id: '2026-11-22-plantillas-seguimiento',
+  intents: [],
+  tools: [],
+  templates: [
+    'leonice_recordatorio_anticipo',
+    'leonice_seguimiento_interesada',
+  ],
+  prompt: false,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
+export const CANT_MAKE_IT_RELEASE: ReleaseManifest = {
+  id: '2026-11-23-no-puedo-llegar',
+  intents: [],
+  tools: [],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
+export const PRODUCT_PROMOTIONS_RELEASE: ReleaseManifest = {
+  id: '2026-11-24-promociones-productos',
+  intents: ['treatment_question', 'booking'],
+  tools: [
+    'promociones_vigentes',
+    'info_productos',
+    'solicitar_compra_producto',
+    'crear_reserva_whatsapp',
+  ],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
   HAIR_PHOTO_RELEASE,
   TEAM_PRICE_RELEASE,
   FOLLOW_UPS_RELEASE,
+  FOLLOW_UP_TEMPLATES_RELEASE,
+  CANT_MAKE_IT_RELEASE,
+  PRODUCT_PROMOTIONS_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

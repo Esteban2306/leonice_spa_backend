@@ -1,4 +1,10 @@
 import type { CatalogProductRecord } from '../../products/catalog/product-catalog.repository';
+import {
+  discountedPesos,
+  productPromotionFor,
+  ProductPromotionSource,
+} from '../../products/domain/product-promotion';
+import { formatPromotionEnd } from './bot-treatment-view';
 
 interface Concern {
   key: string;
@@ -137,7 +143,11 @@ export interface RecommendedProduct {
   name: string;
   price: string;
   why: string[];
+  promotion?: { discount: string; price: string; validUntil: string };
 }
+
+const priceText = (low: number, high: number) =>
+  low === high ? pesos(low) : `desde ${pesos(low)}`;
 
 const pesos = (value: number) =>
   `$${Math.round(value).toLocaleString('es-CO')}`;
@@ -145,6 +155,7 @@ const pesos = (value: number) =>
 export function matchProducts(
   catalog: readonly CatalogProductRecord[],
   concerns: Concern[],
+  promotions: readonly ProductPromotionSource[] = [],
 ): RecommendedProduct[] {
   return catalog
     .filter((product) => product.variants.length > 0)
@@ -170,11 +181,22 @@ export function matchProducts(
       const prices = product.variants.map((variant) => Number(variant.price));
       const low = Math.min(...prices);
       const high = Math.max(...prices);
+      const active = productPromotionFor(promotions, product);
       return {
         type: product.kind === 'COMBO' ? 'ritual' : 'producto',
         name: product.name,
-        price: low === high ? pesos(low) : `desde ${pesos(low)}`,
+        price: priceText(low, high),
         why: reasons,
+        ...(active && {
+          promotion: {
+            discount: `${active.discountPercentage} %`,
+            price: priceText(
+              discountedPesos(low, active.discountPercentage),
+              discountedPesos(high, active.discountPercentage),
+            ),
+            validUntil: formatPromotionEnd(active.endsAt),
+          },
+        }),
       };
     });
 }

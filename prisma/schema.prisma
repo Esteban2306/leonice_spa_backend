@@ -394,26 +394,33 @@ model Promotion {
   endsAt             DateTime              @map("ends_at")
   treatmentId        String?               @map("treatment_id")
   categoryId         String?               @map("category_id")
+  productId          String?               @map("product_id")
+  productCategoryId  String?               @map("product_category_id")
   isActive           Boolean               @default(true) @map("is_active")
   createdAt          DateTime              @default(now()) @map("created_at")
   executions         AutomationExecution[]
   automationRules    AutomationRule[]
   category           Category?             @relation(fields: [categoryId], references: [id])
   treatment          Treatment?            @relation(fields: [treatmentId], references: [id])
+  product            Product?              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productCategory    ProductCategory?      @relation(fields: [productCategoryId], references: [id], onDelete: Cascade)
 
   @@index([startsAt, endsAt])
+  @@index([productId])
+  @@index([productCategoryId])
   @@map("promotions")
 }
 
 model ProductCategory {
-  id           String    @id @default(uuid())
-  name         String    @unique
-  isActive     Boolean   @default(true) @map("is_active")
-  slug         String    @unique
+  id           String      @id @default(uuid())
+  name         String      @unique
+  isActive     Boolean     @default(true) @map("is_active")
+  slug         String      @unique
   description  String?
-  iconKey      String?   @map("icon_key")
-  displayOrder Int       @default(0) @map("display_order")
+  iconKey      String?     @map("icon_key")
+  displayOrder Int         @default(0) @map("display_order")
   products     Product[]
+  promotions   Promotion[]
 
   @@map("product_categories")
 }
@@ -444,6 +451,7 @@ model Product {
   viewLogs           ProductViewLog[]
   category           ProductCategory                  @relation(fields: [productCategoryId], references: [id])
   recommendations    TreatmentProductRecommendation[]
+  promotions         Promotion[]
 
   @@index([productCategoryId])
   @@index([kind])

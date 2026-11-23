@@ -1,3 +1,4 @@
+import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
 import {
   BadRequestException,
   Body,
@@ -61,6 +62,7 @@ export class ConduitBookingToolsController {
     private readonly clientsRepository: ClientsRepository,
     private readonly cancellationLinks: CancellationLinkService,
     private readonly teamQuotes: TeamQuoteService,
+    private readonly promotionOffers: ConduitPromotionOffersService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -164,6 +166,7 @@ export class ConduitBookingToolsController {
           priceOverrides: new Map(quotes.map((q) => [q.treatmentId, q.price])),
         },
       );
+      const closingOffer = await this.promotionOffers.afterBooking(treatments);
       await this.teamQuotes.markUsed(
         quotes.flatMap((q) => {
           const reservation = result.reservations.find(
@@ -174,7 +177,7 @@ export class ConduitBookingToolsController {
             : [];
         }),
       );
-      return result;
+      return closingOffer ? { ...result, closingOffer } : result;
     } catch (error) {
       throw await this.withAlternatives(error, treatments, dto.scheduledStart);
     }

@@ -93,6 +93,7 @@ function item(product: CatalogProductRecord, quantity = 1, isActive = true) {
         slug: product.slug,
         name: product.name,
         isActive: product.isActive,
+        productCategoryId: product.productCategoryId,
         category: { isActive: true },
       },
     },

@@ -54,6 +54,8 @@ function promotion(treatmentId: string): Promotion {
     endsAt: new Date('2026-10-31T00:00:00Z'),
     treatmentId,
     categoryId: null,
+    productId: null,
+    productCategoryId: null,
     isActive: true,
     createdAt: new Date('2026-10-01T00:00:00Z'),
   };

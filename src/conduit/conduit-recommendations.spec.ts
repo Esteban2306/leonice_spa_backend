@@ -49,6 +49,11 @@ function build() {
       ),
     } as never,
     {} as never,
+    { findAllCurrentlyValid: jest.fn(() => Promise.resolve([])) } as never,
+    {
+      afterPurchase: jest.fn(() => Promise.resolve(null)),
+      current: jest.fn(() => Promise.resolve([])),
+    } as never,
   );
 }
 

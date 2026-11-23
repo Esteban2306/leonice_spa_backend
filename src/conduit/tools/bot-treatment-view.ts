@@ -120,7 +120,7 @@ const PROMOTION_END_FORMAT = new Intl.DateTimeFormat('es-CO', {
   month: 'long',
 });
 
-const formatPromotionEnd = (endsAt: Date | string): string =>
+export const formatPromotionEnd = (endsAt: Date | string): string =>
   PROMOTION_END_FORMAT.format(new Date(endsAt));
 
 export function toBotTreatment(

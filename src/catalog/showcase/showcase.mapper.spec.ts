@@ -80,6 +80,8 @@ function promotion(treatmentId: string): Promotion {
     endsAt: NOW,
     treatmentId,
     categoryId: null,
+    productId: null,
+    productCategoryId: null,
     isActive: true,
     createdAt: NOW,
   };

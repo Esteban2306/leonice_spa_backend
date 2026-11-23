@@ -8,10 +8,13 @@ import { PromotionsRepository } from './promotions.repository';
 
 const TREATMENT = '3f1c2c1e-9d52-4a5e-8d6d-0b8f9d3b1111';
 const CATEGORY = '4a2d3d2f-0e63-4b6f-9e7e-1c9f0e4c2222';
+const PRODUCT = '5b3e4e3a-1f74-4c7a-8f8f-2d0a1f5d3333';
+const KIT_CATEGORY = '6c4f5f4b-2a85-4d8b-9a9a-3e1b2a6e4444';
 
 function build(overlap: { id: string; name: string } | null = null) {
   const repository = {
     findOverlapping: jest.fn().mockResolvedValue(overlap),
+    targetExists: jest.fn().mockResolvedValue(true),
     create: jest.fn().mockResolvedValue({ id: 'new' }),
     update: jest.fn().mockResolvedValue({ id: 'p1' }),
     countBlockingReferences: jest
@@ -23,6 +26,8 @@ function build(overlap: { id: string; name: string } | null = null) {
       name: 'Actual',
       treatmentId: TREATMENT,
       categoryId: null,
+      productId: null,
+      productCategoryId: null,
       startsAt: new Date('2026-11-01T05:00:00Z'),
       endsAt: new Date('2026-11-10T05:00:00Z'),
       isActive: true,
@@ -46,7 +51,9 @@ describe('PromotionsService', () => {
     const { service, repository } = build();
     await service.create({ ...dto, categoryId: CATEGORY });
     expect(repository.findOverlapping).toHaveBeenCalledWith(
-      expect.objectContaining({ categoryId: CATEGORY }),
+      expect.objectContaining({
+        target: { field: 'categoryId', id: CATEGORY },
+      }),
     );
     expect(repository.create).toHaveBeenCalled();
   });
@@ -79,7 +86,10 @@ describe('PromotionsService', () => {
     const { service, repository } = build();
     await service.update('p1', { endsAt: '2026-11-20T23:59:59-05:00' });
     expect(repository.findOverlapping).toHaveBeenCalledWith(
-      expect.objectContaining({ treatmentId: TREATMENT, excludeId: 'p1' }),
+      expect.objectContaining({
+        target: { field: 'treatmentId', id: TREATMENT },
+        excludeId: 'p1',
+      }),
     );
   });
 
@@ -115,5 +125,47 @@ describe('PromotionsService', () => {
       NotFoundException,
     );
     expect(repository.delete).not.toHaveBeenCalled();
+  });
+
+  it('crea una promoción para un producto o kit y solo revisa cruces con ese producto', async () => {
+    const { service, repository } = build();
+    await service.create({ ...dto, productId: PRODUCT });
+    expect(repository.findOverlapping).toHaveBeenCalledWith(
+      expect.objectContaining({ target: { field: 'productId', id: PRODUCT } }),
+    );
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productId: PRODUCT,
+        treatmentId: null,
+        categoryId: null,
+        productCategoryId: null,
+      }),
+    );
+  });
+
+  it('rechaza una promoción con dos objetivos, como un servicio y un producto', async () => {
+    const { service, repository } = build();
+    await expect(
+      service.create({ ...dto, treatmentId: TREATMENT, productId: PRODUCT }),
+    ).rejects.toThrow('una sola cosa');
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('no crea la promoción si el producto elegido ya no existe', async () => {
+    const { service, repository } = build();
+    repository.targetExists.mockResolvedValue(false);
+    await expect(
+      service.create({ ...dto, productCategoryId: KIT_CATEGORY }),
+    ).rejects.toThrow('ya no existe');
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('al cambiar el objetivo de servicio a producto limpia el anterior', async () => {
+    const { service, repository } = build();
+    await service.update('p1', { productId: PRODUCT });
+    expect(repository.update).toHaveBeenCalledWith(
+      'p1',
+      expect.objectContaining({ productId: PRODUCT, treatmentId: null }),
+    );
   });
 });

@@ -1,5 +1,12 @@
 import type { CatalogProductRecord } from '../../products/catalog/product-catalog.repository';
 import { computeRitualPricing } from '../../products/domain/ritual-pricing';
+import {
+  discountedPesos,
+  productPromotionFor,
+  ProductPromotionPrice,
+  ProductPromotionSource,
+} from '../../products/domain/product-promotion';
+import { formatPromotionEnd } from './bot-treatment-view';
 
 export const BOT_PRODUCTS_LIMIT = 5;
 const VARIANTS_PER_PRODUCT = 6;
@@ -40,6 +47,15 @@ export interface BotProductVariant {
   brand: string;
   presentation: string;
   price: number;
+  promoPrice?: number;
+}
+
+export interface BotProductPromotion {
+  name: string;
+  discount: string;
+  priceFrom: number;
+  priceTo: number;
+  validUntil: string;
 }
 
 export interface BotRitualInfo {
@@ -64,6 +80,9 @@ export interface BotRitualOffer {
 export const RITUAL_ITEM_HINT =
   'Es un Ritual: un combo con precio especial. Cuéntale qué incluye y cuánto ahorra frente a comprar cada producto por separado.';
 
+export const PROMOTION_HINT =
+  'Tiene promoción vigente: dile el precio normal, el descuento, el precio con promoción (promoPrice) y hasta cuándo, una sola vez y sin presionar. Si lo quiere comprar, pon el precio con promoción en la solicitud.';
+
 export const ALSO_IN_RITUAL_HINT =
   'Este producto también viene en un Ritual con precio especial. Después de responder lo que preguntó, menciónale una sola vez el Ritual, su precio y el ahorro; no insistas.';
 
@@ -84,6 +103,7 @@ export interface BotProductItem {
   usageFrequency: string | null;
   precautions: string[];
   recommendedForTreatments: string[];
+  promotion: BotProductPromotion | null;
   ritual: BotRitualInfo | null;
   alsoInRituals: BotRitualOffer[];
   hint: string | null;
@@ -145,19 +165,47 @@ function sellable(product: CatalogProductRecord): boolean {
   return product.variants.length > 0;
 }
 
-function pricingOf(ritual: CatalogProductRecord) {
+function priceWith(price: number, promotion: ProductPromotionPrice | null) {
+  return promotion
+    ? discountedPesos(price, promotion.discountPercentage)
+    : price;
+}
+
+function componentPrice(
+  variant: CatalogProductRecord['comboItems'][number]['variant'],
+  promotions: readonly ProductPromotionSource[],
+) {
+  return priceWith(
+    Number(variant.price),
+    productPromotionFor(promotions, {
+      id: variant.product.id,
+      productCategoryId: variant.product.productCategoryId ?? '',
+    }),
+  );
+}
+
+function pricingOf(
+  ritual: CatalogProductRecord,
+  promotions: readonly ProductPromotionSource[],
+) {
   return computeRitualPricing(
-    Math.min(...ritual.variants.map((variant) => Number(variant.price))),
+    priceWith(
+      Math.min(...ritual.variants.map((variant) => Number(variant.price))),
+      productPromotionFor(promotions, ritual),
+    ),
     ritual.comboItems.map(({ quantity, variant }) => ({
       quantity,
-      unitPrice: Number(variant.price),
+      unitPrice: componentPrice(variant, promotions),
     })),
   );
 }
 
-function ritualInfo(product: CatalogProductRecord): BotRitualInfo | null {
+function ritualInfo(
+  product: CatalogProductRecord,
+  promotions: readonly ProductPromotionSource[],
+): BotRitualInfo | null {
   if (product.kind !== 'COMBO') return null;
-  const pricing = pricingOf(product);
+  const pricing = pricingOf(product, promotions);
   return {
     separatePrice: pricing.separatePricePesos,
     savings: pricing.savingsPesos,
@@ -166,7 +214,7 @@ function ritualInfo(product: CatalogProductRecord): BotRitualInfo | null {
       name: variant.product.name,
       presentation: variant.presentation,
       quantity,
-      unitPrice: Number(variant.price),
+      unitPrice: componentPrice(variant, promotions),
     })),
   };
 }
@@ -174,6 +222,7 @@ function ritualInfo(product: CatalogProductRecord): BotRitualInfo | null {
 function ritualsIncluding(
   product: CatalogProductRecord,
   catalog: CatalogProductRecord[],
+  promotions: readonly ProductPromotionSource[],
 ): BotRitualOffer[] {
   if (product.kind === 'COMBO') return [];
   return catalog
@@ -186,7 +235,7 @@ function ritualsIncluding(
         ),
     )
     .map((ritual) => {
-      const pricing = pricingOf(ritual);
+      const pricing = pricingOf(ritual, promotions);
       return {
         name: ritual.name,
         price: pricing.pricePesos,
@@ -197,13 +246,49 @@ function ritualsIncluding(
     .filter((offer) => offer.savings > 0);
 }
 
+function promotionView(
+  promotion: ProductPromotionPrice | null,
+  prices: number[],
+): BotProductPromotion | null {
+  if (!promotion) return null;
+  const discounted = prices.map((price) => priceWith(price, promotion));
+  return {
+    name: promotion.name,
+    discount: `${promotion.discountPercentage} %`,
+    priceFrom: Math.min(...discounted),
+    priceTo: Math.max(...discounted),
+    validUntil: formatPromotionEnd(promotion.endsAt),
+  };
+}
+
+function hintFor(
+  promotion: BotProductPromotion | null,
+  ritual: BotRitualInfo | null,
+  alsoInRituals: BotRitualOffer[],
+): string | null {
+  const hints = [
+    promotion ? PROMOTION_HINT : null,
+    ritual
+      ? ritual.savings > 0
+        ? RITUAL_ITEM_HINT
+        : null
+      : alsoInRituals.length > 0
+        ? ALSO_IN_RITUAL_HINT
+        : null,
+  ].filter((hint): hint is string => hint !== null);
+  return hints.length > 0 ? hints.join(' ') : null;
+}
+
 function toItem(
   product: CatalogProductRecord,
   catalog: CatalogProductRecord[],
+  promotions: readonly ProductPromotionSource[],
 ): BotProductItem {
   const prices = product.variants.map((variant) => Number(variant.price));
-  const ritual = ritualInfo(product);
-  const alsoInRituals = ritualsIncluding(product, catalog);
+  const active = productPromotionFor(promotions, product);
+  const promotion = promotionView(active, prices);
+  const ritual = ritualInfo(product, promotions);
+  const alsoInRituals = ritualsIncluding(product, catalog, promotions);
   return {
     type: ritual ? 'ritual' : 'producto',
     name: product.name,
@@ -218,6 +303,9 @@ function toItem(
         brand: variant.brand,
         presentation: variant.presentation,
         price: Number(variant.price),
+        ...(active && {
+          promoPrice: priceWith(Number(variant.price), active),
+        }),
       })),
     purpose: product.purpose,
     description: product.description,
@@ -227,19 +315,17 @@ function toItem(
     usageFrequency: product.usageFrequency,
     precautions: product.precautions.slice(0, LIST_ITEMS),
     recommendedForTreatments: treatmentNames(product),
+    promotion,
     ritual,
     alsoInRituals,
-    hint: ritual
-      ? RITUAL_ITEM_HINT
-      : alsoInRituals.length > 0
-        ? ALSO_IN_RITUAL_HINT
-        : null,
+    hint: hintFor(promotion, ritual, alsoInRituals),
   };
 }
 
 export function toBotProducts(
   catalog: CatalogProductRecord[],
   query: string | undefined,
+  promotions: readonly ProductPromotionSource[] = [],
 ): BotProductsResult {
   const available = catalog.filter(sellable);
   const text = (query ?? '').trim();
@@ -247,7 +333,9 @@ export function toBotProducts(
 
   let ranked: CatalogProductRecord[];
   if (!text) {
-    ranked = available;
+    const promoted = (product: CatalogProductRecord) =>
+      productPromotionFor(promotions, product) ? 1 : 0;
+    ranked = [...available].sort((a, b) => promoted(b) - promoted(a));
   } else if (tokens.length === 0) {
     ranked = [];
   } else {
@@ -271,7 +359,7 @@ export function toBotProducts(
   }
   const products = ranked
     .slice(0, BOT_PRODUCTS_LIMIT)
-    .map((product) => toItem(product, available));
+    .map((product) => toItem(product, available, promotions));
   return {
     status: 'found',
     total: ranked.length,
@@ -279,4 +367,14 @@ export function toBotProducts(
     products,
     availabilityNote: PRODUCT_AVAILABILITY_NOTE,
   };
+}
+
+export function promotedProducts(
+  catalog: CatalogProductRecord[],
+  promotions: readonly ProductPromotionSource[],
+): BotProductItem[] {
+  const available = catalog.filter(sellable);
+  return available
+    .filter((product) => productPromotionFor(promotions, product) !== null)
+    .map((product) => toItem(product, available, promotions));
 }
