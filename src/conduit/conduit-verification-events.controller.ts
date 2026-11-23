@@ -24,7 +24,7 @@ import {
 
 const LIMIT_PER_MINUTE = 600;
 const VERIFICATION_CAPABILITY = 'image-analysis';
-const HAIR_PHOTO_VERDICTS = new Set(['VALID', 'NEEDS_REVIEW']);
+const HAIR_PHOTO_VERDICTS = new Set(['VALID', 'NEEDS_REVIEW', 'ERROR']);
 export const HAIR_PHOTO_REASON =
   'Te envió una foto de su cabello para que la examines: búscala en el chat y atiéndela por ahí.';
 
