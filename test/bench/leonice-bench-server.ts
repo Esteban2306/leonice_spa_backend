@@ -11,8 +11,13 @@ import { seedConduitTemplates } from '../../prisma/seed-conduit-templates';
 import { seedConduitTools } from '../../prisma/seed-conduit-tools';
 import { seedConduitPrompt } from '../../prisma/seed-conduit-prompt';
 import { seedConduitIntents } from '../../prisma/seed-conduit-intents';
+import {
+  seedConduitHairSpecialist,
+  seedConduitSpecialist,
+} from '../../prisma/seed-conduit-specialist';
 import { BusinessSettingsService } from 'src/business-settings/business-settings.service';
 import { conduitSeedRequest } from '../../prisma/conduit-seed-request';
+import { PromotionsService } from 'src/promotions/promotions.service';
 
 const BENCH_DB = 'leonice_bench';
 
@@ -67,6 +72,10 @@ async function wireConduit(): Promise<void> {
   await seedConduitTools(sourceOfTruth);
   await seedConduitPrompt(sourceOfTruth);
   await seedConduitIntents(sourceOfTruth);
+  if (process.env.BENCH_SPECIALISTS === 'true') {
+    await seedConduitSpecialist(process.env);
+    await seedConduitHairSpecialist(process.env);
+  }
   const request = conduitSeedRequest(
     process.env.CONDUIT_BASE_URL!,
     process.env.CONDUIT_API_KEY!,
@@ -247,6 +256,35 @@ async function seedHairPricing(prisma: PrismaService): Promise<void> {
   }
 }
 
+const BENCH_PROMOTED_KITS = [
+  'Ritual Jolly Kids',
+  'Ritual Argan Boom y Blindaje Térmico',
+];
+
+const bogotaDay = (offsetDays: number) =>
+  new Date(Date.now() + offsetDays * 86_400_000).toLocaleDateString('en-CA', {
+    timeZone: 'America/Bogota',
+  });
+
+async function seedPromotions(
+  prisma: PrismaService,
+  promotions: PromotionsService,
+): Promise<void> {
+  for (const name of BENCH_PROMOTED_KITS) {
+    const kit = await prisma.client.product.findFirst({
+      where: { name, kind: 'COMBO' },
+    });
+    if (!kit) throw new Error(`Banco: no existe el kit "${name}"`);
+    await promotions.create({
+      name: 'Kits con 20 % hasta hoy',
+      discountPercentage: 20,
+      productId: kit.id,
+      startsAt: `${bogotaDay(-3)}T00:00:00-05:00`,
+      endsAt: `${bogotaDay(0)}T23:59:59-05:00`,
+    });
+  }
+}
+
 async function main(): Promise<void> {
   assertIsolated();
   await wireConduit();
@@ -308,6 +346,9 @@ async function main(): Promise<void> {
 
   await app.listen(Number(process.env.PORT), '127.0.0.1');
   await seedHairPricing(prisma);
+  if (process.env.BENCH_PROMOTIONS === 'true') {
+    await seedPromotions(prisma, app.get(PromotionsService));
+  }
   await app.get(BusinessSettingsService).update({
     depositAmount: 50,
     depositInstructions:
