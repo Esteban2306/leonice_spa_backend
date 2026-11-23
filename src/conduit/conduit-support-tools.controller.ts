@@ -20,7 +20,6 @@ import { ConduitProductPurchaseDto } from './dto/conduit-product-purchase.dto';
 import { BusinessSettingsService } from '../business-settings/business-settings.service';
 import { ClientsRepository } from '../clients/repositories/clients.repository';
 import { EventBusService } from '../common/events/event.service';
-import { EVENT_TYPES } from '../common/events/constants/event.types';
 import { normalizePhone } from '../clients/utils/normalize-phone.util';
 import { ProductCatalogService } from '../products/catalog/product-catalog.service';
 import { toBotProducts } from './tools/bot-product-view';
@@ -35,6 +34,8 @@ import { toBotTreatmentListItem } from './tools/bot-treatment-view';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
 import { TeamHandoffService } from './handoff/team-handoff.service';
 import { PromotionsService } from '../promotions/promotions.service';
+import { ProductOrdersService } from '../product-orders/product-orders.service';
+import { toBotOrder } from './tools/bot-order-view';
 import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
 import {
   MAX_PROMOTION_OFFERS,
@@ -54,6 +55,7 @@ export class ConduitSupportToolsController {
     private readonly handoffs: TeamHandoffService,
     private readonly promotions: PromotionsService,
     private readonly promotionOffers: ConduitPromotionOffersService,
+    private readonly productOrders: ProductOrdersService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -143,10 +145,6 @@ export class ConduitSupportToolsController {
     };
   }
 
-  /**
-   * La clienta quiere comprar un producto: se avisa a los administradores con
-   * su número y lo que pidió. No pausa el asistente: sigue atendiendo el chat.
-   */
   @HttpCode(HttpStatus.OK)
   @Post('products/purchase-request')
   async productPurchaseRequest(
@@ -157,30 +155,50 @@ export class ConduitSupportToolsController {
     const phone =
       req.conduitContact?.phone ??
       (dto.phone ? normalizePhone(dto.phone) : null);
+    const lid = req.conduitContact?.lid ?? null;
     const client = phone ? await this.clients.findByPhone(phone) : null;
+    const items = (dto.items ?? []).map((item) => ({
+      product: item.producto,
+      presentation: item.presentacion ?? null,
+      quantity: item.cantidad,
+    }));
+    if (items.length === 0 && dto.request) {
+      items.push({ product: dto.request, presentation: null, quantity: 1 });
+    }
+    if (items.length === 0) {
+      return {
+        expected: true,
+        code: 'ORDER_ITEMS_MISSING',
+        message:
+          'Falta qué quiere comprar: pregúntale el producto, la presentación y la cantidad.',
+      };
+    }
 
-    const results = await this.eventBus.publishAsync(
-      EVENT_TYPES.CONDUIT_PRODUCT_PURCHASE_REQUESTED,
-      {
-        phone,
-        lid: req.conduitContact?.lid ?? null,
-        clientName: client?.name ?? null,
-        request: dto.request,
-        notes: dto.notes ?? null,
-        requestId: idempotencyKey ?? randomUUID(),
-      },
-    );
+    const placed = await this.productOrders.place({
+      contact: { phone, lid },
+      clientId: client?.id ?? null,
+      clientName: client?.name ?? null,
+      items,
+      request: dto.request ?? null,
+      notes: dto.notes ?? null,
+      requestId: idempotencyKey ?? randomUUID(),
+    });
 
-    const teamNotified = results.some(Boolean);
-    const closingOffer = teamNotified
-      ? await this.promotionOffers.afterPurchase(dto.request)
-      : null;
+    const closingOffer =
+      placed.created && placed.teamNotified
+        ? await this.promotionOffers.afterPurchase(
+            placed.order.items.map((item) => item.productName).join(', '),
+          )
+        : null;
     return {
-      requested: teamNotified,
-      teamNotified,
-      message: teamNotified
-        ? 'Se avisó al equipo: se comunicará con la clienta para coordinar la compra.'
-        : 'No hay nadie del equipo a quien avisar en este momento; no prometas que alguien escribirá.',
+      requested: true,
+      teamNotified: placed.teamNotified,
+      updated: !placed.created,
+      ...toBotOrder(placed.order, placed.priced, placed.paymentInstructions),
+      ...(!placed.teamNotified && {
+        message:
+          'El pedido quedó guardado pero no hay nadie del equipo a quien avisar ahora; no prometas que alguien escribirá pronto.',
+      }),
       ...(closingOffer && { closingOffer }),
     };
   }

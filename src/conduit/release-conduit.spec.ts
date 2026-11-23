@@ -9,6 +9,8 @@ import {
   CANT_MAKE_IT_RELEASE,
   FOLLOW_UP_TEMPLATES_RELEASE,
   PRODUCT_PROMOTIONS_RELEASE,
+  PRODUCT_ORDERS_RELEASE,
+  RELEASES,
   SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
@@ -26,6 +28,26 @@ import { CONDUIT_BOT_PROMPT_TEMPLATE } from './prompt/conduit-bot-prompt';
 import { BUSINESS_INFO_MAPPING_RULES } from '../business-settings/business-info';
 
 const baseline = loadBaseline(RELEASE.id);
+
+function toolsAddedByReleases(after = RELEASE) {
+  const later = RELEASES.slice(
+    RELEASES.findIndex((release) => release.id === after.id) + 1,
+  );
+  const added = new Set(
+    later.flatMap((release) => {
+      const existed = loadBaseline(release.id).tools;
+      return release.tools.filter((name) => !(name in existed));
+    }),
+  );
+  added.delete('pasar_a_persona');
+  return CONDUIT_TOOL_CATALOG.filter((t) => added.has(t.name)).map((t) => ({
+    id: `t-${t.name}`,
+    name: t.name,
+    isActive: true,
+    endpointUrl: `https://spa/api/v1${t.path}`,
+    ...toolDefinition(t),
+  }));
+}
 
 function productionLike() {
   const intents = RELEASE.intents
@@ -52,6 +74,7 @@ function productionLike() {
       ...baseline.tools.pasar_a_persona,
       description: 'Texto propio del administrador',
     },
+    ...toolsAddedByReleases(),
   ];
   const templates = CONDUIT_TEMPLATE_CATALOG.filter((t) =>
     RELEASE.templates.includes(t.name),
@@ -115,7 +138,7 @@ function beforeProductPromotions() {
     isActive: true,
     endpointUrl: `https://spa/api/v1/${name}`,
     ...previous.tools[name],
-  })) as never;
+  }));
   return state;
 }
 
@@ -236,16 +259,19 @@ describe('despliegue selectivo de Conduit', () => {
       version: 3,
       ...intentDefinition(CONDUIT_INTENT_CATALOG.find((i) => i.key === key)!),
     }));
-    state.tools = CONDUIT_TOOL_CATALOG.filter((t) =>
-      RELEASE.tools.includes(t.name),
-    ).map((t) => ({
-      id: t.name,
-      name: t.name,
-      isActive: true,
-      endpointUrl: '',
-      imageParamName: 'imageBase64',
-      ...toolDefinition(t),
-    })) as never;
+    state.tools = [
+      ...CONDUIT_TOOL_CATALOG.filter((t) => RELEASE.tools.includes(t.name)).map(
+        (t) => ({
+          id: t.name,
+          name: t.name,
+          isActive: true,
+          endpointUrl: '',
+          imageParamName: 'imageBase64',
+          ...toolDefinition(t),
+        }),
+      ),
+      ...toolsAddedByReleases().filter((t) => !RELEASE.tools.includes(t.name)),
+    ] as never;
     state.templates = state.templates.map((t) => ({
       ...t,
       ...templateDefinition(
@@ -298,7 +324,11 @@ describe('entrega de orientación (solo el prompt)', () => {
       request: request as never,
       log: () => undefined,
     });
-    expect(out.plan.map((p) => p.name)).toContain('promociones_vigentes');
+    expect(out.plan.map((p) => p.name)).toEqual([
+      'treatment_question',
+      'booking',
+      'prompt de conversación',
+    ]);
   });
 
   it('su foto anterior es el prompt de la entrega Sofía y el nuevo lo cambia', () => {
@@ -418,6 +448,9 @@ describe('entrega del precio del equipo y los horarios especiales', () => {
 
   it('crea la herramienta activa, actualiza el prompt y agrega los horarios especiales al mapeo', async () => {
     const state = productionLike();
+    state.tools = state.tools.filter(
+      (t) => t.name !== 'guardar_precio_del_equipo',
+    );
     state.prompt = previous.prompt;
     state.mapping.rules = previous.mappingRules;
     const { request, writes } = fakeConduit(state);
@@ -457,7 +490,7 @@ describe('entrega de seguimientos, fichas y horarios por hora', () => {
       isActive: true,
       endpointUrl: `https://spa/api/v1/${name}`,
       ...previous.tools[name],
-    })) as never;
+    }));
     return state;
   }
 
@@ -636,5 +669,94 @@ describe('entrega de promociones de productos y oferta al cierre', () => {
     expect(
       writes.some((w) => w.path === 'bots/bot/tools/t-info_productos'),
     ).toBe(false);
+  });
+});
+
+function beforeProductOrders() {
+  const previous = loadBaseline(PRODUCT_ORDERS_RELEASE.id);
+  const state = productionLike();
+  state.prompt = previous.prompt;
+  state.templates = [
+    ...state.templates,
+    ...Object.keys(previous.templates).map((name) => ({
+      id: `tpl-${name}`,
+      name,
+      channel: templateChannel(
+        CONDUIT_TEMPLATE_CATALOG.find((t) => t.name === name)!,
+      ),
+      ...previous.templates[name],
+    })),
+  ] as never;
+  state.intents = state.intents.map((intent) =>
+    previous.intents[intent.key]
+      ? { ...intent, ...previous.intents[intent.key] }
+      : intent,
+  );
+  state.tools = Object.keys(previous.tools).map((name) => ({
+    id: `t-${name}`,
+    name,
+    isActive: true,
+    endpointUrl: `https://spa/api/v1/${name}`,
+    ...previous.tools[name],
+  }));
+  return state;
+}
+
+describe('entrega de pedidos de productos', () => {
+  it('la foto anterior trae el pedido y los anticipos como estaban, sin la herramienta de pago', () => {
+    const previous = loadBaseline(PRODUCT_ORDERS_RELEASE.id);
+    expect(Object.keys(previous.tools).sort()).toEqual([
+      'depositos_pendientes',
+      'solicitar_compra_producto',
+    ]);
+    expect(previous.prompt).not.toContain('registrar_pago_pedido');
+    expect(previous.prompt).not.toContain('horarios_especiales');
+  });
+
+  it('crea la herramienta de pago y las plantillas antes de subir el prompt que las nombra', async () => {
+    const { request, writes } = fakeConduit(beforeProductOrders());
+    const out = await releaseConduit({
+      manifest: PRODUCT_ORDERS_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.map((p) => [p.name, p.state])).toEqual(
+      expect.arrayContaining([
+        ['registrar_pago_pedido', 'new'],
+        ['solicitar_compra_producto', 'pristine'],
+        ['depositos_pendientes', 'pristine'],
+        ['leonice_aviso_pago_pedido', 'new'],
+        ['leonice_aviso_compra_producto', 'pristine'],
+        ['prompt de conversación', 'pristine'],
+      ]),
+    );
+    const calls = writes.map((w) => `${w.method} ${w.path}`);
+    const createTool = calls.indexOf('POST bots/bot/tools');
+    const putPrompt = calls.indexOf('PUT bots/bot/prompts/CONVERSATION');
+    expect(createTool).toBeGreaterThan(-1);
+    expect(createTool).toBeLessThan(putPrompt);
+    expect(calls.filter((c) => c === 'POST templates')).toHaveLength(2);
+    expect(calls).toContain('PUT templates/tpl-leonice_aviso_compra_producto');
+    expect(calls).toContain('PUT templates/tpl-leonice_correo_compra_producto');
+  });
+
+  it('una entrega anterior que sube el prompt crea también las herramientas que el prompt nombra y faltan', async () => {
+    const { request, writes } = fakeConduit(beforeProductPromotions());
+    const out = await releaseConduit({
+      manifest: PRODUCT_PROMOTIONS_RELEASE,
+      env: env({ CONDUIT_RELEASE_APPLY: 'true' }),
+      request: request as never,
+      log: () => undefined,
+    });
+    expect(out.plan.map((p) => [p.name, p.state])).toEqual(
+      expect.arrayContaining([['registrar_pago_pedido', 'new']]),
+    );
+    const created = writes
+      .filter((w) => w.method === 'POST' && w.path === 'bots/bot/tools')
+      .map((w) => (w.body as { name: string }).name);
+    expect(created).toEqual(
+      expect.arrayContaining(['promociones_vigentes', 'registrar_pago_pedido']),
+    );
   });
 });

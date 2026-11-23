@@ -21,6 +21,13 @@ describe('montos en un mensaje del equipo', () => {
     expect(amountsInText(text)).toEqual(expected);
   });
 
+  it.each([
+    ['Serán 200 para tu cabello', [200000]],
+    ['te queda en 280', [280000]],
+  ])('el equipo escribe en miles: %s', (text, expected) => {
+    expect(amountsInText(text)).toEqual(expected);
+  });
+
   it('ignora horas, fechas y cifras pequeñas', () => {
     expect(
       amountsInText('te espero a las 10:30 el 19/12, son 4 horas'),
@@ -76,13 +83,19 @@ describe('TeamQuoteService.save', () => {
   function build(
     messages: Array<Record<string, unknown>>,
     conversations = [{ id: 'c1', phoneNumber: '573001112233' }],
+    promotions: unknown[] = [],
   ) {
     const upsert = jest.fn((args: unknown) => Promise.resolve(args));
     const prisma = {
       client: {
         treatment: {
           findUnique: jest.fn(() =>
-            Promise.resolve({ id: 't1', name: 'Alisado Orgánico', ...alisado }),
+            Promise.resolve({
+              id: 't1',
+              categoryId: 'cat1',
+              name: 'Alisado Orgánico',
+              ...alisado,
+            }),
           ),
         },
         teamQuote: { upsert },
@@ -104,6 +117,9 @@ describe('TeamQuoteService.save', () => {
       } as never,
       { admin } as never,
       { get: () => BOT } as never,
+      {
+        findAllCurrentlyValid: jest.fn(() => Promise.resolve(promotions)),
+      } as never,
     );
     return { service, upsert, admin };
   }
@@ -139,6 +155,36 @@ describe('TeamQuoteService.save', () => {
     expect(admin.mock.calls[0][1]).toBe(`bots/${BOT}/conversations`);
   });
 
+  it('con la promoción vigente acepta el precio rebajado que dio el equipo', async () => {
+    const { service, upsert } = build(
+      [team('Serán 200 para tu cabello')],
+      undefined,
+      [{ treatmentId: 't1', categoryId: null, discountPercentage: 20 }],
+    );
+    await expect(
+      service.save({
+        phone: PHONE,
+        treatmentName: 'Alisado',
+        amount: 200000,
+        now: NOW,
+      }),
+    ).resolves.toMatchObject({ saved: true, price: 200000 });
+    expect(upsert).toHaveBeenCalled();
+  });
+
+  it('sin promoción, un precio por debajo del rango no se guarda', async () => {
+    const { service, upsert } = build([team('Serán 200 para tu cabello')]);
+    await expect(
+      service.save({
+        phone: PHONE,
+        treatmentName: 'Alisado',
+        amount: 200000,
+        now: NOW,
+      }),
+    ).resolves.toMatchObject({ saved: false, reason: 'OUT_OF_RANGE' });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('un precio que dijo el bot o la clienta no cuenta como del equipo', async () => {
     const { service, upsert } = build([
       {
@@ -161,6 +207,28 @@ describe('TeamQuoteService.save', () => {
       now: NOW,
     });
     expect(result).toEqual({ saved: false, reason: 'NOT_IN_CHAT' });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('lo que el equipo escribió antes de cerrar el chat ya no cuenta', async () => {
+    const { service, upsert } = build(
+      [team('Serán 300 para tu cabello', '2026-11-20T13:00:00Z')],
+      [
+        {
+          id: 'c1',
+          phoneNumber: '573001112233',
+          closedAt: '2026-11-20T14:00:00Z',
+        } as never,
+      ],
+    );
+    await expect(
+      service.save({
+        phone: PHONE,
+        treatmentName: 'Alisado',
+        amount: 300000,
+        now: NOW,
+      }),
+    ).resolves.toMatchObject({ saved: false, reason: 'NOT_IN_CHAT' });
     expect(upsert).not.toHaveBeenCalled();
   });
 
@@ -227,6 +295,7 @@ describe('TeamQuoteService.unsavedTeamPrices', () => {
       {} as never,
       { admin } as never,
       { get: () => BOT } as never,
+      {} as never,
     );
   }
 

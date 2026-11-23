@@ -28,7 +28,8 @@
     "load-test:cache-hit": "ts-node scripts/load-test-availability.ts cache-hit",
     "load-test:cache-miss": "ts-node scripts/load-test-availability.ts cache-miss",
     "release:conduit": "ts-node prisma/release-conduit.ts",
-    "release:hair-specialist": "ts-node prisma/seed-conduit-specialist.ts foto-cabello"
+    "release:hair-specialist": "ts-node prisma/seed-conduit-specialist.ts foto-cabello",
+    "release:receipt-specialist": "CONDUIT_SPECIALIST_OVERWRITE=true ts-node prisma/seed-conduit-specialist.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts",

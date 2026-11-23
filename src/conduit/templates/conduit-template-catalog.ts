@@ -434,7 +434,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     envKey: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PURCHASE',
     name: 'leonice_aviso_compra_producto',
     description:
-      'Aviso interno: una clienta quiere comprar un producto de la tienda y hay que contactarla.',
+      'Aviso interno: una clienta pidió productos por WhatsApp; el pedido ya tiene total y forma de pago.',
     audience: 'ADMIN',
     variables: ['cliente', 'telefono', 'pedido', 'notas'],
     body: [
@@ -445,7 +445,52 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
       'Quiere comprar: {{pedido}}',
       'Notas: {{notas}}',
       '',
-      'El asistente sigue activo en ese chat. Contáctala para coordinar la compra en la tienda.',
+      'El asistente ya le dio el total y la cuenta para pagar, y sigue activo en ese chat. Cuando envíe el comprobante te avisamos para verificarlo en el panel.',
+    ].join('\n'),
+  },
+  {
+    code: 'ADMIN_PRODUCT_PAYMENT',
+    envKey: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PAYMENT',
+    name: 'leonice_aviso_pago_pedido',
+    description:
+      'Aviso interno: una clienta envió el comprobante de un pedido de productos y hay que verificarlo en el panel.',
+    audience: 'ADMIN',
+    variables: [
+      'cliente',
+      'telefono',
+      'pedido',
+      'productos',
+      'total',
+      'pagado',
+      'comprobante',
+      'panel',
+    ],
+    body: [
+      '💳 *Comprobante de un pedido por verificar*',
+      '',
+      'Pedido: {{pedido}}',
+      'Clienta: {{cliente}}',
+      'Teléfono: {{telefono}}',
+      'Productos: {{productos}}',
+      'Total: {{total}}',
+      'Pagó: {{pagado}}',
+      'Comprobante: {{comprobante}}',
+      '',
+      'Verifícalo con un clic en {{panel}}. Si lo rechazas, le avisamos a la clienta el motivo automáticamente.',
+    ].join('\n'),
+  },
+  {
+    code: 'CLIENT_PRODUCT_PAYMENT_REJECTED',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_PRODUCT_PAYMENT_REJECTED',
+    name: 'leonice_pago_pedido_rechazado',
+    description:
+      'El equipo revisó el comprobante de un pedido de productos y no pudo validarlo.',
+    audience: 'CLIENT',
+    variables: ['nombre', 'pedido', 'motivo'],
+    body: [
+      'Hola {{nombre}}, revisamos el comprobante de tu pedido *{{pedido}}* y no pudimos validarlo: {{motivo}}.',
+      '',
+      'Envíanos por aquí el comprobante correcto y lo revisamos de nuevo.',
     ].join('\n'),
   },
   {
@@ -554,7 +599,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     envKey: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PURCHASE_EMAIL',
     name: 'leonice_correo_compra_producto',
     description:
-      'Correo interno: una clienta quiere comprar un producto de la tienda y hay que contactarla.',
+      'Correo interno: una clienta pidió productos por WhatsApp; el pedido ya tiene total y forma de pago.',
     audience: 'ADMIN',
     channel: 'EMAIL',
     subject: 'Solicitud de compra de producto: {{cliente}}',
@@ -567,7 +612,7 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
         '<strong>Quiere comprar:</strong> {{pedido}}',
         '<strong>Notas:</strong> {{notas}}',
       ],
-      'El asistente sigue activo en ese chat. Contáctala para coordinar la compra en la tienda.',
+      'El asistente ya le dio el total y la cuenta para pagar, y sigue activo en ese chat. Cuando envíe el comprobante te avisamos para verificarlo en el panel.',
     ),
   },
   {

@@ -19,7 +19,7 @@ function event(
   };
 }
 
-function build(seen = false) {
+function build(seen = false, openOrder: unknown = null) {
   const alerts = {
     alreadySeen: jest.fn().mockResolvedValue(seen),
     valid: jest.fn().mockResolvedValue(undefined),
@@ -27,12 +27,17 @@ function build(seen = false) {
     review: jest.fn().mockResolvedValue(undefined),
   };
   const handoffs = { request: jest.fn().mockResolvedValue(true) };
+  const productOrders = {
+    openOrderFor: jest.fn().mockResolvedValue(openOrder),
+  };
   return {
     alerts,
     handoffs,
+    productOrders,
     controller: new ConduitVerificationEventsController(
       alerts as never,
       handoffs as never,
+      productOrders as never,
     ),
   };
 }
@@ -48,6 +53,15 @@ describe('ConduitVerificationEventsController', () => {
       'v1',
       ['AMOUNT_GTE_FAILED'],
     );
+  });
+
+  it('un comprobante de una clienta con un pedido de productos abierto no alerta como anticipo inválido', async () => {
+    const { controller, alerts } = build(false, { id: 'o1', number: 7 });
+
+    const out = await controller.receive(event(), 'evt-1');
+
+    expect(alerts.invalid).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ ignored: true, reason: 'product-order' });
   });
 
   it('VALID corta la racha', async () => {

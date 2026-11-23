@@ -36,6 +36,8 @@ import {
   AdminInProgressNoticeJobData,
   ClientEventTicketNoticeJobData,
   AdminProductPurchaseNoticeJobData,
+  AdminProductPaymentNoticeJobData,
+  ClientProductPaymentNoticeJobData,
   AdminReceiptNoticeJobData,
   CancellationLinkNoticeJobData,
   ClientCancellationNoticeJobData,
@@ -67,6 +69,8 @@ type AutomationJobData =
   | CancellationLinkNoticeJobData
   | AdminHandoffNoticeJobData
   | AdminProductPurchaseNoticeJobData
+  | AdminProductPaymentNoticeJobData
+  | ClientProductPaymentNoticeJobData
   | AdminReceiptNoticeJobData
   | AdminInProgressNoticeJobData
   | ClientEventTicketNoticeJobData
@@ -85,6 +89,7 @@ const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
   JOB_NAMES.SEND_CLIENT_CANCELLATION_LINK,
   JOB_NAMES.NOTIFY_CLIENT_EVENT_TICKET,
   JOB_NAMES.NOTIFY_CLIENT_EVENT_WINNER,
+  JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED,
 ]);
 
 const PAUSED_REASON = 'Sistema en pausa: no se envió el mensaje';
@@ -194,6 +199,16 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
           job.data as AdminProductPurchaseNoticeJobData,
           ctx,
         );
+      case JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PAYMENT:
+        return this.notifications.notifyAdminProductPayment(
+          job.data as AdminProductPaymentNoticeJobData,
+          ctx,
+        );
+      case JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED:
+        return this.notifications.notifyClientProductPaymentRejected(
+          job.data as ClientProductPaymentNoticeJobData,
+          ctx,
+        );
       case JOB_NAMES.NOTIFY_CLIENT_EVENT_TICKET:
         return this.notifications.notifyClientEventTicket(
           job.data as ClientEventTicketNoticeJobData,
@@ -301,6 +316,10 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.ADMIN_HANDOFF_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PURCHASE:
         return AutomationExecutionType.ADMIN_PRODUCT_PURCHASE_NOTICE;
+      case JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PAYMENT:
+        return AutomationExecutionType.ADMIN_PRODUCT_PAYMENT_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED:
+        return AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_REJECTED_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
         return AutomationExecutionType.ADMIN_RECEIPT_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS:

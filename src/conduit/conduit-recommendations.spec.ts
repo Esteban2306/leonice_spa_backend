@@ -54,6 +54,7 @@ function build() {
       afterPurchase: jest.fn(() => Promise.resolve(null)),
       current: jest.fn(() => Promise.resolve([])),
     } as never,
+    {} as never,
   );
 }
 

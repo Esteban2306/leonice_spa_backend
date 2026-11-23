@@ -2,7 +2,7 @@ export const MIN_LEAD_MINUTES = 30;
 export const MAX_ADVANCE_DAYS = 90;
 
 export const VALORACION_TIMEOUT_MS = 30 * 60 * 1000;
-export const DEPOSIT_OPERATING_WINDOW_MS = 2 * 60 * 60 * 1000;
+export const DEPOSIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
 
 export const CLIENT_BOOKING_RATE_LIMIT = 15;

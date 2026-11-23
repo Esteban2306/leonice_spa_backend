@@ -30,15 +30,10 @@ describe('prompt del asistente de Leonice', () => {
     expect(missing).toEqual([]);
   });
 
-  it('no nombra herramientas que no existen', () => {
+  it('no nombra herramientas que no existen, con la misma regla con que Conduit rechaza la plantilla', () => {
     const mentioned =
       CONDUIT_BOT_PROMPT_TEMPLATE.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? [];
-    const toolLike = mentioned.filter((word) =>
-      /^(listar|consultar|disponibilidad|registrar|actualizar|crear|reservas|reagendar|cancelar|depositos|pasar|info|enlace)_/.test(
-        word,
-      ),
-    );
-    expect(toolLike.filter((word) => !TOOL_NAMES.includes(word))).toEqual([]);
+    expect(mentioned.filter((word) => !TOOL_NAMES.includes(word))).toEqual([]);
   });
 
   it('usa solo variables de plantilla que Conduit resuelve', () => {
@@ -229,11 +224,27 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).toContain('info_productos');
     expect(section).toContain('cuál va con su tratamiento');
     expect(section).toContain('Nunca prometas unidades');
-    expect(section).toContain('Solo si dice que quiere comprarlo');
+    expect(section).toContain('Si lo quiere comprar');
     expect(section).toContain('solicitar_compra_producto');
-    expect(section).toContain('Una consulta o un precio no es una compra');
-    expect(section).toContain('solo si la herramienta devolvió éxito');
-    expect(section).toContain('No cobras ni tomas pagos');
+    expect(section).toContain('Un precio no es una compra');
+    expect(section).toContain('sigue su hint');
+    expect(section).toContain('paymentInstructions del pedido');
+    expect(section).toContain('Nunca la inventes');
+  });
+
+  it('una foto de producto se responde como pregunta por ese producto, no como comprobante', () => {
+    const section =
+      CONDUIT_BOT_PROMPT_TEMPLATE.split('Productos\n')[1].split('\n\n')[0];
+    expect(section).toContain('tipo: producto');
+    expect(section).toContain('info_productos');
+    expect(section).toContain('sin hablar de comprobantes, pagos ni anticipo');
+    expect(section).toContain('Descuento solo en lo que trae promotion');
+  });
+
+  it('sin un dato o con una herramienta caída siempre responde algo', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'Sin un dato o si una herramienta falla, dilo en una frase y ofrece lo que sí puedes o pasar_a_persona; siempre respondes algo.',
+    );
   });
 
   it('si necesitan a Leo, se le avisa solo a ella con avisar_a_leo y nunca se da su número', () => {
@@ -272,9 +283,7 @@ describe('prompt del asistente de Leonice', () => {
     );
     const booking = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking')!;
     const slim = (booking.config as { slim: { prompt: string } }).slim.prompt;
-    expect(slim).toContain(
-      'no agendes: pídele que te diga el día y la hora exactos',
-    );
+    expect(slim).toContain('no agendes: pídele el día y la hora exactos');
     expect(slim).toContain('Un comprobante no confirma un horario');
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
       'Un comprobante o un "ya pagué" no confirma un horario',
@@ -311,7 +320,7 @@ describe('prompt del asistente de Leonice', () => {
 
   it('una compra pedida se avisa al equipo enseguida, sin pedir confirmación', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
-      /solicitar_compra_producto enseguida, sin pedir confirmación/,
+      /solicitar_compra_producto enseguida, sin preguntar si confirma/,
     );
   });
 
@@ -370,7 +379,7 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain('Nunca des datos de otras clientas');
   });
 
-  it('una foto del cabello va a una persona y nunca se toma por comprobante', () => {
+  it('una foto del cabello la revisa el equipo sin pausar el chat y nunca se toma por comprobante', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     const rule = t.indexOf('foto-cabello');
     expect(rule).toBeGreaterThan(0);
@@ -378,12 +387,29 @@ describe('prompt del asistente de Leonice', () => {
       t.indexOf('Otra imagen puede ser el comprobante'),
     );
     expect(t).toContain('no un comprobante: no registres pago');
+    expect(t).toContain('no la describas ni uses pasar_a_persona');
     expect(t).toContain(
-      'pasar_a_persona (motivo: foto de su cabello para examinar)',
+      'Cuando "[Persona del equipo]" se lo dé, guardar_precio_del_equipo',
     );
+  });
+
+  it('un servicio con valoración ofrece hacerla en el spa o por WhatsApp con una foto desde atrás', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('ofrece dos opciones');
+    expect(t).toContain('el precio podría cambiar');
+    expect(t).toContain('tomada desde atrás');
+    expect(t).toContain('que se vea todo el largo');
+    expect(t).toContain('"serán 200" es $200.000');
     expect(t).toContain(
-      'El sistema ya le envió al equipo una vista previa: no la describas.',
+      'no agendes con el rango hasta que el equipo dé el precio',
     );
+    const booking = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking')!;
+    const slim = (
+      booking.config as { slim: { prompt: string; tools: string[] } }
+    ).slim;
+    expect(slim.prompt).toContain('ofrece dos opciones');
+    expect(slim.prompt).toContain('guardar_precio_del_equipo');
+    expect(slim.tools).toContain('guardar_precio_del_equipo');
   });
 
   it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
@@ -400,19 +426,20 @@ describe('prompt del asistente de Leonice', () => {
 
   it('si hay horarios especiales configurados, los informa cuando preguntan', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
-    expect(t).toContain('Si "Datos del negocio" trae horarios_especiales');
+    expect(t).toContain('Si "Datos del negocio" trae horarios especiales');
     expect(t).toContain('para agendar, igual consulta los cupos');
   });
 
-  it('un comprobante sin anticipo pendiente no se registra: va a una persona', () => {
+  it('un comprobante va al pedido o al anticipo según lo que tenga abierto, y si no es ninguno a una persona', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
-      'sin anticipo pendiente, un comprobante es de otro pago (saldo, producto, deuda): no llames registrar_comprobante_automatico',
+      'Con pedido abierto (openProductOrder) y sin anticipo, o monto cercano al total del pedido: registrar_pago_pedido en ese turno con montoComprobante = amount, sin mirar el veredicto',
     );
+    expect(t).toContain('con ambos y sin saber cuál, pregúntale');
     expect(t).toContain(
-      'pasar_a_persona (motivo: comprobante de un pago que no es anticipo)',
+      'pasar_a_persona (motivo: pago que no es anticipo ni pedido)',
     );
-    expect(t.indexOf('sin anticipo pendiente, un comprobante')).toBeLessThan(
+    expect(t.indexOf('registrar_pago_pedido')).toBeLessThan(
       t.indexOf('· VALID, NEEDS_REVIEW, ERROR'),
     );
   });
@@ -450,7 +477,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(16100);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(17600);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

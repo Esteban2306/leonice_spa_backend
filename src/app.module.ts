@@ -27,6 +27,7 @@ import { QueueModule } from './infrastructure/queue/bullmq.module';
 import { AutomationModule } from './automation/automation.module';
 import { ClientThrottlerGuard } from './reservations/guards/client-throttler.guard';
 import { GlobalGuardChain } from './common/guards/global-guard-chain.guard';
+import { ProductOrdersModule } from './product-orders/product-orders.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { PromoEventsModule } from './promo-events/promo-events.module';
 import { AudiencesModule } from './audiences/audiences.module';
@@ -73,6 +74,7 @@ import { AdminModule } from './admin/admin.module';
     QueueModule,
     AutomationModule,
     PromotionsModule,
+    ProductOrdersModule,
     PromoEventsModule,
     AudiencesModule,
     CampaignsModule,

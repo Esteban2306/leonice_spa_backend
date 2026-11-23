@@ -212,4 +212,20 @@ export class CloudinaryService {
     );
     return { url: result.secure_url, publicId: result.public_id };
   }
+
+  async uploadProductPaymentProofFromBase64(
+    dataUri: string,
+    orderId: string,
+  ): Promise<UploadedImage> {
+    const publicId = `product-payment-${orderId}-${Date.now()}`;
+    const result = await withUploadRetry(() =>
+      this.cloudinary.uploader.upload(dataUri, {
+        folder: 'leonice-spa/product-payments',
+        public_id: publicId,
+        resource_type: 'image',
+        type: 'authenticated',
+      }),
+    );
+    return { url: result.secure_url, publicId: result.public_id };
+  }
 }

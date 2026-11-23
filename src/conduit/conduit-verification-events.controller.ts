@@ -1,3 +1,4 @@
+import { ProductOrdersService } from '../product-orders/product-orders.service';
 import {
   Body,
   Controller,
@@ -38,6 +39,7 @@ export class ConduitVerificationEventsController {
   constructor(
     private readonly alerts: ReceiptAlertsService,
     private readonly handoffs: TeamHandoffService,
+    private readonly productOrders: ProductOrdersService,
   ) {}
 
   @Public()
@@ -63,6 +65,16 @@ export class ConduitVerificationEventsController {
       return { received: true, duplicate: true };
     }
 
+    if (
+      (data.verdict === 'INVALID' || data.verdict === 'NEEDS_REVIEW') &&
+      contact.phone &&
+      (await this.productOrders.openOrderFor({
+        phone: contact.phone,
+        lid: null,
+      }))
+    ) {
+      return { received: true, ignored: true, reason: 'product-order' };
+    }
     if (data.verdict === 'VALID') {
       await this.alerts.valid(contact);
     } else if (data.verdict === 'INVALID') {

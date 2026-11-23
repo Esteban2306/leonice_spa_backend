@@ -23,6 +23,8 @@ export const EVENT_TYPES = {
   CONDUIT_HANDOFF_REQUESTED: 'conduit.handoff_requested',
   CONDUIT_PRODUCT_PURCHASE_REQUESTED: 'conduit.product_purchase_requested',
   CONDUIT_RECEIPT_ISSUE: 'conduit.receipt_issue',
+  PRODUCT_ORDER_PAYMENT_RECEIVED: 'product_order.payment_received',
+  PRODUCT_ORDER_PAYMENT_REJECTED: 'product_order.payment_rejected',
   BUSINESS_INFO_CHANGED: 'business.info_changed',
   RESERVATIONS_IN_PROGRESS_PENDING: 'reservations.in_progress_pending',
 } as const;
@@ -143,6 +145,16 @@ export interface EventPayloadMap {
     request: string;
     notes: string | null;
     requestId: string;
+  };
+
+  [EVENT_TYPES.PRODUCT_ORDER_PAYMENT_RECEIVED]: {
+    orderId: string;
+    proofReceivedAt: string;
+  };
+
+  [EVENT_TYPES.PRODUCT_ORDER_PAYMENT_REJECTED]: {
+    orderId: string;
+    reason: string;
   };
 
   [EVENT_TYPES.CONDUIT_RECEIPT_ISSUE]: {

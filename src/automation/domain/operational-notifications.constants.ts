@@ -17,6 +17,9 @@ export const OPERATIONAL_TEMPLATE_ENV_KEYS = {
   CLIENT_CANCELLATION_LINK: 'CONDUIT_TEMPLATE_CLIENT_CANCELLATION_LINK',
   ADMIN_HANDOFF: 'CONDUIT_TEMPLATE_ADMIN_HANDOFF',
   ADMIN_PRODUCT_PURCHASE: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PURCHASE',
+  ADMIN_PRODUCT_PAYMENT: 'CONDUIT_TEMPLATE_ADMIN_PRODUCT_PAYMENT',
+  CLIENT_PRODUCT_PAYMENT_REJECTED:
+    'CONDUIT_TEMPLATE_CLIENT_PRODUCT_PAYMENT_REJECTED',
   ADMIN_RECEIPT_REVIEW: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_REVIEW',
   ADMIN_RECEIPT_RETRIES: 'CONDUIT_TEMPLATE_ADMIN_RECEIPT_RETRIES',
   ADMIN_IN_PROGRESS: 'CONDUIT_TEMPLATE_ADMIN_IN_PROGRESS',
@@ -110,6 +113,16 @@ export interface AdminProductPurchaseNoticeJobData {
   clientName: string | null;
   request: string;
   notes: string | null;
+}
+
+export interface AdminProductPaymentNoticeJobData {
+  recipientId: string;
+  orderId: string;
+}
+
+export interface ClientProductPaymentNoticeJobData {
+  orderId: string;
+  reason?: string;
 }
 
 export interface ClientEventTicketNoticeJobData {

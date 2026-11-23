@@ -1,5 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { orderCode } from '../product-orders/domain/order-pricing';
+import {
+  describeItems,
+  formatPesos,
+} from '../product-orders/domain/order-text';
 import {
   AutomationExecutionResult,
   AutomationExecutionType,
@@ -32,6 +37,8 @@ import {
   type AdminInProgressNoticeJobData,
   type ClientEventTicketNoticeJobData,
   type AdminProductPurchaseNoticeJobData,
+  type AdminProductPaymentNoticeJobData,
+  type ClientProductPaymentNoticeJobData,
   type AdminReceiptNoticeJobData,
   type AdminRescheduleNoticeJobData,
   type CancellationChannel,
@@ -685,6 +692,91 @@ export class OperationalNotificationsService {
       result: AutomationExecutionResult.EXECUTED,
       reason: `Destinatario ${recipient.id}`,
     });
+  }
+
+  async notifyAdminProductPayment(
+    data: AdminProductPaymentNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.ADMIN_PRODUCT_PAYMENT_NOTICE;
+    const [recipient, order] = await Promise.all([
+      this.findActiveRecipient(data.recipientId),
+      this.loadProductOrder(data.orderId),
+    ]);
+    if (!recipient || !order) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: !recipient
+          ? RECIPIENT_INACTIVE_REASON
+          : 'El pedido ya no existe',
+      });
+      return;
+    }
+    const total = order.total === null ? null : Number(order.total);
+    const paid = order.proofAmount === null ? null : Number(order.proofAmount);
+    await this.notifyRecipient(ctx, 'ADMIN_PRODUCT_PAYMENT', recipient, {
+      cliente: order.clientName ?? 'Cliente sin registrar',
+      telefono:
+        order.phone ?? `(número oculto por WhatsApp, LID ${order.lid ?? '?'})`,
+      pedido: orderCode(order.number),
+      productos: describeItems(order.items),
+      total: total === null ? 'por confirmar' : formatPesos(total),
+      pagado:
+        paid === null
+          ? 'no se leyó el monto'
+          : `${formatPesos(paid)}${total !== null && paid < total ? ' ⚠️ menor que el total' : ''}`,
+      comprobante: order.proofImageUrl ?? 'sin imagen',
+      panel: this.ordersPanelUrl(),
+    });
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.EXECUTED,
+      reason: `Destinatario ${recipient.id}`,
+    });
+  }
+
+  async notifyClientProductPaymentRejected(
+    data: ClientProductPaymentNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_REJECTED_NOTICE;
+    const order = await this.loadProductOrder(data.orderId);
+    if (!order?.phone) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: order
+          ? 'El pedido no tiene teléfono (contacto con LID): avísale desde el chat'
+          : 'El pedido ya no existe',
+      });
+      return;
+    }
+    await this.send(ctx, 'CLIENT_PRODUCT_PAYMENT_REJECTED', order.phone, {
+      nombre: order.clientName?.split(' ')[0] ?? 'hola',
+      pedido: orderCode(order.number),
+      motivo: data.reason ?? 'no pudimos validarlo',
+    });
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.EXECUTED,
+      clientId: order.clientId ?? undefined,
+      reason: `Pedido ${orderCode(order.number)}`,
+    });
+  }
+
+  private loadProductOrder(id: string) {
+    return this.prisma.client.productOrder.findUnique({
+      where: { id },
+      include: { items: { orderBy: { position: 'asc' } } },
+    });
+  }
+
+  private ordersPanelUrl(): string {
+    const base = this.config.get<string>('FRONTEND_ADMIN_URL') ?? '';
+    return base
+      ? `${base.replace(/\/+$/, '')}/admin/orders`
+      : 'Panel > Pedidos';
   }
 
   /** Un comprobante quedó en revisión o la clienta lleva varios rechazos. */

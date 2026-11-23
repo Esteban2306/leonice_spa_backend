@@ -338,6 +338,14 @@ const PRODUCT = {
     status: HttpStatus.NOT_FOUND,
     message: 'Producto no encontrado.',
   },
+  PRODUCT_ORDER_NOT_FOUND: {
+    status: HttpStatus.NOT_FOUND,
+    message: 'Pedido no encontrado.',
+  },
+  PRODUCT_ORDER_INVALID_STATUS: {
+    status: HttpStatus.CONFLICT,
+    message: 'El pedido no está en un estado que permita esta acción.',
+  },
   PRODUCT_HAS_HISTORY: {
     status: HttpStatus.CONFLICT,
     message:

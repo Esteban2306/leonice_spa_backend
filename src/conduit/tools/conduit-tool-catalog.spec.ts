@@ -37,6 +37,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
         'enlace_cancelacion',
         'depositos_pendientes',
         'registrar_comprobante_automatico',
+        'registrar_pago_pedido',
         'pasar_a_persona',
         'avisar_a_leo',
         'recomendar_para',
@@ -64,19 +65,19 @@ describe('CONDUIT_TOOL_CATALOG', () => {
     },
   );
 
-  it('solo el perfil de la clienta queda fijo en la memoria del bot (sin datos sensibles)', () => {
+  it('solo el perfil de la clienta y su pedido quedan fijos en la memoria del bot (sin datos sensibles)', () => {
     const pinned = CONDUIT_TOOL_CATALOG.filter((t) => t.pinResultInMemory).map(
       (t) => t.name,
     );
-    expect(pinned).toEqual(['consultar_cliente']);
+    expect(pinned).toEqual(['consultar_cliente', 'solicitar_compra_producto']);
   });
 
-  it('solo la de comprobante pide imagen y solo los traspasos (equipo o Leo) pausan el bot', () => {
+  it('solo las de comprobante (anticipo o pedido) piden imagen y solo los traspasos (equipo o Leo) pausan el bot', () => {
     expect(
       CONDUIT_TOOL_CATALOG.filter((t) => t.requiresImageAttachment).map(
         (t) => t.name,
       ),
-    ).toEqual(['registrar_comprobante_automatico']);
+    ).toEqual(['registrar_pago_pedido', 'registrar_comprobante_automatico']);
     expect(
       CONDUIT_TOOL_CATALOG.filter((t) => t.pausesBotMinutes).map((t) => t.name),
     ).toEqual(['avisar_a_leo', 'pasar_a_persona']);
