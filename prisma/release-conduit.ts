@@ -147,6 +147,25 @@ export const PRODUCT_PROMOTIONS_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const PRODUCT_ORDERS_RELEASE: ReleaseManifest = {
+  id: '2026-11-25-pedidos-productos',
+  intents: ['treatment_question'],
+  tools: [
+    'solicitar_compra_producto',
+    'registrar_pago_pedido',
+    'depositos_pendientes',
+  ],
+  templates: [
+    'leonice_aviso_pago_pedido',
+    'leonice_pago_pedido_verificado',
+    'leonice_pago_pedido_rechazado',
+  ],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
@@ -156,6 +175,7 @@ export const RELEASES: readonly ReleaseManifest[] = [
   FOLLOW_UP_TEMPLATES_RELEASE,
   CANT_MAKE_IT_RELEASE,
   PRODUCT_PROMOTIONS_RELEASE,
+  PRODUCT_ORDERS_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];
@@ -445,7 +465,17 @@ export async function releaseConduit(
     return item;
   };
 
-  const toolPlan = tools.map((tool) => ({
+  const laterNewTools = laterReleaseNewTools(manifest);
+  const promptTools = manifest.prompt
+    ? CONDUIT_TOOL_CATALOG.filter(
+        (tool) =>
+          laterNewTools.has(tool.name) &&
+          CONDUIT_BOT_PROMPT_TEMPLATE.includes(tool.name) &&
+          !manifest.tools.includes(tool.name) &&
+          !toolByName.has(tool.name),
+      )
+    : [];
+  const toolPlan = [...tools, ...promptTools].map((tool) => ({
     tool,
     remote: toolByName.get(tool.name),
     item: (() => {
@@ -676,6 +706,19 @@ export async function releaseConduit(
   }
 
   return { plan, applied: true, backupFile, warnings };
+}
+
+function laterReleaseNewTools(manifest: ReleaseManifest): Set<string> {
+  const index = RELEASES.findIndex((release) => release.id === manifest.id);
+  const later = index === -1 ? [] : RELEASES.slice(index + 1);
+  const names = new Set<string>();
+  for (const release of later) {
+    const existed = loadBaseline(release.id).tools;
+    for (const name of release.tools) {
+      if (!(name in existed)) names.add(name);
+    }
+  }
+  return names;
 }
 
 function definedOnly(values: Record<string, unknown>): Record<string, unknown> {

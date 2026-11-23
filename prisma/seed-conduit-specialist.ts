@@ -26,6 +26,8 @@ const PROMPT_TEMPLATE = [
   'La fecha es la de la transacción, en formato AAAA-MM-DD.',
   'Si la imagen no es un comprobante de transferencia o de pago (por ejemplo una foto personal, una captura de conversación o un paisaje), marca que no es el documento esperado.',
   'Si es un comprobante pero se lee mal, refleja esa dificultad en la legibilidad.',
+  'Clasifica siempre la imagen en tipo: comprobante (un pago o transferencia), producto (frascos, cajas o empaques de productos de cabello), cabello (una foto del cabello o del cuero cabelludo de una persona) u otro.',
+  'Si es producto, escribe en producto solo lo que se lee en las etiquetas: marca, línea, tipo y presentación de cada producto distinto, separados por punto y coma, con la cantidad si hay varios iguales (por ejemplo "2 x Shampoo Purify Amazônica 300 ml; Acondicionador Jolly Kids 500 ml"). Si no se lee, describe el tipo de producto y su color. Si no es producto, déjalo vacío.',
 ].join('\n');
 
 const OUTPUT_SCHEMA = {
@@ -69,6 +71,23 @@ const OUTPUT_SCHEMA = {
       type: 'date',
       label: 'fecha',
       description: 'Fecha de la transacción en formato YYYY-MM-DD',
+    },
+    {
+      name: 'tipo',
+      type: 'enum',
+      values: ['comprobante', 'producto', 'cabello', 'otro'],
+      label: 'tipo de imagen',
+      description:
+        'Qué muestra la imagen: comprobante, producto, cabello u otro',
+    },
+    {
+      name: 'producto',
+      type: 'string',
+      maxLength: 200,
+      exposeToBot: true,
+      label: 'producto visible',
+      description:
+        'Marca, línea, tipo y presentación que se leen en los productos de la foto; vacío si no es producto',
     },
   ],
   uniqueBy: ['reference', 'amount', 'date'],

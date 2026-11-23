@@ -96,26 +96,78 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'solicitar_compra_producto',
     description:
-      'Avisa al equipo que la clienta quiere COMPRAR un producto, con su número y lo que pidió. Úsala solo cuando ella diga que lo quiere comprar o pida comprarlo, nunca por una simple consulta de información o precio. Si tiene promoción vigente, pon en request el precio con promoción. No pausa el asistente. Puede devolver closingOffer: una promoción para mencionar al cerrar.',
+      'Crea o actualiza el pedido de productos de la clienta y avisa al equipo. Úsala cuando diga que lo quiere o pide comprarlo (no por una consulta de precio). Pasa cada producto con el nombre y la presentación tal como los dio info_productos, y la cantidad. Devuelve el código del pedido, los precios con promoción, el total, la forma de pago y una pista de qué decir; puede devolver closingOffer.',
     httpMethod: 'POST',
     path: '/conduit/products/purchase-request',
     injectPhoneParamName: 'phone',
+    pinResultInMemory: true,
     parametersSchema: {
       type: 'object',
-      required: ['request'],
+      required: ['items'],
       properties: {
         phone: PHONE,
+        items: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 10,
+          items: {
+            type: 'object',
+            required: ['producto', 'cantidad'],
+            properties: {
+              producto: {
+                type: 'string',
+                minLength: 2,
+                maxLength: 120,
+                description:
+                  'Nombre del producto o kit como lo dio info_productos',
+              },
+              presentacion: {
+                type: 'string',
+                maxLength: 60,
+                description: 'Presentación elegida, por ejemplo "300 ml"',
+              },
+              cantidad: { type: 'integer', minimum: 1, maximum: 20 },
+            },
+          },
+        },
         request: {
           type: 'string',
           minLength: 3,
           maxLength: 400,
-          description:
-            'Producto, marca, presentación y cantidad que quiere comprar',
+          description: 'Lo que pidió en sus palabras, si ayuda al equipo',
         },
         notes: {
           type: 'string',
           maxLength: 600,
           description: 'Algo más que el equipo deba saber',
+        },
+      },
+    },
+  },
+  {
+    name: 'registrar_pago_pedido',
+    description:
+      'Registra la foto del comprobante de pago de su pedido de productos para que el equipo lo verifique. No confirma el pago.',
+    httpMethod: 'POST',
+    path: '/conduit/product-orders/payment',
+    injectPhoneParamName: 'phone',
+    requiresImageAttachment: true,
+    imageParamName: 'imageBase64',
+    parametersSchema: {
+      type: 'object',
+      required: ['phone'],
+      properties: {
+        phone: PHONE,
+        pedido: {
+          type: 'string',
+          maxLength: 12,
+          description: 'Código del pedido (P-0042) si lo sabes',
+        },
+        montoComprobante: {
+          type: 'number',
+          minimum: 0,
+          description:
+            'El monto que leyó el sistema en el comprobante (amount), si lo hay',
         },
       },
     },
@@ -396,7 +448,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'depositos_pendientes',
     description:
-      'Reservas de la clienta que esperan anticipo, con monto y plazo. Úsala cuando vaya a enviar o pregunte por un anticipo.',
+      'Reservas de la clienta que esperan anticipo y su pedido de productos abierto (openProductOrder). Úsala cuando envíe un comprobante o pregunte por un anticipo o un pago.',
     httpMethod: 'GET',
     path: '/deposits/pending',
     injectPhoneParamName: 'phone',

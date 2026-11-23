@@ -23,6 +23,8 @@ import {
   type AdminHandoffNoticeJobData,
   type AdminInProgressNoticeJobData,
   type AdminProductPurchaseNoticeJobData,
+  type AdminProductPaymentNoticeJobData,
+  type ClientProductPaymentNoticeJobData,
   type AdminReceiptNoticeJobData,
   type CancellationLinkNoticeJobData,
   type ClientCancellationNoticeJobData,
@@ -358,6 +360,88 @@ export class OperationalNotificationsListener {
       );
       return false;
     }
+  }
+
+  @OnEvent(EVENT_TYPES.PRODUCT_ORDER_PAYMENT_RECEIVED)
+  async handleProductPaymentReceived(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.PRODUCT_ORDER_PAYMENT_RECEIVED
+    >,
+  ): Promise<boolean> {
+    const { orderId, proofReceivedAt } = event.payload;
+    try {
+      const queued =
+        await this.enqueueForAdmins<AdminProductPaymentNoticeJobData>(
+          JOB_NAMES.NOTIFY_ADMIN_PRODUCT_PAYMENT,
+          'comprobante de un pedido de productos',
+          (recipientId) => ({
+            data: { orderId, recipientId },
+            opts: {
+              jobId: `admin-product-payment-${orderId}-${Date.parse(proofReceivedAt)}-${recipientId}`,
+            },
+          }),
+        );
+      return queued > 0;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `No se pudo encolar el aviso del pago de un pedido: ${message}`,
+      );
+      return false;
+    }
+  }
+
+  @OnEvent(EVENT_TYPES.PRODUCT_ORDER_PAYMENT_VERIFIED)
+  async handleProductPaymentVerified(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.PRODUCT_ORDER_PAYMENT_VERIFIED
+    >,
+  ): Promise<void> {
+    const data: ClientProductPaymentNoticeJobData = {
+      orderId: event.payload.orderId,
+    };
+    await this.guard(
+      'aviso cliente por pago de pedido',
+      data.orderId,
+      async () => {
+        await this.queue.add(
+          JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_VERIFIED,
+          data,
+          {
+            ...NOTICE_JOB_OPTIONS,
+            jobId: `client-product-paid-${data.orderId}`,
+          },
+        );
+      },
+    );
+  }
+
+  @OnEvent(EVENT_TYPES.PRODUCT_ORDER_PAYMENT_REJECTED)
+  async handleProductPaymentRejected(
+    event: EventOf<
+      EventPayloadMap,
+      typeof EVENT_TYPES.PRODUCT_ORDER_PAYMENT_REJECTED
+    >,
+  ): Promise<void> {
+    const data: ClientProductPaymentNoticeJobData = {
+      orderId: event.payload.orderId,
+      reason: event.payload.reason,
+    };
+    await this.guard(
+      'aviso cliente por pago de pedido rechazado',
+      data.orderId,
+      async () => {
+        await this.queue.add(
+          JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED,
+          data,
+          {
+            ...NOTICE_JOB_OPTIONS,
+          },
+        );
+      },
+    );
   }
 
   @OnEvent(EVENT_TYPES.CONDUIT_RECEIPT_ISSUE)

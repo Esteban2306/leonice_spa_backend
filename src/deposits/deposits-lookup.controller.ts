@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { ProductOrdersService } from '../product-orders/product-orders.service';
+import { orderCode } from '../product-orders/domain/order-pricing';
+import { formatPesos } from '../product-orders/domain/order-text';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ConduitTool } from '../conduit/decorators/conduit-tool.decorator';
 import { VerifiedPhone } from '../conduit/decorators/verified-phone.decorator';
 import { PendingDepositLookupService } from './services/pending-deposit-lookup.service';
@@ -21,6 +31,7 @@ export class DepositsLookupController {
     private readonly cloudinary: CloudinaryService,
     private readonly depositsRepository: DepositsRepository,
     private readonly depositCredit: DepositCreditService,
+    private readonly productOrders: ProductOrdersService,
   ) {}
 
   @Get()
@@ -46,8 +57,27 @@ export class DepositsLookupController {
 
   @ConduitTool({ requiresVerifiedContact: true })
   @Get('pending')
-  findPending(@VerifiedPhone() phone: string) {
-    return this.lookupService.findCandidates(phone);
+  async findPending(@VerifiedPhone() phone: string) {
+    const [deposits, order] = await Promise.all([
+      this.lookupService.findCandidates(phone).catch((error: unknown) => {
+        if (error instanceof NotFoundException) {
+          return { clientName: null, candidates: [] };
+        }
+        throw error;
+      }),
+      this.productOrders.openOrderFor({ phone, lid: null }),
+    ]);
+    return {
+      ...deposits,
+      openProductOrder: order
+        ? {
+            orderCode: orderCode(order.number),
+            status: order.status,
+            total:
+              order.total === null ? null : formatPesos(Number(order.total)),
+          }
+        : null,
+    };
   }
 
   @ConduitTool({ requiresVerifiedContact: true })

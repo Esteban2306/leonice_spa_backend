@@ -38,6 +38,11 @@ export const JOB_NAMES = {
   NOTIFY_ADMIN_CLIENT_CANCELLED: 'notify-admin-client-cancelled',
   NOTIFY_ADMIN_HANDOFF: 'notify-admin-handoff',
   NOTIFY_ADMIN_PRODUCT_PURCHASE: 'notify-admin-product-purchase',
+  NOTIFY_ADMIN_PRODUCT_PAYMENT: 'notify-admin-product-payment',
+  NOTIFY_CLIENT_PRODUCT_PAYMENT_VERIFIED:
+    'notify-client-product-payment-verified',
+  NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED:
+    'notify-client-product-payment-rejected',
   NOTIFY_ADMIN_RECEIPT_ISSUE: 'notify-admin-receipt-issue',
   NOTIFY_ADMIN_IN_PROGRESS: 'notify-admin-in-progress',
   NOTIFY_CLIENT_EVENT_TICKET: 'notify-client-event-ticket',

@@ -1,3 +1,5 @@
+import { ProductOrdersModule } from '../product-orders/product-orders.module';
+import { ConduitProductOrdersController } from './conduit-product-orders.controller';
 import { Module } from '@nestjs/common';
 import { ConduitApiClient } from './client/conduit-api.client';
 import { ConduitTemplateResolver } from './templates/conduit-template-resolver';
@@ -39,6 +41,7 @@ import { ConduitPromotionOffersService } from './promotions/conduit-promotion-of
     BusinessSettingsModule,
     ProductsModule,
     PromotionsModule,
+    ProductOrdersModule,
   ],
   controllers: [
     ConduitWebhooksController,
@@ -49,6 +52,7 @@ import { ConduitPromotionOffersService } from './promotions/conduit-promotion-of
     ConduitAdminController,
     ConduitSpecialistController,
     ConduitVerificationEventsController,
+    ConduitProductOrdersController,
   ],
   providers: [
     TeamQuoteService,

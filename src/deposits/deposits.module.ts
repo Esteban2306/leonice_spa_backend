@@ -1,3 +1,4 @@
+import { ProductOrdersModule } from '../product-orders/product-orders.module';
 import { Module } from '@nestjs/common';
 import { DepositsController } from './deposits.controller';
 import { DepositsRepository } from './repositories/deposits.repositories';
@@ -14,7 +15,7 @@ import { EncryptionService } from 'src/infrastructure/encryption/encryption.serv
 import { DepositCreditService } from 'src/reservations/service/deposit-credit.service';
 
 @Module({
-  imports: [ReservationsModule],
+  imports: [ReservationsModule, ProductOrdersModule],
   controllers: [DepositsController, DepositsLookupController],
   providers: [
     DepositsRepository,

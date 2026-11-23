@@ -33,6 +33,7 @@ export class BusinessSettingsService {
         id: SETTINGS_ID,
         depositAmount: null,
         depositInstructions: null,
+        productPaymentInstructions: null,
         depositPolicy: null,
         cancellationPolicy: null,
         address: null,

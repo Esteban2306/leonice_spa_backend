@@ -224,11 +224,27 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).toContain('info_productos');
     expect(section).toContain('cuál va con su tratamiento');
     expect(section).toContain('Nunca prometas unidades');
-    expect(section).toContain('Solo si dice que quiere comprarlo');
+    expect(section).toContain('Si lo quiere comprar');
     expect(section).toContain('solicitar_compra_producto');
-    expect(section).toContain('Una consulta o un precio no es una compra');
-    expect(section).toContain('solo si la herramienta devolvió éxito');
-    expect(section).toContain('No cobras ni tomas pagos');
+    expect(section).toContain('Un precio no es una compra');
+    expect(section).toContain('sigue su hint');
+    expect(section).toContain('paymentInstructions del pedido');
+    expect(section).toContain('Nunca la inventes');
+  });
+
+  it('una foto de producto se responde como pregunta por ese producto, no como comprobante', () => {
+    const section =
+      CONDUIT_BOT_PROMPT_TEMPLATE.split('Productos\n')[1].split('\n\n')[0];
+    expect(section).toContain('tipo: producto');
+    expect(section).toContain('info_productos');
+    expect(section).toContain('no es un comprobante ni hables de anticipo');
+    expect(section).toContain('Descuento solo en lo que trae promotion');
+  });
+
+  it('sin un dato o con una herramienta caída siempre responde algo', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'Sin un dato o si una herramienta falla, dilo en una frase y ofrece lo que sí puedes o pasar_a_persona; siempre respondes algo.',
+    );
   });
 
   it('si necesitan a Leo, se le avisa solo a ella con avisar_a_leo y nunca se da su número', () => {
@@ -306,7 +322,7 @@ describe('prompt del asistente de Leonice', () => {
 
   it('una compra pedida se avisa al equipo enseguida, sin pedir confirmación', () => {
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toMatch(
-      /solicitar_compra_producto enseguida, sin pedir confirmación/,
+      /solicitar_compra_producto enseguida, sin confirmar/,
     );
   });
 
@@ -399,15 +415,16 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain('para agendar, igual consulta los cupos');
   });
 
-  it('un comprobante sin anticipo pendiente no se registra: va a una persona', () => {
+  it('un comprobante va al pedido o al anticipo según lo que tenga abierto, y si no es ninguno a una persona', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
-      'sin anticipo pendiente, un comprobante es de otro pago (saldo, producto, deuda): no llames registrar_comprobante_automatico',
+      'Con pedido abierto (openProductOrder) y sin anticipo, o monto cercano al total del pedido: registrar_pago_pedido con montoComprobante = amount, sin mirar el veredicto',
     );
+    expect(t).toContain('con ambos y sin saber cuál, pregúntale');
     expect(t).toContain(
-      'pasar_a_persona (motivo: comprobante de un pago que no es anticipo)',
+      'pasar_a_persona (motivo: pago que no es anticipo ni pedido)',
     );
-    expect(t.indexOf('sin anticipo pendiente, un comprobante')).toBeLessThan(
+    expect(t.indexOf('registrar_pago_pedido')).toBeLessThan(
       t.indexOf('· VALID, NEEDS_REVIEW, ERROR'),
     );
   });
@@ -445,7 +462,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(16100);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(16600);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

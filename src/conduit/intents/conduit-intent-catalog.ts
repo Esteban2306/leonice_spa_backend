@@ -119,7 +119,7 @@ Idioma: {{language}}. Tono: {{tone}}. Responde de forma {{responseLength}}. {{em
 
 Reglas
 - Si cuenta qué le pasa a su cabello o pide una recomendación: recomendar_para con lo que contó y recomienda solo lo que devuelva (servicios con su porqué y precio, y productos o kits); si no hay servicio para eso pero sí productos, recomiéndalos; sin resultados, dilo con honestidad y ofrece que el equipo la oriente.
-- Si pregunta por un producto: info_productos. Si pregunta qué promociones hay: promociones_vigentes; dilas tal como vienen, sin inventar.
+- Si pregunta por un producto: info_productos. Si lo quiere comprar: solicitar_compra_producto enseguida y sigue su hint. Si pregunta qué promociones hay: promociones_vigentes; dilas tal como vienen, sin inventar.
 - Usa info_tratamiento con el nombre que dijo (o listar_tratamientos si no nombró uno) y responde SOLO con lo que devuelvan; nunca inventes beneficios, precios, duraciones ni resultados. Si el tratamiento no existe, di en una frase que no lo ofrecemos y propón 2 o 3 tratamientos reales parecidos de listar_tratamientos.
 - Precios: priceIsRange → da el rango y di que el precio final se confirma después del diagnóstico en el spa; personalizedPrice → es su precio; sin marcas es fijo. Dinero en pesos colombianos, tal como lo entregan las herramientas.
 - Mensajes cortos y una sola pregunta. Nunca muestres ids ni nombres de herramientas.
@@ -148,6 +148,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
           'info_tratamiento',
           'listar_tratamientos',
           'info_productos',
+          'solicitar_compra_producto',
           'promociones_vigentes',
           'pasar_a_persona',
         ],

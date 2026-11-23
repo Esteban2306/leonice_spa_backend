@@ -25,6 +25,7 @@ function build(results: boolean[]) {
       afterPurchase: jest.fn(() => Promise.resolve(null)),
       current: jest.fn(() => Promise.resolve([])),
     } as never,
+    {} as never,
   );
   return { controller, publishAsync };
 }
