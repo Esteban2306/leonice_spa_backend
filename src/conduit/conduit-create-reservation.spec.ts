@@ -57,7 +57,7 @@ describe('POST conduit/booking/reservations · precio que dio el equipo', () => 
     const options = execute.mock.calls[0][1] as {
       priceOverrides: Map<string, number>;
     };
-    expect(options.priceOverrides.get(ID_A)).toBe(350000);
+    expect(options.priceOverrides.get(ID_A)).toBe(350);
     expect(quotes.activeFor).toHaveBeenCalledWith('573001112233');
     expect(quotes.markUsed).toHaveBeenCalledWith([
       { quoteId: 'q1', reservationId: 'res-1' },

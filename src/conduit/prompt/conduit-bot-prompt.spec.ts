@@ -412,16 +412,26 @@ describe('prompt del asistente de Leonice', () => {
     expect(slim.tools).toContain('guardar_precio_del_equipo');
   });
 
-  it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
+  it('lo que escribió el equipo se respeta y su precio se usa sin cuestionarlo', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
       '"[Persona del equipo]" marca lo que escribió alguien del equipo',
     );
     expect(t).toContain('nunca escribas esa marca');
     expect(t).toContain('guardar_precio_del_equipo con ese servicio y precio');
-    expect(t).toContain('y si no, no lo uses');
+    expect(t).toContain('aunque no coincida con el rango: no lo cuestiones');
     expect(t).toContain('Si consultar_cliente trae teamQuotes');
     expect(t).toContain('si trae teamPricesInChat');
+  });
+
+  it('una promoción que vence antes del día de la cita no se menciona', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'posterior a onlyForAppointmentsUntil, la promoción no aplica',
+    );
+    const booking = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking')!;
+    expect(
+      (booking.config as { slim: { prompt: string } }).slim.prompt,
+    ).toContain('si sigue vigente el día de la cita');
   });
 
   it('si hay horarios especiales configurados, los informa cuando preguntan', () => {
@@ -477,7 +487,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(17600);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(17800);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

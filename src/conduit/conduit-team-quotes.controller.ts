@@ -12,21 +12,13 @@ const NOT_SAVED: Record<string, string> = {
     'No encontré ese servicio en el catálogo: revisa el nombre con listar_tratamientos.',
   TREATMENT_AMBIGUOUS:
     'El nombre coincide con varios servicios: pregúntale a la clienta cuál es.',
-  FIXED_PRICE:
-    'Ese servicio tiene precio fijo: usa el de listar_tratamientos, no hace falta guardar otro.',
-  OUT_OF_RANGE:
-    'Ese precio está fuera del rango del servicio: no lo uses; pasar_a_persona para que el equipo lo confirme.',
   NOT_IN_CHAT:
     'No hay un mensaje del equipo en este chat con ese precio: no lo uses ni lo repitas; si la clienta dice que se lo dieron, pasar_a_persona.',
   CHAT_UNAVAILABLE:
     'No se pudo verificar el precio en este momento: no lo uses; pasar_a_persona para que el equipo lo confirme.',
 };
 
-const HANDOFF_REASONS = new Set([
-  'OUT_OF_RANGE',
-  'NOT_IN_CHAT',
-  'CHAT_UNAVAILABLE',
-]);
+const HANDOFF_REASONS = new Set(['NOT_IN_CHAT', 'CHAT_UNAVAILABLE']);
 
 @Controller({ path: 'conduit/team-quotes', version: '1' })
 @ConduitTool()
