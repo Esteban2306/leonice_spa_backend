@@ -167,6 +167,17 @@ export const PRODUCT_ORDERS_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const ASSESSMENT_FLOW_RELEASE: ReleaseManifest = {
+  id: '2026-11-26-valoracion-y-precio-del-equipo',
+  intents: ['treatment_question', 'booking'],
+  tools: [],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
@@ -177,6 +188,7 @@ export const RELEASES: readonly ReleaseManifest[] = [
   CANT_MAKE_IT_RELEASE,
   PRODUCT_PROMOTIONS_RELEASE,
   PRODUCT_ORDERS_RELEASE,
+  ASSESSMENT_FLOW_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

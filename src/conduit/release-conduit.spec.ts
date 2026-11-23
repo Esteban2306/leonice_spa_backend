@@ -324,7 +324,11 @@ describe('entrega de orientación (solo el prompt)', () => {
       request: request as never,
       log: () => undefined,
     });
-    expect(out.plan.map((p) => p.name)).toContain('registrar_pago_pedido');
+    expect(out.plan.map((p) => p.name)).toEqual([
+      'treatment_question',
+      'booking',
+      'prompt de conversación',
+    ]);
   });
 
   it('su foto anterior es el prompt de la entrega Sofía y el nuevo lo cambia', () => {

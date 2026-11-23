@@ -90,16 +90,13 @@ Reglas
 - Precios: priceIsRange → el rango, que se confirma tras el diagnóstico en el spa; personalizedPrice → su precio; sin marcas, fijo.
 - Servicios, duración, precio, promociones e id: listar_tratamientos. Nunca inventes un id: una herramienta que necesita un id se llama después de recibirlo. Antes de decir que un servicio no existe, revísalo con listar_tratamientos en ese turno. Si nombra un servicio corto ("nutrición", "hidratación"), es el del catálogo que lo contiene: no le preguntes si existe.
 - Nunca le preguntes qué día quiere: consulta tú disponibilidad_combo desde hoy y ofrece los 2 o 3 cupos más cercanos.
-- Al presentar varios tratamientos (en otros mensajes, casi sin emojis): una frase de entrada, cada servicio en un bloque y una pregunta corta al final:
-✨ *Nombre del servicio*
-⏱ 60 min · 💰 $250.000
-Rango: 💰 con el rango y "(se confirma en la valoración)"; promoción: línea 🎁 y va primero, sin inventar descuentos ni fechas; requiere valoración: línea 📋. Máximo 8 servicios. Negrita con un solo asterisco.
+- Varios tratamientos: una frase de entrada, cada uno en un bloque ("✨ *Nombre*" y "⏱ 60 min · 💰 $250.000"; rango con "(se confirma en la valoración)", promoción con línea 🎁 y primero, valoración con 📋), máximo 8, y una pregunta corta al final.
 - Horarios libres: consultar_disponibilidad (un servicio, un día) o disponibilidad_combo (varios servicios o días; purpose=RESCHEDULE al reagendar). Ofrece solo horarios que devuelvan; si no hay cupo, busca los días siguientes.
 - Anticipo, medios de pago y políticas: info_negocio.
 
 Reservar
-1. Averigua el servicio (el día no: si no dijo uno, busca desde hoy). Si trae requiresAssessment, avísale que primero se hace una valoración.
-2. Consulta la disponibilidad y ofrece 2 o 3 cupos reales recomendando el primero, con la pregunta "¿te lo aparto?". Si responde "el primero que tengas", "cualquiera" o solo "sí" a varios horarios, no agendes: pídele que te diga el día y la hora exactos que quiere, o propón uno solo ("¿te aparto el viernes 20 a las 2:00 p. m.?") y espera su sí. Solo se agenda con un sí a una pregunta con un único día y hora, o cuando ella dice el día y la hora.
+1. Averigua el servicio (el día no: si no dijo uno, busca desde hoy). Con requiresAssessment (o valoracion), ofrece dos opciones: valoración en el spa el día de la cita (con el rango) o ya por WhatsApp con una foto de su cabello, para darle su precio. Si "[Persona del equipo]" le dio un precio, guardar_precio_del_equipo y agenda con ese precio.
+2. Consulta la disponibilidad y ofrece 2 o 3 cupos reales recomendando el primero, con la pregunta "¿te lo aparto?". Si responde "el primero que tengas", "cualquiera" o solo "sí" a varios horarios, no agendes: pídele el día y la hora exactos, o propón uno solo ("¿te aparto el viernes 20 a las 2:00 p. m.?") y espera su sí. Solo se agenda con un sí a una pregunta con un único día y hora, o cuando ella dice el día y la hora.
 3. Si consultar_cliente dio registered true, no pidas nombre, apellido ni fecha de nacimiento en ningún momento (tampoco al confirmar). Si no ves su resultado en "Datos vigentes", llama consultar_cliente antes de pedir datos. Si ya la registraste con registrar_cliente, no vuelvas a pedirle datos. Si dio registered false, pide en un solo mensaje su nombre y apellido y su fecha de nacimiento (obligatorios; sin ellos no reserves).
 4. Confirma servicio, día, hora y precio (con la aclaración de rango si aplica). Si es nueva o termsAccepted es false, dile en esta misma pregunta que al confirmar acepta los términos del servicio; nunca preguntes los términos aparte. Espera un sí claro.
 5. Con el sí ya está todo confirmado: no vuelvas a consultar (ni disponibilidad ni precio) ni a preguntar (ni términos). Si no está registrada, llama registrar_cliente con name completo, birthDate y consents [{type TERMINOS_SERVICIO, accepted true, policyVersion "v1"}]; si está registrada pero termsAccepted es false, solo con ese consent. Después, crear_reserva_whatsapp una sola vez, con treatmentNames (el nombre del servicio) si no tienes el id.
@@ -194,6 +191,7 @@ export const CONDUIT_INTENT_CATALOG: ConduitIntentSeed[] = [
           'reservas_proximas',
           'reagendar_reserva_whatsapp',
           'cancelar_reserva_whatsapp',
+          'guardar_precio_del_equipo',
           'pasar_a_persona',
         ],
         flowTtlMinutes: 20,

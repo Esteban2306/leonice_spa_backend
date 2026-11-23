@@ -50,6 +50,9 @@ const SLOT_ERRORS = new Set<string>([
   'PLACEMENT_CLIENT_OVERLAP',
 ]);
 
+export const ASSESSMENT_CHOICE =
+  'Este servicio requiere valoración: si aún no tiene su precio del equipo, antes de apartar ofrécele dos opciones: valoración en el spa el día de la cita (con el rango) o ya por WhatsApp con una foto de su cabello para darle su precio.';
+
 @Controller({ path: 'conduit/booking', version: '1' })
 @ConduitTool()
 export class ConduitBookingToolsController {
@@ -116,15 +119,19 @@ export class ConduitBookingToolsController {
 
   @ConduitToolOptionsMeta({ publicData: true })
   @Get('availability')
-  async getAvailability(@Query() query: GetAvailabilityDto) {
-    const slots = await this.reservationsService.getAvailability(
-      query.treatmentId,
-      query.date,
-    );
+  async getAvailability(
+    @Query() query: GetAvailabilityDto,
+    @Req() req: RequestWithConduitContact,
+  ) {
+    const [slots, assessment] = await Promise.all([
+      this.reservationsService.getAvailability(query.treatmentId, query.date),
+      this.assessmentChoice([query.treatmentId], req),
+    ]);
     return {
       treatmentId: query.treatmentId,
       date: query.date,
       slots: onePerHour(slots),
+      ...assessment,
     };
   }
 
@@ -134,10 +141,38 @@ export class ConduitBookingToolsController {
    */
   @ConduitToolOptionsMeta({ publicData: true })
   @Get('availability/calendar')
-  async getAvailabilityCalendar(@Query() query: GetAvailabilityCalendarDto) {
-    const calendar =
-      await this.reservationsService.getAvailabilityCalendar(query);
-    return { ...calendar, days: onePerHourByDay(calendar.days) };
+  async getAvailabilityCalendar(
+    @Query() query: GetAvailabilityCalendarDto,
+    @Req() req: RequestWithConduitContact,
+  ) {
+    const [calendar, assessment] = await Promise.all([
+      this.reservationsService.getAvailabilityCalendar(query),
+      this.assessmentChoice(query.treatmentIds, req),
+    ]);
+    return {
+      ...calendar,
+      days: onePerHourByDay(calendar.days),
+      ...assessment,
+    };
+  }
+
+  private async assessmentChoice(
+    treatmentIds: string[],
+    req: RequestWithConduitContact,
+  ): Promise<{ valoracion?: string }> {
+    const wanted = new Set(treatmentIds);
+    const assessed = (await this.treatmentsService.findAll())
+      .filter((t) => wanted.has(t.id) && t.requiresPriorAssessment)
+      .map((t) => t.id);
+    if (assessed.length === 0) return {};
+    const phone = req.conduitContact?.phone;
+    if (phone && hasVerifiedIdentity(req)) {
+      const quoted = new Set(
+        (await this.teamQuotes.activeFor(phone)).map((q) => q.treatmentId),
+      );
+      if (assessed.every((id) => quoted.has(id))) return {};
+    }
+    return { valoracion: ASSESSMENT_CHOICE };
   }
 
   @Post('reservations')

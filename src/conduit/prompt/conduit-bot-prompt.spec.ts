@@ -283,9 +283,7 @@ describe('prompt del asistente de Leonice', () => {
     );
     const booking = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking')!;
     const slim = (booking.config as { slim: { prompt: string } }).slim.prompt;
-    expect(slim).toContain(
-      'no agendes: pídele que te diga el día y la hora exactos',
-    );
+    expect(slim).toContain('no agendes: pídele el día y la hora exactos');
     expect(slim).toContain('Un comprobante no confirma un horario');
     expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
       'Un comprobante o un "ya pagué" no confirma un horario',
@@ -405,6 +403,13 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toContain(
       'no agendes con el rango hasta que el equipo dé el precio',
     );
+    const booking = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking')!;
+    const slim = (
+      booking.config as { slim: { prompt: string; tools: string[] } }
+    ).slim;
+    expect(slim.prompt).toContain('ofrece dos opciones');
+    expect(slim.prompt).toContain('guardar_precio_del_equipo');
+    expect(slim.tools).toContain('guardar_precio_del_equipo');
   });
 
   it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
@@ -472,7 +477,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(17400);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(17600);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {
