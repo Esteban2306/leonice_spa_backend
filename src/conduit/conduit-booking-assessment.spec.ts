@@ -29,6 +29,11 @@ function build(quotes: Array<{ treatmentId: string }> = []) {
     {} as never,
     { activeFor: jest.fn(() => Promise.resolve(quotes)) } as never,
     {} as never,
+    {
+      markDay: jest.fn(),
+      markRange: jest.fn(),
+      assertConsulted: jest.fn(),
+    } as never,
   );
   return controller;
 }

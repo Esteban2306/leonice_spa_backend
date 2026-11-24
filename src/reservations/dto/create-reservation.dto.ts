@@ -77,6 +77,17 @@ export class ClientInputDto {
   consent?: ConsentInputDto;
 }
 
+/** The person the appointment is for when it is not the client who books (daughter, mother, friend...). */
+export class DependentInputDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(100)
+  name: string;
+
+  @IsCalendarDate()
+  birthDate: string;
+}
+
 export class CreateReservationDto {
   @ValidateNested()
   @Type(() => ClientInputDto)
@@ -90,6 +101,11 @@ export class CreateReservationDto {
 
   @IsZonedDateTime()
   scheduledStart: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DependentInputDto)
+  dependent?: DependentInputDto;
 
   @IsOptional()
   @IsEnum(ReservationChannel)

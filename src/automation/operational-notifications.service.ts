@@ -85,6 +85,16 @@ interface NoticeRecipient {
   email: string | null;
 }
 
+/** Names the person when the appointment is for someone other than the contact: "Spa Capilar (para Sofía)". */
+export function treatmentLabel(r: {
+  treatment: { name: string };
+  dependent?: { name: string } | null;
+}): string {
+  return r.dependent
+    ? `${r.treatment.name} (para ${r.dependent.name})`
+    : r.treatment.name;
+}
+
 @Injectable()
 export class OperationalNotificationsService {
   private readonly logger = new Logger(OperationalNotificationsService.name);
@@ -144,7 +154,7 @@ export class OperationalNotificationsService {
     await this.notifyRecipient(ctx, 'ADMIN_DEPOSIT_TIMEOUT', recipient, {
       cliente: first.client.name,
       telefono: first.client.phone,
-      tratamientos: details.map((r) => r.treatment.name).join(', '),
+      tratamientos: details.map(treatmentLabel).join(', '),
       fecha: formatNotificationDateTime(first.scheduledStart),
     });
     await this.executed(type, reservationId, `Destinatario ${recipient.id}`);
@@ -229,7 +239,7 @@ export class OperationalNotificationsService {
 
     await this.send(ctx, 'CLIENT_RESERVATION_CONFIRMED', first.client.phone, {
       nombre: first.client.name,
-      tratamiento: confirmed.map((r) => r.treatment.name).join(', '),
+      tratamiento: confirmed.map(treatmentLabel).join(', '),
       fecha: formatNotificationDateTime(first.scheduledStart),
     });
     await this.executed(type, reservationId);
@@ -328,7 +338,7 @@ export class OperationalNotificationsService {
     );
     await this.send(ctx, 'CLIENT_DEPOSIT_REMINDER', reservation.client.phone, {
       nombre: reservation.client.name.split(/\s+/)[0],
-      tratamiento: ordered.map((r) => r.treatment.name).join(', '),
+      tratamiento: ordered.map(treatmentLabel).join(', '),
       fecha: formatNotificationDateTime(ordered[0].scheduledStart),
       plazo: `el ${formatNotificationDateTime(expiresAt)}`,
     });
@@ -362,7 +372,7 @@ export class OperationalNotificationsService {
       reservation.client.phone,
       {
         nombre: reservation.client.name,
-        tratamiento: reservation.treatment.name,
+        tratamiento: treatmentLabel(reservation),
         fecha: formatNotificationDateTime(reservation.scheduledStart),
         motivo: reason,
       },
@@ -393,7 +403,7 @@ export class OperationalNotificationsService {
 
     await this.send(ctx, 'CLIENT_RESCHEDULED', reservation.client.phone, {
       nombre: reservation.client.name,
-      tratamiento: reservation.treatment.name,
+      tratamiento: treatmentLabel(reservation),
       fecha: formatNotificationDateTime(reservation.scheduledStart),
     });
     await this.executed(type, reservationId);
@@ -429,7 +439,7 @@ export class OperationalNotificationsService {
     await this.notifyRecipient(ctx, 'ADMIN_RESCHEDULED', recipient, {
       cliente: reservation.client.name,
       telefono: reservation.client.phone,
-      tratamiento: reservation.treatment.name,
+      tratamiento: treatmentLabel(reservation),
       fecha_anterior: formatNotificationDateTime(
         new Date(data.previousScheduledStart),
       ),
@@ -457,7 +467,7 @@ export class OperationalNotificationsService {
 
     await this.send(ctx, 'CLIENT_CANCELLATION_CONFIRMED', first.client.phone, {
       nombre: first.client.name,
-      tratamientos: cancelled.map((r) => r.treatment.name).join(', '),
+      tratamientos: cancelled.map(treatmentLabel).join(', '),
       fecha: formatNotificationDateTime(first.scheduledStart),
     });
     await this.executed(type, data.reservationId);
@@ -488,7 +498,7 @@ export class OperationalNotificationsService {
     await this.notifyRecipient(ctx, 'ADMIN_CLIENT_CANCELLED', recipient, {
       cliente: first.client.name,
       telefono: first.client.phone,
-      tratamientos: cancelled.map((r) => r.treatment.name).join(', '),
+      tratamientos: cancelled.map(treatmentLabel).join(', '),
       fecha: formatNotificationDateTime(first.scheduledStart),
       canal: CHANNEL_LABELS[data.channel],
     });
@@ -866,7 +876,7 @@ export class OperationalNotificationsService {
 
     await this.send(ctx, 'CLIENT_CANCELLATION_LINK', reservation.client.phone, {
       nombre: reservation.client.name,
-      tratamiento: reservation.treatment.name,
+      tratamiento: treatmentLabel(reservation),
       fecha: formatNotificationDateTime(reservation.scheduledStart),
       enlace: data.url,
     });

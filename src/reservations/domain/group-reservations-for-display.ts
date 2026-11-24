@@ -15,6 +15,7 @@ import {
 import { getCalendarDayKey } from './calendar-day-key';
 
 export type ReservationWithRelations = Reservation & {
+  dependent?: { name: string } | null;
   client: { id: string; name: string; phone: string } & Partial<
     Pick<Client, 'hairLength' | 'hairColor' | 'hairProfileUpdatedAt'>
   >;

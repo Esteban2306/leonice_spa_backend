@@ -85,6 +85,13 @@ export class CreateReservationOrchestrator {
       dto.client,
       options,
     );
+    const dependent = dto.dependent
+      ? await this.clientService.resolveDependent(client.id, dto.dependent)
+      : null;
+    // The hair profile and the deposit credit belong to the client, not to the person she books for.
+    const pricingProfile = dependent
+      ? { hairLength: null, hairColor: null, hairProfileUpdatedAt: null }
+      : client;
 
     const treatmentIds = dto.treatments;
     assertNoDuplicateTreatmentsInRequest(treatmentIds);
@@ -112,7 +119,7 @@ export class CreateReservationOrchestrator {
     ).filter((promotion) => promotion.endsAt >= requestedStart);
 
     const timingInputs: TreatmentTimingInput[] = treatments.map((t) => {
-      const pricing = determineTreatmentPricing(t, client);
+      const pricing = determineTreatmentPricing(t, pricingProfile);
       const promo = resolveApplicablePromotion(activePromotions, {
         treatmentId: t.id,
         categoryId: t.categoryId,
@@ -151,6 +158,9 @@ export class CreateReservationOrchestrator {
               dayStart,
               dayEnd,
               tx,
+              undefined,
+              undefined,
+              dependent?.id ?? null,
             );
 
           const resolved: BookedSegmentSummary[] = [];
@@ -175,6 +185,7 @@ export class CreateReservationOrchestrator {
                 ? await this.resolvePlacement({
                     tx,
                     clientId: client.id,
+                    dependentId: dependent?.id ?? null,
                     categoryId: draft.categoryId,
                     categoryName: draft.categoryName,
                     durationMinutes: draft.durationMinutes,
@@ -187,6 +198,7 @@ export class CreateReservationOrchestrator {
                 : await this.placeAlongside({
                     tx,
                     clientId: client.id,
+                    dependentId: dependent?.id ?? null,
                     categoryId: draft.categoryId,
                     categoryName: draft.categoryName,
                     durationMinutes: draft.durationMinutes,
@@ -202,6 +214,7 @@ export class CreateReservationOrchestrator {
                 dayEnd,
                 undefined,
                 tx,
+                dependent?.id ?? null,
               );
             assertNoSameDayCategoryConflict(
               draft.categoryName,
@@ -222,6 +235,7 @@ export class CreateReservationOrchestrator {
             const createdReservation = await tx.reservation.create({
               data: {
                 clientId: client.id,
+                dependentId: dependent?.id ?? null,
                 categoryId: draft.categoryId,
                 treatmentId: draft.treatmentId,
                 status: initialStatus,
@@ -322,6 +336,7 @@ export class CreateReservationOrchestrator {
   private async placeAlongside(params: {
     tx: Prisma.TransactionClient;
     clientId: string;
+    dependentId: string | null;
     categoryId: string;
     categoryName: string;
     durationMinutes: number;
@@ -333,11 +348,19 @@ export class CreateReservationOrchestrator {
     wasAdjusted: boolean;
     adjustmentReason?: string;
   }> {
-    const { tx, clientId, categoryId, categoryName, start, comboGroupId } =
-      params;
+    const {
+      tx,
+      clientId,
+      dependentId,
+      categoryId,
+      categoryName,
+      start,
+      comboGroupId,
+    } = params;
     const end = new Date(start.getTime() + params.durationMinutes * 60_000);
     const decision = await this.placementCheck.evaluate(tx, {
       clientId,
+      dependentId,
       categoryId,
       start,
       end,
@@ -364,6 +387,7 @@ export class CreateReservationOrchestrator {
   private async resolvePlacement(params: {
     tx: Prisma.TransactionClient;
     clientId: string;
+    dependentId: string | null;
     categoryId: string;
     categoryName: string;
     durationMinutes: number;
@@ -381,6 +405,7 @@ export class CreateReservationOrchestrator {
     const {
       tx,
       clientId,
+      dependentId,
       categoryId,
       categoryName,
       durationMinutes,
@@ -420,6 +445,7 @@ export class CreateReservationOrchestrator {
 
     const decision = await this.placementCheck.evaluate(tx, {
       clientId,
+      dependentId,
       categoryId,
       start: candidateStart,
       end: candidateEnd,

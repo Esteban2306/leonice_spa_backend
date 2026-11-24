@@ -53,9 +53,25 @@ model Client {
   tags                 ClientTag[]
   eventTickets         EventTicket[]
   productOrders        ProductOrder[]
+  dependents           ClientDependent[]
 
   @@index([createdAt])
   @@map("clients")
+}
+
+/// Someone the client books for (daughter, mother, friend...). The client stays the contact: phone, deposit and reminders.
+model ClientDependent {
+  id           String        @id @default(uuid())
+  clientId     String        @map("client_id")
+  name         String
+  nameKey      String        @map("name_key")
+  birthDate    DateTime      @map("birth_date") @db.Date
+  createdAt    DateTime      @default(now()) @map("created_at")
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@unique([clientId, nameKey, birthDate])
+  @@map("client_dependents")
 }
 
 model ClientTag {
@@ -252,6 +268,7 @@ model TreatmentHairColorSurcharge {
 model Reservation {
   id                       String              @id @default(uuid())
   clientId                 String              @map("client_id")
+  dependentId              String?             @map("dependent_id")
   categoryId               String              @map("category_id")
   treatmentId              String              @map("treatment_id")
   status                   ReservationStatus   @default(SOLICITUD_INICIADA)
@@ -282,6 +299,7 @@ model Reservation {
   coveredByDeposit         DepositRecord?      @relation("DepositCoversReservation", fields: [coveredByDepositId], references: [id])
   category                 Category            @relation(fields: [categoryId], references: [id])
   client                   Client              @relation(fields: [clientId], references: [id])
+  dependent                ClientDependent?    @relation(fields: [dependentId], references: [id])
   rescheduledFrom          Reservation?        @relation("ReservationReschedule", fields: [rescheduledFromId], references: [id])
   rescheduledTo            Reservation?        @relation("ReservationReschedule")
   treatment                Treatment           @relation(fields: [treatmentId], references: [id])
@@ -291,6 +309,7 @@ model Reservation {
   @@index([comboGroupId])
   @@index([status, depositExpiresAt])
   @@index([clientId, categoryId, status])
+  @@index([dependentId])
   @@index([treatmentId])
   @@index([coveredByDepositId])
   @@map("reservations")

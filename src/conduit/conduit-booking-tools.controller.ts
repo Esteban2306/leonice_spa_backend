@@ -1,3 +1,4 @@
+import { AvailabilityConsultedService } from './availability-consulted.service';
 import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
 import {
   BadRequestException,
@@ -71,6 +72,7 @@ export class ConduitBookingToolsController {
     private readonly cancellationLinks: CancellationLinkService,
     private readonly teamQuotes: TeamQuoteService,
     private readonly promotionOffers: ConduitPromotionOffersService,
+    private readonly consulted: AvailabilityConsultedService,
   ) {}
 
   @ConduitToolOptionsMeta({ publicData: true })
@@ -128,6 +130,7 @@ export class ConduitBookingToolsController {
     @Query() query: GetAvailabilityDto,
     @Req() req: RequestWithConduitContact,
   ) {
+    await this.consulted.markDay(req.conduitContact?.phone, query.date);
     const [slots, assessment] = await Promise.all([
       this.reservationsService.getAvailability(query.treatmentId, query.date),
       this.availabilityNotes([query.treatmentId], query.date, req),
@@ -150,6 +153,13 @@ export class ConduitBookingToolsController {
     @Query() query: GetAvailabilityCalendarDto,
     @Req() req: RequestWithConduitContact,
   ) {
+    if (query.purpose !== 'RESCHEDULE') {
+      await this.consulted.markRange(
+        req.conduitContact?.phone,
+        query.from,
+        query.to,
+      );
+    }
     const [calendar, assessment] = await Promise.all([
       this.reservationsService.getAvailabilityCalendar(query),
       this.availabilityNotes(query.treatmentIds, query.from, req),
@@ -196,6 +206,7 @@ export class ConduitBookingToolsController {
   ) {
     const treatments = await this.resolveTreatmentIds(dto);
     const phone = req.conduitContact?.phone;
+    await this.consulted.assertConsulted(phone, new Date(dto.scheduledStart));
     const quotes =
       phone && hasVerifiedIdentity(req)
         ? (await this.teamQuotes.activeFor(phone)).filter((q) =>
@@ -206,6 +217,7 @@ export class ConduitBookingToolsController {
       const result = await this.createReservation.execute(
         {
           client: dto.client,
+          dependent: dto.dependent,
           treatments,
           scheduledStart: dto.scheduledStart,
           channel: ReservationChannel.WHATSAPP,

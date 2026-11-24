@@ -42,6 +42,21 @@ export class ClientsService {
     private readonly tagsService: ClientTagsService,
   ) {}
 
+  resolveDependent(
+    clientId: string,
+    dependent: { name: string; birthDate: string },
+  ) {
+    const name = dependent.name.trim().replace(/\s+/g, ' ');
+    return this.repository.findOrCreateDependent(clientId, {
+      name,
+      nameKey: name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase(),
+      birthDate: calendarDateToUtcMidnight(dependent.birthDate),
+    });
+  }
+
   async resolveOrCreateForBooking(
     dto: ResolveClientDto,
     options: ResolveClientOptions = { trustedIdentity: false },

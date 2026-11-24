@@ -31,6 +31,7 @@ import { BusinessSettingsModule } from '../business-settings/business-settings.m
 import { ProductsModule } from '../products/products.module';
 import { ConduitSystemPauseService } from './pause/conduit-system-pause.service';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { AvailabilityConsultedService } from './availability-consulted.service';
 import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
 
 @Module({
@@ -72,6 +73,7 @@ import { ConduitPromotionOffersService } from './promotions/conduit-promotion-of
     ReceiptAlertsService,
     TeamHandoffService,
     ConduitPromotionOffersService,
+    AvailabilityConsultedService,
   ],
   exports: [
     ConduitApiClient,

@@ -87,6 +87,7 @@ export class ReviveReservationOrchestrator {
 
           const decision = await this.placementCheck.evaluate(tx, {
             clientId: fresh.clientId,
+            dependentId: fresh.dependentId,
             categoryId: fresh.categoryId,
             start: fresh.scheduledStart,
             end: fresh.scheduledEnd,
