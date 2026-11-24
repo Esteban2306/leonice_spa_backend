@@ -178,8 +178,8 @@ describe('foto del cabello', () => {
     );
   });
 
-  it.each(['NEEDS_REVIEW', 'ERROR'])(
-    'una foto dudosa o que no se pudo revisar (%s) también se pasa al equipo',
+  it.each(['NEEDS_REVIEW'])(
+    'una foto dudosa (%s) también se pasa al equipo',
     async (verdict) => {
       const { controller, handoffs } = build();
       await controller.receive(
@@ -190,7 +190,7 @@ describe('foto del cabello', () => {
     },
   );
 
-  it.each(['NOT_APPLICABLE', 'UNREADABLE', 'INVALID'])(
+  it.each(['NOT_APPLICABLE', 'UNREADABLE', 'ERROR', 'INVALID'])(
     'con %s no avisa',
     async (verdict) => {
       const { controller, handoffs } = build();
