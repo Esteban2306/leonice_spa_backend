@@ -25,6 +25,9 @@ export function toAdminOrder(order: ProductOrderWithItems) {
     amountMatches:
       proofAmount === null || total === null ? null : proofAmount >= total,
     rejectionReason: order.rejectionReason,
+    fulfillment: order.fulfillment,
+    paymentMethod: order.paymentMethod,
+    deliveryAddress: order.deliveryAddress,
     verifiedAt: order.verifiedAt,
     deliveredAt: order.deliveredAt,
     cancelledAt: order.cancelledAt,

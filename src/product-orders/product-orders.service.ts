@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ProductOrderStatus } from '@prisma/client';
+import {
+  ProductFulfillment,
+  ProductOrderStatus,
+  ProductPaymentMethod,
+} from '@prisma/client';
 import { AppException } from '../common/errors/app.exception';
 import { EVENT_TYPES } from '../common/events/constants/event.types';
 import { EventBusService } from '../common/events/event.service';
@@ -16,10 +20,17 @@ import {
 } from './domain/order-pricing';
 import { describeItems, formatPesos } from './domain/order-text';
 import {
+  FULFILLMENT_LABEL,
+  PAYMENT_LABEL,
+  readyNoticeDetail,
+} from './domain/order-fulfillment';
+import {
   OrderContact,
+  OrderFulfillment,
   OPEN_ORDER_STATUSES,
   ProductOrderWithItems,
   ProductOrdersRepository,
+  TO_VERIFY_STATUSES,
 } from './product-orders.repository';
 
 export interface PlaceOrderInput {
@@ -30,6 +41,7 @@ export interface PlaceOrderInput {
   request: string | null;
   notes: string | null;
   requestId: string;
+  fulfillment?: OrderFulfillment;
 }
 
 export interface RegisterPaymentInput {
@@ -38,6 +50,19 @@ export interface RegisterPaymentInput {
   imageBase64: string;
   amountSeen?: number | null;
 }
+
+export function paymentMethodsText(settings: {
+  depositInstructions?: string | null;
+  productPaymentInstructions?: string | null;
+}): string | null {
+  return (
+    settings.depositInstructions?.trim() ||
+    settings.productPaymentInstructions?.trim() ||
+    null
+  );
+}
+
+export type { ProductFulfillment, ProductPaymentMethod };
 
 const CLOSED: ProductOrderStatus[] = [
   ProductOrderStatus.ENTREGADO,
@@ -70,6 +95,7 @@ export class ProductOrdersService {
       total: priced.total,
       priceHeldUntil: priceHeldUntil(priced.items),
       items: priced.items,
+      ...input.fulfillment,
     };
     const order = open
       ? await this.repository.replaceItems(open.id, data)
@@ -102,10 +128,24 @@ export class ProductOrdersService {
       priced,
       created: !open,
       teamNotified,
-      paymentInstructions:
-        settings.productPaymentInstructions?.trim() ||
-        settings.depositInstructions?.trim() ||
-        null,
+      paymentInstructions: paymentMethodsText(settings),
+    };
+  }
+
+  async preview(items: RequestedItem[]) {
+    const [catalog, promotions] = await Promise.all([
+      this.catalog.listRecords(),
+      this.promotions.findAllCurrentlyValid(),
+    ]);
+    return priceOrder(catalog, promotions, items);
+  }
+
+  async fulfillmentSettings() {
+    const settings = await this.businessSettings.get();
+    return {
+      deliveryInfo: settings.productDeliveryInfo?.trim() || null,
+      pickupAddress: settings.address?.trim() || null,
+      paymentMethods: paymentMethodsText(settings),
     };
   }
 
@@ -197,19 +237,31 @@ export class ProductOrdersService {
     };
   }
 
-  list(filters: {
+  async list(filters: {
     status?: ProductOrderStatus;
+    view?: 'TO_VERIFY';
+    clientId?: string;
     page: number;
     pageSize: number;
   }) {
-    return this.repository.list(filters);
+    const phone = filters.clientId
+      ? await this.repository.clientPhone(filters.clientId)
+      : null;
+    return this.repository.list({
+      status: filters.status,
+      statuses: filters.view === 'TO_VERIFY' ? TO_VERIFY_STATUSES : undefined,
+      clientId: filters.clientId,
+      phone: phone ?? undefined,
+      page: filters.page,
+      pageSize: filters.pageSize,
+    });
   }
 
   async summary() {
     const counts = await this.repository.countByStatus();
     return {
       counts,
-      toVerify: counts.PAGO_EN_REVISION,
+      toVerify: counts.PAGO_EN_REVISION + counts.PENDIENTE_PAGO,
       awaitingPayment: counts.PENDIENTE_PAGO,
       toDeliver: counts.PAGADO,
     };
@@ -226,6 +278,13 @@ export class ProductOrdersService {
       verifiedAt: new Date(),
       verifiedByUserId: userId,
       rejectionReason: null,
+    });
+    const settings = await this.businessSettings.get();
+    this.eventBus.publish(EVENT_TYPES.PRODUCT_ORDER_VERIFIED, {
+      orderId: id,
+      detail: readyNoticeDetail(updated, {
+        pickupAddress: settings.address?.trim() || null,
+      }),
     });
     return updated;
   }
@@ -246,7 +305,11 @@ export class ProductOrdersService {
 
   async markDelivered(id: string) {
     const order = await this.load(id);
-    this.assertStatus(order, [ProductOrderStatus.PAGADO]);
+    this.assertStatus(order, [
+      ProductOrderStatus.PENDIENTE_PAGO,
+      ProductOrderStatus.PAGO_EN_REVISION,
+      ProductOrderStatus.PAGADO,
+    ]);
     return this.repository.update(id, {
       status: ProductOrderStatus.ENTREGADO,
       deliveredAt: new Date(),
@@ -304,6 +367,12 @@ export class ProductOrdersService {
       total === null
         ? 'Total: por confirmar (hay productos sin precio o sin presentación)'
         : `Total: ${formatPesos(total)}`,
+      order.fulfillment
+        ? `Entrega: ${FULFILLMENT_LABEL[order.fulfillment]}${order.deliveryAddress ? ` en ${order.deliveryAddress}` : ''}`
+        : null,
+      order.paymentMethod
+        ? `Pago: ${PAYMENT_LABEL[order.paymentMethod]}`
+        : null,
       request ? `En sus palabras: ${request}` : null,
     ]
       .filter(Boolean)

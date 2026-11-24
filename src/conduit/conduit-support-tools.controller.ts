@@ -35,7 +35,17 @@ import { TreatmentsService } from '../catalog/treatments/treatments.service';
 import { TeamHandoffService } from './handoff/team-handoff.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import { ProductOrdersService } from '../product-orders/product-orders.service';
-import { toBotOrder } from './tools/bot-order-view';
+import {
+  DETAILS_MISSING_HINT,
+  ORDER_MISSING_HINT,
+  deliveryOptions,
+  missingDetails,
+  missingItems,
+  orderSummary,
+  paymentOptions,
+  readyHint,
+  toBotOrder,
+} from './tools/bot-order-view';
 import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
 import {
   MAX_PROMOTION_OFFERS,
@@ -177,6 +187,46 @@ export class ConduitSupportToolsController {
       };
     }
 
+    const preview = await this.productOrders.preview(items);
+    const unclear = missingItems(preview);
+    if (unclear.length > 0) {
+      return {
+        expected: true,
+        code: 'ORDER_ITEM_UNCLEAR',
+        nextStep: 'ASK_CLIENT_DATA',
+        requested: false,
+        ...orderSummary(preview),
+        missing: unclear,
+        hint: ORDER_MISSING_HINT,
+      };
+    }
+
+    const settings = await this.productOrders.fulfillmentSettings();
+    const details = {
+      entrega: dto.entrega,
+      pago: dto.pago,
+      direccion: dto.direccion?.trim() || undefined,
+    };
+    const gap = missingDetails(details, settings);
+    if (gap.missing.length > 0) {
+      return {
+        expected: true,
+        code: 'ORDER_DETAILS_MISSING',
+        nextStep: 'ASK_CLIENT_DATA',
+        requested: false,
+        ...orderSummary(preview),
+        faltan: gap.missing,
+        ...(gap.problem && { problema: gap.problem }),
+        opcionesEntrega: details.entrega
+          ? undefined
+          : deliveryOptions(settings),
+        opcionesPago: paymentOptions(details.entrega),
+        hint: DETAILS_MISSING_HINT,
+      };
+    }
+
+    const entrega = details.entrega!;
+    const pago = details.pago!;
     const placed = await this.productOrders.place({
       contact: { phone, lid },
       clientId: client?.id ?? null,
@@ -185,13 +235,32 @@ export class ConduitSupportToolsController {
       request: dto.request ?? null,
       notes: dto.notes ?? null,
       requestId: idempotencyKey ?? randomUUID(),
+      fulfillment: {
+        fulfillment: entrega,
+        paymentMethod: pago,
+        deliveryAddress: entrega === 'DOMICILIO' ? details.direccion! : null,
+      },
     });
 
+    const view = toBotOrder(
+      placed.order,
+      placed.priced,
+      pago === 'TRANSFERENCIA' ? placed.paymentInstructions : null,
+    );
     return {
       requested: true,
       teamNotified: placed.teamNotified,
       updated: !placed.created,
-      ...toBotOrder(placed.order, placed.priced, placed.paymentInstructions),
+      ...view,
+      entrega,
+      pago,
+      ...(entrega === 'DOMICILIO' && { direccion: details.direccion }),
+      ...(entrega === 'RECOGER' &&
+        settings.pickupAddress && { recogerEn: settings.pickupAddress }),
+      hint: readyHint(
+        { entrega, pago, direccion: details.direccion },
+        settings,
+      ),
       ...(!placed.teamNotified && {
         message:
           'El pedido quedó guardado pero no hay nadie del equipo a quien avisar ahora; no prometas que alguien escribirá pronto.',

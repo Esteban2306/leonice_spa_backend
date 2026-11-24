@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, ProductOrderStatus } from '@prisma/client';
+import {
+  Prisma,
+  ProductFulfillment,
+  ProductOrderStatus,
+  ProductPaymentMethod,
+} from '@prisma/client';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import type { PricedItem } from './domain/order-pricing';
 
@@ -9,6 +14,14 @@ export const OPEN_ORDER_STATUSES: ProductOrderStatus[] = [
 ];
 
 export const OPEN_ORDER_MAX_AGE_DAYS = 7;
+
+export const TO_VERIFY_STATUSES: ProductOrderStatus[] = OPEN_ORDER_STATUSES;
+
+export interface OrderFulfillment {
+  fulfillment: ProductFulfillment | null;
+  paymentMethod: ProductPaymentMethod | null;
+  deliveryAddress: string | null;
+}
 
 export const orderInclude = {
   items: { orderBy: { position: 'asc' } },
@@ -25,6 +38,9 @@ export interface OrderContact {
 
 export interface OrderListFilters {
   status?: ProductOrderStatus;
+  statuses?: readonly ProductOrderStatus[];
+  clientId?: string;
+  phone?: string;
   page: number;
   pageSize: number;
 }
@@ -69,6 +85,14 @@ export class ProductOrdersRepository {
     });
   }
 
+  async clientPhone(clientId: string): Promise<string | null> {
+    const client = await this.prisma.client.client.findUnique({
+      where: { id: clientId },
+      select: { phone: true },
+    });
+    return client?.phone ?? null;
+  }
+
   findById(id: string): Promise<ProductOrderWithItems | null> {
     return this.prisma.client.productOrder.findUnique({
       where: { id },
@@ -83,16 +107,18 @@ export class ProductOrdersRepository {
     });
   }
 
-  create(data: {
-    contact: OrderContact;
-    clientId: string | null;
-    clientName: string | null;
-    request: string | null;
-    notes: string | null;
-    total: number | null;
-    priceHeldUntil: Date | null;
-    items: readonly PricedItem[];
-  }): Promise<ProductOrderWithItems> {
+  create(
+    data: {
+      contact: OrderContact;
+      clientId: string | null;
+      clientName: string | null;
+      request: string | null;
+      notes: string | null;
+      total: number | null;
+      priceHeldUntil: Date | null;
+      items: readonly PricedItem[];
+    } & Partial<OrderFulfillment>,
+  ): Promise<ProductOrderWithItems> {
     return this.prisma.client.productOrder.create({
       data: {
         phone: data.contact.phone,
@@ -103,6 +129,9 @@ export class ProductOrdersRepository {
         notes: data.notes,
         total: data.total,
         priceHeldUntil: data.priceHeldUntil,
+        fulfillment: data.fulfillment ?? null,
+        paymentMethod: data.paymentMethod ?? null,
+        deliveryAddress: data.deliveryAddress ?? null,
         items: { create: itemRows(data.items) },
       },
       include: orderInclude,
@@ -117,7 +146,7 @@ export class ProductOrdersRepository {
       total: number | null;
       priceHeldUntil: Date | null;
       items: readonly PricedItem[];
-    },
+    } & Partial<OrderFulfillment>,
   ): Promise<ProductOrderWithItems> {
     return this.prisma.client.$transaction(async (tx) => {
       await tx.productOrderItem.deleteMany({ where: { orderId: id } });
@@ -128,6 +157,15 @@ export class ProductOrdersRepository {
           notes: data.notes,
           total: data.total,
           priceHeldUntil: data.priceHeldUntil,
+          ...(data.fulfillment !== undefined && {
+            fulfillment: data.fulfillment,
+          }),
+          ...(data.paymentMethod !== undefined && {
+            paymentMethod: data.paymentMethod,
+          }),
+          ...(data.deliveryAddress !== undefined && {
+            deliveryAddress: data.deliveryAddress,
+          }),
           status: ProductOrderStatus.PENDIENTE_PAGO,
           items: { create: itemRows(data.items) },
         },
@@ -148,9 +186,19 @@ export class ProductOrdersRepository {
   }
 
   async list(filters: OrderListFilters) {
-    const where: Prisma.ProductOrderWhereInput = filters.status
-      ? { status: filters.status }
-      : {};
+    const statuses = filters.statuses?.length
+      ? [...filters.statuses]
+      : filters.status
+        ? [filters.status]
+        : null;
+    const owners: Prisma.ProductOrderWhereInput[] = [
+      ...(filters.clientId ? [{ clientId: filters.clientId }] : []),
+      ...(filters.phone ? [{ phone: filters.phone }] : []),
+    ];
+    const where: Prisma.ProductOrderWhereInput = {
+      ...(statuses && { status: { in: statuses } }),
+      ...(owners.length > 0 && { OR: owners }),
+    };
     const [items, total] = await this.prisma.client.$transaction([
       this.prisma.client.productOrder.findMany({
         where,

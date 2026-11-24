@@ -96,7 +96,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'solicitar_compra_producto',
     description:
-      'Crea o actualiza el pedido de productos de la clienta y avisa al equipo. Úsala cuando diga que lo quiere o pide comprarlo (no por una consulta de precio). Pasa cada producto con el nombre y la presentación tal como los dio info_productos, y la cantidad. Devuelve el código del pedido, los precios con promoción, el total, la forma de pago y una pista de qué decir.',
+      'Registra el pedido de productos de la clienta y avisa al equipo. Llámala en cuanto diga que lo quiere (no por una consulta de precio), aunque aún no sepas cómo lo recibe o paga: si falta algo, NO lo registra y devuelve el resumen con las opciones para preguntarle (faltan, opcionesEntrega, opcionesPago); cuando responda, llámala de nuevo con entrega, pago y direccion. Pasa cada producto con el nombre exacto de info_productos (sin descripción ni precio), su presentación y la cantidad. Sigue siempre su hint.',
     httpMethod: 'POST',
     path: '/conduit/products/purchase-request',
     injectPhoneParamName: 'phone',
@@ -119,7 +119,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
                 minLength: 2,
                 maxLength: 120,
                 description:
-                  'Nombre del producto o kit como lo dio info_productos',
+                  'Nombre exacto del producto o kit como lo dio info_productos, sin descripción, cantidad ni precio',
               },
               presentacion: {
                 type: 'string',
@@ -140,6 +140,24 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
           type: 'string',
           maxLength: 600,
           description: 'Algo más que el equipo deba saber',
+        },
+        entrega: {
+          type: 'string',
+          enum: ['DOMICILIO', 'RECOGER'],
+          description:
+            'DOMICILIO si se lo enviamos a su casa, RECOGER si lo recoge en el spa',
+        },
+        pago: {
+          type: 'string',
+          enum: ['TRANSFERENCIA', 'CONTRAENTREGA', 'EN_TIENDA'],
+          description:
+            'TRANSFERENCIA (envía comprobante), CONTRAENTREGA (efectivo al recibirlo, solo a domicilio) o EN_TIENDA (paga al recogerlo)',
+        },
+        direccion: {
+          type: 'string',
+          minLength: 5,
+          maxLength: 300,
+          description: 'Dirección completa con barrio, solo si es a domicilio',
         },
       },
     },

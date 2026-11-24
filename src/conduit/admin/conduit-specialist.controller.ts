@@ -46,7 +46,13 @@ import {
   HAIR_SPECIALIST_KEY,
   HAIR_SPECIALIST_MODELS,
 } from '../specialists/hair-photo-specialist';
-import { HairPhotoStatus, buildHairPhotoStatus } from './hair-photo-status';
+import {
+  HairPhotoContact,
+  HairPhotoStatus,
+  buildHairPhotoStatus,
+  recentConversationIds,
+} from './hair-photo-status';
+import { ClientsRepository } from '../../clients/repositories/clients.repository';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -64,6 +70,7 @@ function canonical(value: unknown): string {
 }
 
 const RECENT_LIMIT = 10;
+const CONVERSATION_LOOKUP_LIMIT = 100;
 const PENDING_LIMIT = 50;
 const DEFAULT_TIMEOUT_MS = 12000;
 
@@ -77,6 +84,7 @@ export class ConduitSpecialistController {
   constructor(
     private readonly conduit: ConduitApiClient,
     private readonly config: ConfigService,
+    private readonly clients?: ClientsRepository,
   ) {}
 
   @Get()
@@ -251,6 +259,9 @@ export class ConduitSpecialistController {
           ),
         ])
       : [[], []];
+    const contacts = await optional(() =>
+      this.hairPhotoContacts(botId, recent),
+    );
     return buildHairPhotoStatus({
       imageAnalysisEnabled: bot?.imageAnalysisEnabled === true,
       specialist,
@@ -258,7 +269,36 @@ export class ConduitSpecialistController {
       rawModels: models,
       rawRecent: recent,
       partial,
+      contacts: contacts instanceof Map ? contacts : undefined,
     });
+  }
+
+  private async hairPhotoContacts(
+    botId: string,
+    recent: unknown,
+  ): Promise<Map<string, HairPhotoContact>> {
+    const wanted = new Set(recentConversationIds(recent));
+    const contacts = new Map<string, HairPhotoContact>();
+    if (wanted.size === 0) return contacts;
+    const page = await this.call<{ data?: unknown }>(
+      'GET',
+      `bots/${botId}/conversations`,
+      { query: { limit: CONVERSATION_LOOKUP_LIMIT } },
+    );
+    const rows = Array.isArray(page?.data) ? page.data : [];
+    for (const row of rows) {
+      if (!isRecord(row) || typeof row.id !== 'string' || !wanted.has(row.id))
+        continue;
+      const address =
+        typeof row.phoneNumber === 'string' ? row.phoneNumber : null;
+      const digits =
+        address && !address.includes('@') ? address.replace(/\D/g, '') : '';
+      const phone = digits.length >= 10 ? `+${digits}` : null;
+      const client =
+        phone && this.clients ? await this.clients.findByPhone(phone) : null;
+      contacts.set(row.id, { phone, clientName: client?.name ?? null });
+    }
+    return contacts;
   }
 
   @HttpCode(HttpStatus.OK)

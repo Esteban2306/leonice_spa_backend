@@ -43,11 +43,21 @@ const pricedMissing = {
   total: null,
 };
 
-function build(placed: Record<string, unknown>, closingOffer: unknown = null) {
-  const afterPurchase = jest.fn((_request: string) =>
-    Promise.resolve(closingOffer),
-  );
+const SETTINGS = {
+  deliveryInfo: 'Envíos en Granada con pago contraentrega',
+  pickupAddress: 'Calle 5 # 4-20, Granada',
+  paymentMethods: 'Nequi 310 000 1122 a nombre de Leonice Arenas',
+};
+
+function build(
+  placed: Record<string, unknown>,
+  options: { preview?: unknown; settings?: typeof SETTINGS } = {},
+) {
+  const afterPurchase = jest.fn((_request: string) => Promise.resolve(null));
   const place = jest.fn((_input: unknown) => Promise.resolve(placed));
+  const preview = jest.fn((_items: unknown) =>
+    Promise.resolve(options.preview ?? pricedReady),
+  );
   const clients = {
     findByPhone: jest.fn(() => Promise.resolve({ id: 'c1', name: 'Diana' })),
   };
@@ -60,95 +70,109 @@ function build(placed: Record<string, unknown>, closingOffer: unknown = null) {
     new TeamHandoffService(
       memoryCache() as never,
       clients as never,
-      {
-        publishAsync: jest.fn(),
-      } as never,
+      { publishAsync: jest.fn() } as never,
     ),
     { findAllCurrentlyValid: jest.fn(() => Promise.resolve([])) } as never,
+    { afterPurchase, current: jest.fn(() => Promise.resolve([])) } as never,
     {
-      afterPurchase,
-      current: jest.fn(() => Promise.resolve([])),
+      place,
+      preview,
+      fulfillmentSettings: jest.fn(() =>
+        Promise.resolve(options.settings ?? SETTINGS),
+      ),
     } as never,
-    { place } as never,
   );
   return { controller, place, afterPurchase };
 }
 
 const req = { conduitContact: { phone: '573001112233', lid: null } } as never;
+const ready = {
+  order: order([{ productName: 'Ritual Jolly Kids' }]),
+  priced: pricedReady,
+  created: true,
+  teamNotified: true,
+  paymentInstructions: SETTINGS.paymentMethods,
+};
 
-describe('POST conduit/products/purchase-request: el pedido', () => {
-  it('crea el pedido con lo que pidió y devuelve código, precios, total y cómo pagar', async () => {
-    const { controller, place } = build({
-      order: order([{ productName: 'Ritual Jolly Kids' }]),
-      priced: pricedReady,
-      created: true,
-      teamNotified: true,
-      paymentInstructions: 'Nequi 310 000 1122 a nombre de Leonice Arenas',
+describe('POST conduit/products/purchase-request: antes de registrar el pedido', () => {
+  it('sin entrega ni pago no crea nada: da el resumen y las opciones para preguntarle', async () => {
+    const { controller, place } = build(ready);
+    const out = await controller.productPurchaseRequest(
+      { items: [{ producto: 'kit jolly kids', cantidad: 2 }] },
+      req,
+    );
+    expect(place).not.toHaveBeenCalled();
+    expect(out).toMatchObject({
+      expected: true,
+      code: 'ORDER_DETAILS_MISSING',
+      nextStep: 'ASK_CLIENT_DATA',
+      requested: false,
+      total: '$392.000',
+      faltan: ['entrega', 'pago'],
     });
+    const options = out as {
+      opcionesEntrega: string[];
+      opcionesPago: string[];
+    };
+    expect(options.opcionesEntrega.join(' ')).toContain('Granada');
+    expect(options.opcionesEntrega.join(' ')).toContain('Calle 5');
+    expect(options.opcionesPago.join(' ')).toContain('Transferencia');
+  });
 
+  it('a domicilio sin dirección la pide', async () => {
+    const { controller, place } = build(ready);
     const out = await controller.productPurchaseRequest(
       {
-        items: [{ producto: 'kit jolly kids', cantidad: 2 }],
-        notes: 'Pasa el sábado',
+        items: [{ producto: 'kit', cantidad: 1 }],
+        entrega: 'DOMICILIO',
+        pago: 'CONTRAENTREGA',
       },
       req,
-      'idem-1',
     );
-
-    expect(place.mock.calls[0][0]).toMatchObject({
-      contact: { phone: '573001112233', lid: null },
-      clientId: 'c1',
-      clientName: 'Diana',
-      items: [{ product: 'kit jolly kids', presentation: null, quantity: 2 }],
-      notes: 'Pasa el sábado',
-      requestId: 'idem-1',
-    });
-    expect(out).toMatchObject({
-      requested: true,
-      teamNotified: true,
-      updated: false,
-      orderCode: 'P-0042',
-      total: '$392.000',
-      paymentInstructions: 'Nequi 310 000 1122 a nombre de Leonice Arenas',
-      items: [{ precio: '$245.000', precioPromocion: '$196.000' }],
-    });
-    expect((out as { hint: string }).hint).toContain('paymentInstructions');
+    expect(place).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ faltan: ['direccion'] });
   });
 
-  it('si falta la presentación no da cuenta ni total: pide el dato con sus opciones', async () => {
-    const { controller } = build({
-      order: order(),
-      priced: pricedMissing,
-      created: true,
-      teamNotified: true,
-      paymentInstructions: 'Nequi 310',
+  it('no acepta contraentrega si lo recoge, ni domicilio si el spa no hace envíos', async () => {
+    const { controller } = build(ready);
+    const pickup = await controller.productPurchaseRequest(
+      {
+        items: [{ producto: 'kit', cantidad: 1 }],
+        entrega: 'RECOGER',
+        pago: 'CONTRAENTREGA',
+      },
+      req,
+    );
+    expect(pickup).toMatchObject({ faltan: ['pago'] });
+    const noDelivery = build(ready, {
+      settings: { ...SETTINGS, deliveryInfo: null as never },
     });
+    const out = await noDelivery.controller.productPurchaseRequest(
+      {
+        items: [{ producto: 'kit', cantidad: 1 }],
+        entrega: 'DOMICILIO',
+        pago: 'TRANSFERENCIA',
+        direccion: 'Cra 3 # 2-10',
+      },
+      req,
+    );
+    expect((out as { problema: string }).problema).toContain('no hay envíos');
+  });
+
+  it('si no se reconoce el producto o falta la presentación, no crea el pedido', async () => {
+    const { controller, place } = build(ready, { preview: pricedMissing });
     const out = await controller.productPurchaseRequest(
-      { items: [{ producto: 'shampoo jolly kids', cantidad: 1 }] },
+      {
+        items: [{ producto: 'shampoo jolly kids', cantidad: 1 }],
+        entrega: 'RECOGER',
+        pago: 'EN_TIENDA',
+      },
       req,
     );
+    expect(place).not.toHaveBeenCalled();
     expect(out).toMatchObject({
-      total: null,
-      paymentInstructions: null,
+      code: 'ORDER_ITEM_UNCLEAR',
       missing: [{ falta: 'presentación', options: ['300 ml', '500 ml'] }],
-    });
-    expect((out as { hint: string }).hint).toContain('missing');
-  });
-
-  it('con solo el texto libre igual crea el pedido para que no se pierda', async () => {
-    const { controller, place } = build({
-      order: order(),
-      priced: pricedMissing,
-      created: true,
-      teamNotified: true,
-      paymentInstructions: null,
-    });
-    await controller.productPurchaseRequest(
-      { request: '1 mascarilla de 500 ml' },
-      req,
-    );
-    expect(place.mock.calls[0][0]).toMatchObject({
-      items: [{ product: '1 mascarilla de 500 ml', quantity: 1 }],
     });
   });
 
@@ -158,62 +182,82 @@ describe('POST conduit/products/purchase-request: el pedido', () => {
     expect(place).not.toHaveBeenCalled();
     expect(out).toMatchObject({ expected: true, code: 'ORDER_ITEMS_MISSING' });
   });
-
-  it('si no hay a quién avisar no promete que alguien escribirá', async () => {
-    const { controller } = build({
-      order: order(),
-      priced: pricedReady,
-      created: true,
-      teamNotified: false,
-      paymentInstructions: null,
-    });
-    const out = await controller.productPurchaseRequest(
-      { items: [{ producto: 'kit', cantidad: 1 }] },
-      req,
-    );
-    expect(out).toMatchObject({ teamNotified: false });
-    expect((out as { message: string }).message).toContain('no prometas');
-  });
 });
 
-describe('POST conduit/products/purchase-request · promoción para el cierre', () => {
-  it('al crear el pedido no agrega promociones de otros servicios o productos', async () => {
-    const closing = { offer: { name: 'Hidratación profunda' }, hint: 'cierre' };
-    const { controller, afterPurchase } = build(
-      {
-        order: order([{ productName: 'Shampoo hidratante' }]),
-        priced: pricedReady,
-        created: true,
-        teamNotified: true,
-        paymentInstructions: null,
-      },
-      closing,
-    );
+describe('POST conduit/products/purchase-request: pedido completo', () => {
+  it('por transferencia y a domicilio: crea el pedido, da los métodos de pago y pide el comprobante', async () => {
+    const { controller, place } = build(ready);
     const out = await controller.productPurchaseRequest(
-      { items: [{ producto: 'shampoo hidratante', cantidad: 1 }] },
+      {
+        items: [{ producto: 'kit jolly kids', cantidad: 2 }],
+        entrega: 'DOMICILIO',
+        pago: 'TRANSFERENCIA',
+        direccion: 'Cra 3 # 2-10, barrio Centro',
+      },
+      req,
+      'idem-1',
+    );
+    expect(place.mock.calls[0][0]).toMatchObject({
+      clientId: 'c1',
+      requestId: 'idem-1',
+      fulfillment: {
+        fulfillment: 'DOMICILIO',
+        paymentMethod: 'TRANSFERENCIA',
+        deliveryAddress: 'Cra 3 # 2-10, barrio Centro',
+      },
+    });
+    expect(out).toMatchObject({
+      requested: true,
+      orderCode: 'P-0042',
+      total: '$392.000',
+      paymentInstructions: SETTINGS.paymentMethods,
+      entrega: 'DOMICILIO',
+      direccion: 'Cra 3 # 2-10, barrio Centro',
+    });
+    expect((out as { hint: string }).hint).toContain('comprobante');
+  });
+
+  it('si lo recoge y paga allá: no pide comprobante ni da datos de pago', async () => {
+    const { controller } = build(ready);
+    const out = await controller.productPurchaseRequest(
+      {
+        items: [{ producto: 'kit', cantidad: 1 }],
+        entrega: 'RECOGER',
+        pago: 'EN_TIENDA',
+      },
+      req,
+    );
+    expect(out).toMatchObject({
+      paymentInstructions: null,
+      recogerEn: SETTINGS.pickupAddress,
+    });
+    expect((out as { hint: string }).hint).toContain('No le pidas comprobante');
+  });
+
+  it('el pedido no agrega promociones de otros servicios o productos', async () => {
+    const { controller, afterPurchase } = build(ready);
+    const out = await controller.productPurchaseRequest(
+      {
+        items: [{ producto: 'kit', cantidad: 1 }],
+        entrega: 'RECOGER',
+        pago: 'TRANSFERENCIA',
+      },
       req,
     );
     expect(afterPurchase).not.toHaveBeenCalled();
     expect(out).not.toHaveProperty('closingOffer');
   });
 
-  it('al actualizar un pedido abierto no repite la oferta', async () => {
-    const { controller, afterPurchase } = build(
-      {
-        order: order([{ productName: 'Shampoo' }]),
-        priced: pricedReady,
-        created: false,
-        teamNotified: true,
-        paymentInstructions: null,
-      },
-      { offer: {}, hint: '' },
-    );
+  it('si no hay a quién avisar no promete que alguien escribirá', async () => {
+    const { controller } = build({ ...ready, teamNotified: false });
     const out = await controller.productPurchaseRequest(
-      { items: [{ producto: 'shampoo', cantidad: 2 }] },
+      {
+        items: [{ producto: 'kit', cantidad: 1 }],
+        entrega: 'RECOGER',
+        pago: 'EN_TIENDA',
+      },
       req,
     );
-    expect(afterPurchase).not.toHaveBeenCalled();
-    expect(out).toMatchObject({ updated: true });
-    expect(out).not.toHaveProperty('closingOffer');
+    expect((out as { message: string }).message).toContain('no prometas');
   });
 });

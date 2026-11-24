@@ -41,6 +41,7 @@ export const JOB_NAMES = {
   NOTIFY_ADMIN_PRODUCT_PAYMENT: 'notify-admin-product-payment',
   NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED:
     'notify-client-product-payment-rejected',
+  NOTIFY_CLIENT_PRODUCT_ORDER_READY: 'notify-client-product-order-ready',
   NOTIFY_ADMIN_RECEIPT_ISSUE: 'notify-admin-receipt-issue',
   NOTIFY_ADMIN_IN_PROGRESS: 'notify-admin-in-progress',
   NOTIFY_CLIENT_EVENT_TICKET: 'notify-client-event-ticket',

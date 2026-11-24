@@ -618,6 +618,9 @@ describe('ConduitSpecialistController: fotos del cabello', () => {
         verdict: 'VALID',
         mode: 'SHADOW',
         description: 'Cabello largo castaño · puntas resecas',
+        conversationId: null,
+        phone: null,
+        clientName: null,
       },
     ]);
     expect(JSON.stringify(status)).not.toContain('sk-ant');
@@ -626,6 +629,36 @@ describe('ConduitSpecialistController: fotos del cabello', () => {
         c[1] === 'verifications' && c[2]?.query?.capability === 'foto-cabello',
     );
     expect(recentCall?.[2]?.query).toMatchObject({ botConfigId: BOT });
+  });
+
+  it('cada foto dice de quién es y de qué chat, para poder contestarle', async () => {
+    const { controller } = build({
+      'GET specialists/by-key/foto-cabello': hair(),
+      [`GET bots/${BOT}/specialists`]: [
+        { capability: 'foto-cabello', mode: 'ACTIVE', specialistId: HAIR },
+      ],
+      [`GET specialists/${HAIR}/models`]: [model({ id: HAIR_MODEL })],
+      'GET verifications': {
+        items: [
+          { id: VERIFICATION, conversationId: 'conv-9', verdict: 'VALID' },
+        ],
+      },
+      [`GET bots/${BOT}/conversations`]: {
+        data: [{ id: 'conv-9', phoneNumber: '573108525522' }],
+      },
+    });
+    (controller as unknown as { clients: unknown }).clients = {
+      findByPhone: (phone: string) =>
+        Promise.resolve(
+          phone === '+573108525522' ? { name: 'Luz Marina Vargas' } : null,
+        ),
+    };
+    const status = await controller.hairPhotoStatus();
+    expect(status.recent[0]).toMatchObject({
+      conversationId: 'conv-9',
+      phone: '+573108525522',
+      clientName: 'Luz Marina Vargas',
+    });
   });
 
   it('activarlo con la clave crea el especialista, sus dos modelos y lo deja en SHADOW', async () => {

@@ -243,7 +243,9 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).toContain('Un precio no es una compra');
     expect(section).toContain('sigue su hint');
     expect(section).toContain('paymentInstructions del pedido');
-    expect(section).toContain('Nunca la inventes');
+    expect(section).toContain('nunca los inventes');
+    expect(section).toContain('cómo lo recibe, cómo paga o la dirección');
+    expect(section).toContain('Nunca digas que el pedido quedó registrado');
   });
 
   it('una foto de producto se responde como pregunta por ese producto, no como comprobante', () => {
@@ -501,7 +503,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(18400);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(18600);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

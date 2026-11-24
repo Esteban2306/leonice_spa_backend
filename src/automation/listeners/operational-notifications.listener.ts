@@ -418,6 +418,30 @@ export class OperationalNotificationsListener {
     );
   }
 
+  @OnEvent(EVENT_TYPES.PRODUCT_ORDER_VERIFIED)
+  async handleProductOrderVerified(
+    event: EventOf<EventPayloadMap, typeof EVENT_TYPES.PRODUCT_ORDER_VERIFIED>,
+  ): Promise<void> {
+    const data: ClientProductPaymentNoticeJobData = {
+      orderId: event.payload.orderId,
+      detail: event.payload.detail,
+    };
+    await this.guard(
+      'aviso cliente de pedido listo',
+      data.orderId,
+      async () => {
+        await this.queue.add(
+          JOB_NAMES.NOTIFY_CLIENT_PRODUCT_ORDER_READY,
+          data,
+          {
+            ...NOTICE_JOB_OPTIONS,
+            jobId: `client-product-ready-${data.orderId}`,
+          },
+        );
+      },
+    );
+  }
+
   @OnEvent(EVENT_TYPES.CONDUIT_RECEIPT_ISSUE)
   async handleReceiptIssue(
     event: EventOf<EventPayloadMap, typeof EVENT_TYPES.CONDUIT_RECEIPT_ISSUE>,

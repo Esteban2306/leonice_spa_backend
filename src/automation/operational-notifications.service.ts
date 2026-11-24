@@ -765,6 +765,36 @@ export class OperationalNotificationsService {
     });
   }
 
+  async notifyClientProductOrderReady(
+    data: ClientProductPaymentNoticeJobData,
+    ctx: ConduitSendContext,
+  ): Promise<void> {
+    const type = AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_VERIFIED_NOTICE;
+    const order = await this.loadProductOrder(data.orderId);
+    if (!order?.phone) {
+      await this.executions.log({
+        type,
+        result: AutomationExecutionResult.SKIPPED,
+        reason: order
+          ? 'El pedido no tiene teléfono (contacto con LID): avísale desde el chat'
+          : 'El pedido ya no existe',
+      });
+      return;
+    }
+    await this.send(ctx, 'CLIENT_PRODUCT_ORDER_READY', order.phone, {
+      nombre: order.clientName?.split(' ')[0] ?? 'hola',
+
+      detalle:
+        data.detail ?? `tu pedido *${orderCode(order.number)}* ya está listo.`,
+    });
+    await this.executions.log({
+      type,
+      result: AutomationExecutionResult.EXECUTED,
+      clientId: order.clientId ?? undefined,
+      reason: `Pedido ${orderCode(order.number)} listo`,
+    });
+  }
+
   private loadProductOrder(id: string) {
     return this.prisma.client.productOrder.findUnique({
       where: { id },

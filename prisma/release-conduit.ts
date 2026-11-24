@@ -175,7 +175,7 @@ export const ASSESSMENT_FLOW_RELEASE: ReleaseManifest = {
     'crear_reserva_whatsapp',
     'solicitar_compra_producto',
   ],
-  templates: [],
+  templates: ['leonice_pedido_listo'],
   prompt: true,
   mapping: false,
   retiredVariables: [],

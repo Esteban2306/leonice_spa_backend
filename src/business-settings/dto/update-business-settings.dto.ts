@@ -31,6 +31,11 @@ export class UpdateBusinessSettingsDto {
   @IsOptional()
   @IsString()
   @MaxLength(1500)
+  productDeliveryInfo?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1500)
   depositPolicy?: string | null;
 
   @IsOptional()

@@ -34,6 +34,7 @@ export class BusinessSettingsService {
         depositAmount: null,
         depositInstructions: null,
         productPaymentInstructions: null,
+        productDeliveryInfo: null,
         depositPolicy: null,
         cancellationPolicy: null,
         address: null,
