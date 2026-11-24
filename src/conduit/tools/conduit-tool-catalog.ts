@@ -53,7 +53,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'consultar_cliente',
     description:
-      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING) su última visita (lastVisit: fecha y servicio) y noDepositNeeded si es clienta de confianza (no se le pide anticipo). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
+      'Busca a la clienta del chat por su teléfono en el CRM. Devuelve registered, su nombre (name y firstName), las personas por las que ya agendó (dependents: nombre y fecha de nacimiento), si aceptó los términos (termsAccepted) y su perfil capilar (hairProfile.status VALID, EXPIRED o MISSING) su última visita (lastVisit: fecha y servicio) y noDepositNeeded si es clienta de confianza (no se le pide anticipo). Llámala al inicio de la conversación y antes de pedir datos o dar precios.',
     httpMethod: 'GET',
     path: '/conduit/clients/me',
     pinResultInMemory: true,
@@ -377,6 +377,16 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
             },
           },
         },
+        dependent: {
+          type: 'object',
+          required: ['name', 'birthDate'],
+          description:
+            'Solo cuando la cita es para otra persona (hija, mamá, amiga, pareja...). Su nombre completo y su fecha de nacimiento, no los de quien escribe. Sin este campo la cita es de quien escribe. Una llamada por persona.',
+          properties: {
+            name: { type: 'string', minLength: 3, maxLength: 100 },
+            birthDate: DATE('Fecha de nacimiento de esa persona'),
+          },
+        },
         treatments: {
           type: 'array',
           minItems: 1,
@@ -401,7 +411,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'reservas_proximas',
     description:
-      'Citas futuras de la clienta del chat, agrupadas por día. Úsala antes de consultar, cancelar o reagendar.',
+      'Citas futuras de la clienta del chat, agrupadas por día; si una cita es para otra persona trae para con su nombre. Úsala antes de consultar, cancelar o reagendar.',
     httpMethod: 'GET',
     path: '/conduit/booking/reservations/upcoming',
     injectPhoneParamName: 'phone',

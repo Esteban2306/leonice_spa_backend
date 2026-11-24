@@ -182,6 +182,17 @@ export const ASSESSMENT_FLOW_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const THIRD_PARTY_BOOKING_RELEASE: ReleaseManifest = {
+  id: '2026-11-27-citas-para-terceros',
+  intents: [],
+  tools: ['consultar_cliente', 'reservas_proximas', 'crear_reserva_whatsapp'],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
@@ -193,6 +204,7 @@ export const RELEASES: readonly ReleaseManifest[] = [
   PRODUCT_PROMOTIONS_RELEASE,
   PRODUCT_ORDERS_RELEASE,
   ASSESSMENT_FLOW_RELEASE,
+  THIRD_PARTY_BOOKING_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

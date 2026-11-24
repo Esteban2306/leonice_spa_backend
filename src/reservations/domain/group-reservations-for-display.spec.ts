@@ -50,6 +50,7 @@ function fakeReservation(
   return {
     id: overrides.id,
     clientId,
+    dependentId: null,
     categoryId: 'c1',
     treatmentId: 't1',
     status: overrides.status ?? ReservationStatus.CONFIRMADA,

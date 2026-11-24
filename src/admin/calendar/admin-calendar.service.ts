@@ -50,6 +50,9 @@ export class AdminCalendarService {
           reservation.status,
           reservation.deposit,
         ),
+        dependent: reservation.dependent
+          ? { name: reservation.dependent.name }
+          : null,
         client: {
           id: reservation.client.id,
           name: reservation.client.name,

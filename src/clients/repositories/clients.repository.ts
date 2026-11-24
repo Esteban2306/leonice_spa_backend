@@ -30,6 +30,30 @@ export class ClientsRepository {
     private readonly cache: SafeCacheService,
   ) {}
 
+  async findOrCreateDependent(
+    clientId: string,
+    data: { name: string; nameKey: string; birthDate: Date },
+  ) {
+    return this.prisma.client.clientDependent.upsert({
+      where: {
+        clientId_nameKey_birthDate: {
+          clientId,
+          nameKey: data.nameKey,
+          birthDate: data.birthDate,
+        },
+      },
+      update: {},
+      create: { clientId, ...data },
+    });
+  }
+
+  listDependents(clientId: string) {
+    return this.prisma.client.clientDependent.findMany({
+      where: { clientId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   async findByPhone(phone: string) {
     const client = await this.prisma.client.client.findUnique({
       where: { phone },

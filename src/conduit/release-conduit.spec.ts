@@ -326,11 +326,9 @@ describe('entrega de orientación (solo el prompt)', () => {
     });
     expect(out.plan.map((p) => p.name)).toEqual(
       expect.arrayContaining([
-        'consultar_al_equipo',
+        'consultar_cliente',
+        'reservas_proximas',
         'crear_reserva_whatsapp',
-        'solicitar_compra_producto',
-        'treatment_question',
-        'booking',
         'prompt de conversación',
       ]),
     );
@@ -646,7 +644,7 @@ describe('entrega de promociones de productos y oferta al cierre', () => {
         ['promociones_vigentes', 'new'],
         ['info_productos', 'pristine'],
         ['solicitar_compra_producto', 'pristine'],
-        ['crear_reserva_whatsapp', 'current'],
+        ['crear_reserva_whatsapp', 'pristine'],
         ['booking', 'pristine'],
         ['treatment_question', 'pristine'],
         ['prompt de conversación', 'pristine'],

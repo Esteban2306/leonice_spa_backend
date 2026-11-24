@@ -61,6 +61,7 @@ export class CancelReservationOrchestrator {
         reservations: rows.map((r) => ({
           reservationId: r.id,
           treatment: r.treatment.name,
+          ...(r.dependent && { para: r.dependent.name }),
           scheduledStart: r.scheduledStart,
           scheduledEnd: r.scheduledEnd,
           status: r.status,

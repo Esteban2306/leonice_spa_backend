@@ -67,6 +67,7 @@ export class ReservationsRepository {
         id,
       },
       include: {
+        dependent: { select: { name: true } },
         client: {
           select: {
             id: true,
@@ -149,6 +150,7 @@ export class ReservationsRepository {
       where: { id: { in: ids } },
       orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
       include: {
+        dependent: { select: { name: true } },
         client: {
           select: {
             id: true,
@@ -186,6 +188,7 @@ export class ReservationsRepository {
         scheduledStart: 'asc',
       },
       include: {
+        dependent: { select: { name: true } },
         client: {
           select: {
             id: true,
@@ -310,6 +313,7 @@ export class ReservationsRepository {
         scheduledStart: true,
         scheduledEnd: true,
         comboGroupId: true,
+        dependent: { select: { name: true } },
         treatment: { select: { name: true } },
       },
     });
@@ -453,7 +457,10 @@ export class ReservationsRepository {
   ) {
     return client.reservation.findUnique({
       where: { id },
-      include: { client: { select: { phone: true, name: true } } },
+      include: {
+        client: { select: { phone: true, name: true } },
+        dependent: { select: { name: true } },
+      },
     });
   }
 
@@ -464,10 +471,12 @@ export class ReservationsRepository {
     client: PrismaClientOrTx = this.prisma.client,
     excludeReservationId?: string,
     excludeComboGroupId?: string,
+    dependentId?: string | null,
   ): Promise<{ start: Date; end: Date }[]> {
     const rows = await client.reservation.findMany({
       where: {
         clientId,
+        ...(dependentId !== undefined ? { dependentId } : {}),
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
         scheduledStart: { lt: dayEnd },
         scheduledEnd: { gt: dayStart },
@@ -505,6 +514,7 @@ export class ReservationsRepository {
       orderBy: { scheduledStart: 'asc' },
       take: 200,
       include: {
+        dependent: { select: { name: true } },
         client: { select: { id: true, name: true, phone: true } },
         treatment: { select: { id: true, name: true } },
         category: { select: { id: true, name: true } },
@@ -582,10 +592,12 @@ export class ReservationsRepository {
     dayEnd: Date,
     excludeReservationId?: string,
     client: PrismaClientOrTx = this.prisma.client,
+    dependentId?: string | null,
   ): Promise<boolean> {
     const count = await client.reservation.count({
       where: {
         clientId,
+        ...(dependentId !== undefined ? { dependentId } : {}),
         categoryId,
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
         scheduledStart: { gte: dayStart, lt: dayEnd },

@@ -11,6 +11,8 @@ import {
 
 export interface PlacementCheckParams {
   clientId: string;
+  /** undefined: any person of the client; null: the client herself; id: that dependent. */
+  dependentId?: string | null;
   categoryId: string;
   start: Date;
   end: Date;
@@ -55,6 +57,7 @@ export class PlacementCheckService {
         tx,
         excludeReservationId,
         params.comboGroupId ?? undefined,
+        params.dependentId,
       );
     const hasCategoryDayConflict =
       await this.reservationsRepository.hasActiveReservationInCategoryOnDay(
@@ -64,6 +67,7 @@ export class PlacementCheckService {
         dayEnd,
         excludeReservationId,
         tx,
+        params.dependentId,
       );
 
     const operatingWindows = await this.operatingSchedule.getWindows(

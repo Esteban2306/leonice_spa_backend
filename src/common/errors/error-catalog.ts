@@ -90,6 +90,11 @@ const PLACEMENT = {
     status: HttpStatus.CONFLICT,
     message: 'Hay otra reserva del cliente que se cruza con este horario.',
   },
+  AVAILABILITY_NOT_CONSULTED: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'Antes de reservar consulta la disponibilidad de ese día con consultar_disponibilidad o disponibilidad_combo y confirma con la clienta un horario que devuelva.',
+  },
   PLACEMENT_NO_SLOT_THAT_DAY: {
     status: HttpStatus.CONFLICT,
     message:

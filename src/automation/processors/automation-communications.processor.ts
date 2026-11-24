@@ -558,7 +558,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
       ),
       variables: {
         nombre: reservation.client.name,
-        fecha: formatNotificationDateTime(reservation.scheduledStart),
+        fecha: `${formatNotificationDateTime(reservation.scheduledStart)}${
+          reservation.dependent
+            ? ` (cita de ${reservation.dependent.name})`
+            : ''
+        }`,
       },
     });
 

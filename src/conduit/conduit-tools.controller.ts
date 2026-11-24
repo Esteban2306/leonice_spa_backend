@@ -1,3 +1,4 @@
+import type { ClientDependent } from '@prisma/client';
 import { calendarDateToUtcMidnight } from '../common/validation/date-input.validators';
 import {
   Body,
@@ -49,12 +50,21 @@ export class ConduitToolsController {
       phone ? this.teamQuotes.activeFor(phone) : [],
       client ? this.history.getLastCompletedReservation(client.id) : null,
     ]);
+    const dependents: ClientDependent[] = client
+      ? await this.clientsRepository.listDependents(client.id)
+      : [];
     const unsaved = phone
       ? await this.teamQuotes.unsavedTeamPrices(phone, quotes)
       : [];
     return {
       ...toBotClient(client, termsAccepted),
       ...(lastVisit && { lastVisit: toBotLastVisit(lastVisit) }),
+      ...(dependents.length > 0 && {
+        dependents: dependents.map((d) => ({
+          name: d.name,
+          birthDate: d.birthDate.toISOString().slice(0, 10),
+        })),
+      }),
       ...(quotes.length > 0 && { teamQuotes: quotes.map(toBotTeamQuote) }),
       ...(unsaved.length > 0 && {
         teamPricesInChat: unsaved.map((p) => ({

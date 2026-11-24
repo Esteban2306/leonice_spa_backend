@@ -38,6 +38,11 @@ function build(
     {} as never,
     quotes as never,
     { afterBooking } as never,
+    {
+      markDay: jest.fn(),
+      markRange: jest.fn(),
+      assertConsulted: jest.fn(),
+    } as never,
   );
   return { controller, execute, quotes, afterBooking };
 }
@@ -157,6 +162,11 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
           markUsed: jest.fn(() => Promise.resolve()),
         } as never,
         { afterBooking: jest.fn(() => Promise.resolve(null)) } as never,
+        {
+          markDay: jest.fn(),
+          markRange: jest.fn(),
+          assertConsulted: jest.fn(),
+        } as never,
       );
       return { controller, getAvailabilityCalendar };
     }

@@ -71,6 +71,7 @@ export class ReservationRescheduler {
 
         const decision = await this.placementCheck.evaluate(tx, {
           clientId: current.clientId,
+          dependentId: current.dependentId,
           categoryId: current.categoryId,
           start: newScheduledStart,
           end: newScheduledEnd,

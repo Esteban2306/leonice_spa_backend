@@ -11,7 +11,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { IsZonedDateTime } from '../../common/validation/date-input.validators';
-import { ClientInputDto } from '../../reservations/dto/create-reservation.dto';
+import {
+  ClientInputDto,
+  DependentInputDto,
+} from '../../reservations/dto/create-reservation.dto';
 
 /**
  * Reserva desde el bot. Además de los ids acepta el nombre de los servicios:
@@ -41,4 +44,10 @@ export class ConduitCreateReservationDto {
 
   @IsZonedDateTime()
   scheduledStart: string;
+
+  /** Someone else is the one who will be attended (daughter, mother, friend...). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DependentInputDto)
+  dependent?: DependentInputDto;
 }

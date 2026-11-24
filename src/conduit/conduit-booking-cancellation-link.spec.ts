@@ -23,6 +23,11 @@ function build(days: unknown[]) {
       markUsed: jest.fn(() => Promise.resolve()),
     } as never,
     { afterBooking: jest.fn(() => Promise.resolve(null)) } as never,
+    {
+      markDay: jest.fn(),
+      markRange: jest.fn(),
+      assertConsulted: jest.fn(),
+    } as never,
   );
   return { controller, issue };
 }
