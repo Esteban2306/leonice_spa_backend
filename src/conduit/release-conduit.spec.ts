@@ -324,11 +324,16 @@ describe('entrega de orientación (solo el prompt)', () => {
       request: request as never,
       log: () => undefined,
     });
-    expect(out.plan.map((p) => p.name)).toEqual([
-      'treatment_question',
-      'booking',
-      'prompt de conversación',
-    ]);
+    expect(out.plan.map((p) => p.name)).toEqual(
+      expect.arrayContaining([
+        'consultar_al_equipo',
+        'crear_reserva_whatsapp',
+        'solicitar_compra_producto',
+        'treatment_question',
+        'booking',
+        'prompt de conversación',
+      ]),
+    );
   });
 
   it('su foto anterior es el prompt de la entrega Sofía y el nuevo lo cambia', () => {
@@ -617,7 +622,6 @@ describe('entrega de promociones de productos y oferta al cierre', () => {
   it('su foto anterior no conoce las promociones de productos ni el cierre', () => {
     expect(previous.prompt).toContain('no podrá llegar');
     expect(previous.prompt).not.toContain('closingOffer');
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain('closingOffer');
     expect(Object.keys(previous.tools).sort()).toEqual([
       'crear_reserva_whatsapp',
       'info_productos',
@@ -642,7 +646,7 @@ describe('entrega de promociones de productos y oferta al cierre', () => {
         ['promociones_vigentes', 'new'],
         ['info_productos', 'pristine'],
         ['solicitar_compra_producto', 'pristine'],
-        ['crear_reserva_whatsapp', 'pristine'],
+        ['crear_reserva_whatsapp', 'current'],
         ['booking', 'pristine'],
         ['treatment_question', 'pristine'],
         ['prompt de conversación', 'pristine'],

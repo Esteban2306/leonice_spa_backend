@@ -87,3 +87,24 @@ describe('POST conduit/handoff/owner', () => {
     expect(out.message).toMatch(/no prometas/);
   });
 });
+
+describe('POST conduit/handoff/advice', () => {
+  it('le pide a una profesional del equipo que recomiende y le dice al bot que espere su respuesta', async () => {
+    const { controller, publishAsync } = build([true]);
+    const out = await controller.adviceRequest(
+      { reason: 'No sabe qué tratamiento le sirve; tiene el cabello seco' },
+      req,
+    );
+    expect(out).toMatchObject({ teamNotified: true, awaitTeamAnswer: true });
+    expect(
+      (publishAsync.mock.calls[0][1] as { reason: string }).reason,
+    ).toContain('profesional le recomiende');
+  });
+
+  it('si nadie puede responder, el bot recomienda por su cuenta y no espera', async () => {
+    const { controller } = build([false]);
+    const out = await controller.adviceRequest({ reason: 'No sabe' }, req);
+    expect(out).toMatchObject({ teamNotified: false, awaitTeamAnswer: false });
+    expect(out.message).toMatch(/recomendar_para/);
+  });
+});

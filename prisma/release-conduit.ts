@@ -170,7 +170,11 @@ export const PRODUCT_ORDERS_RELEASE: ReleaseManifest = {
 export const ASSESSMENT_FLOW_RELEASE: ReleaseManifest = {
   id: '2026-11-26-valoracion-y-precio-del-equipo',
   intents: ['treatment_question', 'booking'],
-  tools: [],
+  tools: [
+    'consultar_al_equipo',
+    'crear_reserva_whatsapp',
+    'solicitar_compra_producto',
+  ],
   templates: [],
   prompt: true,
   mapping: false,

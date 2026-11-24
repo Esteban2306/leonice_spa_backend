@@ -177,7 +177,7 @@ describe('POST conduit/products/purchase-request: el pedido', () => {
 });
 
 describe('POST conduit/products/purchase-request · promoción para el cierre', () => {
-  it('al crear el pedido devuelve una promoción distinta a lo que pidió', async () => {
+  it('al crear el pedido no agrega promociones de otros servicios o productos', async () => {
     const closing = { offer: { name: 'Hidratación profunda' }, hint: 'cierre' };
     const { controller, afterPurchase } = build(
       {
@@ -193,8 +193,8 @@ describe('POST conduit/products/purchase-request · promoción para el cierre', 
       { items: [{ producto: 'shampoo hidratante', cantidad: 1 }] },
       req,
     );
-    expect(afterPurchase).toHaveBeenCalledWith('Shampoo hidratante');
-    expect(out).toMatchObject({ closingOffer: closing });
+    expect(afterPurchase).not.toHaveBeenCalled();
+    expect(out).not.toHaveProperty('closingOffer');
   });
 
   it('al actualizar un pedido abierto no repite la oferta', async () => {

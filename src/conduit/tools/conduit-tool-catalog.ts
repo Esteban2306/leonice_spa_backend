@@ -96,7 +96,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'solicitar_compra_producto',
     description:
-      'Crea o actualiza el pedido de productos de la clienta y avisa al equipo. Úsala cuando diga que lo quiere o pide comprarlo (no por una consulta de precio). Pasa cada producto con el nombre y la presentación tal como los dio info_productos, y la cantidad. Devuelve el código del pedido, los precios con promoción, el total, la forma de pago y una pista de qué decir; puede devolver closingOffer.',
+      'Crea o actualiza el pedido de productos de la clienta y avisa al equipo. Úsala cuando diga que lo quiere o pide comprarlo (no por una consulta de precio). Pasa cada producto con el nombre y la presentación tal como los dio info_productos, y la cantidad. Devuelve el código del pedido, los precios con promoción, el total, la forma de pago y una pista de qué decir.',
     httpMethod: 'POST',
     path: '/conduit/products/purchase-request',
     injectPhoneParamName: 'phone',
@@ -327,7 +327,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'crear_reserva_whatsapp',
     description:
-      'Crea la reserva cuando la clienta confirmó servicio(s), fecha y hora exactos. Llámala una sola vez y comunica el estado y el resumen que devuelva (el precio ya incluye la promoción vigente). Puede devolver closingOffer: una promoción para mencionar al cerrar.',
+      'Crea la reserva cuando la clienta confirmó servicio(s), fecha y hora exactos. Llámala una sola vez y comunica el estado y el resumen que devuelva (el precio ya incluye la promoción vigente).',
     httpMethod: 'POST',
     path: '/conduit/booking/reservations',
     injectPhoneParamName: 'client.phone',
@@ -490,6 +490,29 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
       properties: {
         phone: PHONE,
         reason: { type: 'string', minLength: 3, maxLength: 300 },
+        summary: { type: 'string', maxLength: 1000 },
+      },
+    },
+  },
+  {
+    name: 'consultar_al_equipo',
+    description:
+      'Le pide a una profesional del spa que le recomiende a la clienta el servicio o producto que le conviene, cuando no sabe cuál y elige esa opción, contó qué le pasa a su cabello o envió una foto para eso. Avisa al equipo SIN pausar el asistente: la profesional responde en el chat y el asistente sigue con lo que recomiende.',
+    httpMethod: 'POST',
+    path: '/conduit/handoff/advice',
+    injectPhoneParamName: 'phone',
+    parametersSchema: {
+      type: 'object',
+      required: ['reason'],
+      properties: {
+        phone: PHONE,
+        reason: {
+          type: 'string',
+          minLength: 3,
+          maxLength: 250,
+          description:
+            'Qué quiere saber (servicio o producto) y qué le pasa a su cabello, en una frase.',
+        },
         summary: { type: 'string', maxLength: 1000 },
       },
     },

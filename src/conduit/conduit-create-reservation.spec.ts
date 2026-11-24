@@ -218,12 +218,12 @@ describe('POST conduit/booking/reservations · servicios por nombre', () => {
 });
 
 describe('POST conduit/booking/reservations · promoción para el cierre', () => {
-  it('devuelve la promoción elegida para los servicios reservados', async () => {
+  it('la reserva no agrega una promoción de cierre', async () => {
     const closing = { offer: { name: 'Kit post alisado' }, hint: 'cierre' };
     const { controller, afterBooking } = build([], closing);
     const out = await controller.create({ ...base, treatments: [ID_A] }, req);
-    expect(afterBooking).toHaveBeenCalledWith([ID_A]);
-    expect(out).toMatchObject({ closingOffer: closing });
+    expect(afterBooking).not.toHaveBeenCalled();
+    expect(out).not.toHaveProperty('closingOffer');
   });
 
   it('sin promoción vigente la respuesta queda igual', async () => {

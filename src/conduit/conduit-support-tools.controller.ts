@@ -43,6 +43,9 @@ import {
   PROMOTIONS_HINT,
 } from './promotions/bot-promotion-offers';
 
+export const ADVICE_REASON_PREFIX =
+  'Pide que una profesional le recomiende qué le sirve (el bot espera tu respuesta en el chat y luego sigue): ';
+
 @Controller({ path: 'conduit', version: '1' })
 @ConduitTool()
 export class ConduitSupportToolsController {
@@ -184,12 +187,6 @@ export class ConduitSupportToolsController {
       requestId: idempotencyKey ?? randomUUID(),
     });
 
-    const closingOffer =
-      placed.created && placed.teamNotified
-        ? await this.promotionOffers.afterPurchase(
-            placed.order.items.map((item) => item.productName).join(', '),
-          )
-        : null;
     return {
       requested: true,
       teamNotified: placed.teamNotified,
@@ -199,7 +196,6 @@ export class ConduitSupportToolsController {
         message:
           'El pedido quedó guardado pero no hay nadie del equipo a quien avisar ahora; no prometas que alguien escribirá pronto.',
       }),
-      ...(closingOffer && { closingOffer }),
     };
   }
 
@@ -249,6 +245,28 @@ export class ConduitSupportToolsController {
       message: teamNotified
         ? 'Se le avisó a Leo que la clienta necesita hablar con ella; ella verá el mensaje y decidirá cómo responder. No des su número ni prometas cuándo escribirá.'
         : 'No fue posible avisarle a Leo en este momento; no prometas que ella escribirá ni des su número.',
+    };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('handoff/advice')
+  async adviceRequest(
+    @Body() dto: ConduitHandoffDto,
+    @Req() req: RequestWithConduitContact,
+    @Headers('x-conduit-idempotency-key') idempotencyKey?: string,
+  ) {
+    const teamNotified = await this.requestHandoff(
+      { ...dto, reason: `${ADVICE_REASON_PREFIX}${dto.reason}`.slice(0, 300) },
+      req,
+      'TEAM',
+      idempotencyKey,
+    );
+    return {
+      teamNotified,
+      awaitTeamAnswer: teamNotified,
+      message: teamNotified
+        ? 'Una profesional del equipo ya tiene su consulta y le responderá por este chat. Dile eso en una línea y no recomiendes tú el servicio ni el producto.'
+        : 'No hay nadie del equipo a quien consultar ahora: recomiéndale tú con recomendar_para según lo que contó.',
     };
   }
 
