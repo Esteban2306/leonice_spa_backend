@@ -20,6 +20,7 @@ describe('CONDUIT_TOOL_CATALOG', () => {
     expect(CONDUIT_TOOL_CATALOG.map((t) => t.name).sort()).toEqual(
       [
         'consultar_cliente',
+        'consultar_al_equipo',
         'info_negocio',
         'info_productos',
         'promociones_vigentes',

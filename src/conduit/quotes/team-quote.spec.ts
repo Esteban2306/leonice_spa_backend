@@ -1,9 +1,9 @@
-import { amountsInText, checkTeamQuote, quoteBounds } from './team-quote';
+import { amountsInText, checkTeamQuote, priceUnitsOf } from './team-quote';
 import { TeamQuoteService } from './team-quote.service';
 
 const alisado = {
-  basePriceMin: 250000,
-  basePriceMax: 450000,
+  basePriceMin: 250,
+  basePriceMax: 380,
   hasHairVariablePricing: false,
   requiresPriorAssessment: true,
   hairLengthPricing: [],
@@ -36,42 +36,22 @@ describe('montos en un mensaje del equipo', () => {
 });
 
 describe('qué precio del equipo se acepta', () => {
-  it('un servicio de precio fijo no acepta otro precio', () => {
-    expect(
-      quoteBounds({
-        ...alisado,
-        basePriceMax: 250000,
-        requiresPriorAssessment: false,
-      }),
-    ).toBeNull();
+  it('vale cualquier precio que el equipo escribió en el chat, sin compararlo con el rango', () => {
+    const teamMessages = ['Costaría 250000', 'Te dejo en 50.000'];
+    expect(checkTeamQuote({ amount: 250000, teamMessages })).toEqual({
+      ok: true,
+    });
+    expect(checkTeamQuote({ amount: 50000, teamMessages })).toEqual({
+      ok: true,
+    });
+    expect(checkTeamQuote({ amount: 300000, teamMessages })).toEqual({
+      ok: false,
+      reason: 'NOT_IN_CHAT',
+    });
   });
 
-  it('el rango incluye los precios por largo y el recargo por color', () => {
-    expect(
-      quoteBounds({
-        ...alisado,
-        hasHairVariablePricing: true,
-        hairLengthPricing: [{ price: 300000 }, { price: 500000 }],
-        hairColorSurcharges: [{ surcharge: 40000 }],
-      }),
-    ).toEqual({ min: 250000, max: 540000 });
-  });
-
-  it('solo vale si el equipo escribió ese monto y está dentro del rango', () => {
-    const teamMessages = ['Tiene un costo de 350,000 pesos'];
-    expect(
-      checkTeamQuote({ amount: 350000, treatment: alisado, teamMessages }),
-    ).toEqual({ ok: true });
-    expect(
-      checkTeamQuote({ amount: 300000, treatment: alisado, teamMessages }),
-    ).toEqual({ ok: false, reason: 'NOT_IN_CHAT' });
-    expect(
-      checkTeamQuote({
-        amount: 50000,
-        treatment: alisado,
-        teamMessages: ['Te dejo en 50.000'],
-      }),
-    ).toEqual({ ok: false, reason: 'OUT_OF_RANGE' });
+  it('los precios del catálogo van en miles: $250.000 son 250', () => {
+    expect(priceUnitsOf(250000)).toBe(250);
   });
 });
 
@@ -83,7 +63,6 @@ describe('TeamQuoteService.save', () => {
   function build(
     messages: Array<Record<string, unknown>>,
     conversations = [{ id: 'c1', phoneNumber: '573001112233' }],
-    promotions: unknown[] = [],
   ) {
     const upsert = jest.fn((args: unknown) => Promise.resolve(args));
     const prisma = {
@@ -117,9 +96,6 @@ describe('TeamQuoteService.save', () => {
       } as never,
       { admin } as never,
       { get: () => BOT } as never,
-      {
-        findAllCurrentlyValid: jest.fn(() => Promise.resolve(promotions)),
-      } as never,
     );
     return { service, upsert, admin };
   }
@@ -155,12 +131,8 @@ describe('TeamQuoteService.save', () => {
     expect(admin.mock.calls[0][1]).toBe(`bots/${BOT}/conversations`);
   });
 
-  it('con la promoción vigente acepta el precio rebajado que dio el equipo', async () => {
-    const { service, upsert } = build(
-      [team('Serán 200 para tu cabello')],
-      undefined,
-      [{ treatmentId: 't1', categoryId: null, discountPercentage: 20 }],
-    );
+  it('guarda el precio del equipo aunque quede por fuera del rango del catálogo', async () => {
+    const { service, upsert } = build([team('Serán 200 para tu cabello')]);
     await expect(
       service.save({
         phone: PHONE,
@@ -170,19 +142,6 @@ describe('TeamQuoteService.save', () => {
       }),
     ).resolves.toMatchObject({ saved: true, price: 200000 });
     expect(upsert).toHaveBeenCalled();
-  });
-
-  it('sin promoción, un precio por debajo del rango no se guarda', async () => {
-    const { service, upsert } = build([team('Serán 200 para tu cabello')]);
-    await expect(
-      service.save({
-        phone: PHONE,
-        treatmentName: 'Alisado',
-        amount: 200000,
-        now: NOW,
-      }),
-    ).resolves.toMatchObject({ saved: false, reason: 'OUT_OF_RANGE' });
-    expect(upsert).not.toHaveBeenCalled();
   });
 
   it('un precio que dijo el bot o la clienta no cuenta como del equipo', async () => {
@@ -295,7 +254,6 @@ describe('TeamQuoteService.unsavedTeamPrices', () => {
       {} as never,
       { admin } as never,
       { get: () => BOT } as never,
-      {} as never,
     );
   }
 

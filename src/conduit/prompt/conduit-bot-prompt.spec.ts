@@ -44,20 +44,34 @@ describe('prompt del asistente de Leonice', () => {
     expect(used.filter((v) => !SUPPORTED_VARIABLES.includes(v))).toEqual([]);
   });
 
-  it('ofrece promociones de productos y kits, y una sola al cerrar sin preguntar', () => {
+  it('la promoción se dice solo del servicio o producto que pregunta, una vez en todo el chat, y nunca al cerrar', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     const promos = t
       .split('\n')
       .find((line) => line.startsWith('- Promociones:'));
-    expect(promos).toContain('productos y kits en info_productos');
+    expect(promos).toContain(
+      'solo cuando la clienta pregunta por ese mismo servicio o producto',
+    );
+    expect(promos).toContain('Una sola vez en todo el chat');
+    expect(promos).toContain('nunca hables de promociones de otros servicios');
     expect(promos).toContain('promociones_vigentes');
-    expect(promos).toContain('una sola vez por conversación');
-    const closing = t
-      .split('\n')
-      .find((line) => line.startsWith('- Al cerrar:'));
-    expect(closing).toContain('closingOffer');
-    expect(closing).toContain('sin pregunta');
-    expect(closing).toContain('si no hablaron ya de ella');
+    expect(t).not.toContain('closingOffer');
+  });
+
+  it('si no sabe qué le conviene, una profesional del equipo responde; con productos le da las dos opciones', () => {
+    const t = CONDUIT_BOT_PROMPT_TEMPLATE;
+    expect(t).toContain('Si no sabe qué servicio le conviene');
+    expect(t).toContain('o te envíe una foto');
+    expect(t).toContain('consultar_al_equipo');
+    expect(t).toContain('ofrécele siempre las dos opciones');
+    const treatment = CONDUIT_INTENT_CATALOG.find(
+      (i) => i.key === 'treatment_question',
+    )!;
+    const slim = (
+      treatment.config as { slim: { prompt: string; tools: string[] } }
+    ).slim;
+    expect(slim.tools).toContain('consultar_al_equipo');
+    expect(slim.prompt).toContain('consultar_al_equipo');
   });
 
   it('si no puede llegar le ofrece mover la cita sin cancelarla ni hablar del anticipo', () => {
@@ -229,7 +243,9 @@ describe('prompt del asistente de Leonice', () => {
     expect(section).toContain('Un precio no es una compra');
     expect(section).toContain('sigue su hint');
     expect(section).toContain('paymentInstructions del pedido');
-    expect(section).toContain('Nunca la inventes');
+    expect(section).toContain('nunca los inventes');
+    expect(section).toContain('cómo lo recibe, cómo paga o la dirección');
+    expect(section).toContain('Nunca digas que el pedido quedó registrado');
   });
 
   it('una foto de producto se responde como pregunta por ese producto, no como comprobante', () => {
@@ -412,16 +428,26 @@ describe('prompt del asistente de Leonice', () => {
     expect(slim.tools).toContain('guardar_precio_del_equipo');
   });
 
-  it('lo que escribió el equipo se respeta y su precio se guarda solo verificado', () => {
+  it('lo que escribió el equipo se respeta y su precio se usa sin cuestionarlo', () => {
     const t = CONDUIT_BOT_PROMPT_TEMPLATE;
     expect(t).toContain(
       '"[Persona del equipo]" marca lo que escribió alguien del equipo',
     );
     expect(t).toContain('nunca escribas esa marca');
     expect(t).toContain('guardar_precio_del_equipo con ese servicio y precio');
-    expect(t).toContain('y si no, no lo uses');
+    expect(t).toContain('aunque no coincida con el rango: no lo cuestiones');
     expect(t).toContain('Si consultar_cliente trae teamQuotes');
     expect(t).toContain('si trae teamPricesInChat');
+  });
+
+  it('una promoción que vence antes del día de la cita no se menciona', () => {
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE).toContain(
+      'posterior a onlyForAppointmentsUntil, no aplica',
+    );
+    const booking = CONDUIT_INTENT_CATALOG.find((i) => i.key === 'booking')!;
+    expect(
+      (booking.config as { slim: { prompt: string } }).slim.prompt,
+    ).toContain('si sigue vigente el día de la cita');
   });
 
   it('si hay horarios especiales configurados, los informa cuando preguntan', () => {
@@ -477,7 +503,7 @@ describe('prompt del asistente de Leonice', () => {
   });
 
   it('es corto: cabe en el bloque cacheable sin pesar en cada turno', () => {
-    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(17600);
+    expect(CONDUIT_BOT_PROMPT_TEMPLATE.length).toBeLessThan(18800);
   });
 
   it('los ajustes dan margen al razonamiento y están dentro de los límites de Conduit', () => {

@@ -12,6 +12,14 @@ export interface RecentHairPhoto {
   verdict: string;
   mode: string;
   description: string | null;
+  conversationId: string | null;
+  phone: string | null;
+  clientName: string | null;
+}
+
+export interface HairPhotoContact {
+  phone: string | null;
+  clientName: string | null;
 }
 
 export interface HairPhotoStatus {
@@ -54,7 +62,20 @@ function toRecentHairPhoto(value: unknown): RecentHairPhoto | null {
     verdict: text(value.verdict) ?? '',
     mode: text(value.mode) ?? '',
     description: description ? description.slice(0, MAX_DESCRIPTION) : null,
+    conversationId: text(value.conversationId),
+    phone: null,
+    clientName: null,
   };
+}
+
+export function recentConversationIds(rawRecent: unknown): string[] {
+  return [
+    ...new Set(
+      listOf(rawRecent)
+        .map((item) => (isRecord(item) ? text(item.conversationId) : null))
+        .filter((id): id is string => id !== null),
+    ),
+  ];
 }
 
 const usable = (model: AiModelPublic) =>
@@ -70,6 +91,7 @@ export function buildHairPhotoStatus(input: {
   rawModels: unknown;
   rawRecent: unknown;
   partial: boolean;
+  contacts?: ReadonlyMap<string, HairPhotoContact>;
 }): HairPhotoStatus {
   const models = toPublicAiModels(input.rawModels);
   return {
@@ -80,7 +102,11 @@ export function buildHairPhotoStatus(input: {
     modelReady: models.some(usable),
     recent: listOf(input.rawRecent)
       .map(toRecentHairPhoto)
-      .filter((photo): photo is RecentHairPhoto => photo !== null),
+      .filter((photo): photo is RecentHairPhoto => photo !== null)
+      .map((photo) => ({
+        ...photo,
+        ...(photo.conversationId && input.contacts?.get(photo.conversationId)),
+      })),
     partial: input.partial,
   };
 }

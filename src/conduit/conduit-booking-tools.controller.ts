@@ -29,6 +29,8 @@ import {
 } from './tools/bot-treatment-view';
 import { matchTreatment } from './tools/treatment-matcher';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
+import { priceUnitsOf } from './quotes/team-quote';
+import { bogotaDay } from './tools/bot-treatment-view';
 import { TeamQuoteService } from './quotes/team-quote.service';
 import { ClientsRepository } from '../clients/repositories/clients.repository';
 import { ReservationsService } from '../reservations/reservations.service';
@@ -52,6 +54,9 @@ const SLOT_ERRORS = new Set<string>([
 
 export const ASSESSMENT_CHOICE =
   'Este servicio requiere valoración: si aún no tiene su precio del equipo, antes de apartar ofrécele dos opciones: valoración en el spa el día de la cita (con el rango) o ya por WhatsApp con una foto de su cabello para darle su precio.';
+
+export const EXPIRED_PROMOTION =
+  'La promoción de este servicio vence antes de este día: no aplica a esta cita. No la menciones y usa el precio sin descuento.';
 
 @Controller({ path: 'conduit/booking', version: '1' })
 @ConduitTool()
@@ -125,7 +130,7 @@ export class ConduitBookingToolsController {
   ) {
     const [slots, assessment] = await Promise.all([
       this.reservationsService.getAvailability(query.treatmentId, query.date),
-      this.assessmentChoice([query.treatmentId], req),
+      this.availabilityNotes([query.treatmentId], query.date, req),
     ]);
     return {
       treatmentId: query.treatmentId,
@@ -147,7 +152,7 @@ export class ConduitBookingToolsController {
   ) {
     const [calendar, assessment] = await Promise.all([
       this.reservationsService.getAvailabilityCalendar(query),
-      this.assessmentChoice(query.treatmentIds, req),
+      this.availabilityNotes(query.treatmentIds, query.from, req),
     ]);
     return {
       ...calendar,
@@ -156,23 +161,32 @@ export class ConduitBookingToolsController {
     };
   }
 
-  private async assessmentChoice(
+  private async availabilityNotes(
     treatmentIds: string[],
+    day: string,
     req: RequestWithConduitContact,
-  ): Promise<{ valoracion?: string }> {
+  ): Promise<{ valoracion?: string; promocion?: string }> {
     const wanted = new Set(treatmentIds);
-    const assessed = (await this.treatmentsService.findAll())
-      .filter((t) => wanted.has(t.id) && t.requiresPriorAssessment)
+    const chosen = (await this.treatmentsService.findAll()).filter((t) =>
+      wanted.has(t.id),
+    );
+    const expired = chosen.some(
+      (t) =>
+        t.activePromotion?.endsAt && bogotaDay(t.activePromotion.endsAt) < day,
+    );
+    const promotion = expired ? { promocion: EXPIRED_PROMOTION } : {};
+    const assessed = chosen
+      .filter((t) => t.requiresPriorAssessment)
       .map((t) => t.id);
-    if (assessed.length === 0) return {};
+    if (assessed.length === 0) return promotion;
     const phone = req.conduitContact?.phone;
     if (phone && hasVerifiedIdentity(req)) {
       const quoted = new Set(
         (await this.teamQuotes.activeFor(phone)).map((q) => q.treatmentId),
       );
-      if (assessed.every((id) => quoted.has(id))) return {};
+      if (assessed.every((id) => quoted.has(id))) return promotion;
     }
-    return { valoracion: ASSESSMENT_CHOICE };
+    return { ...promotion, valoracion: ASSESSMENT_CHOICE };
   }
 
   @Post('reservations')
@@ -198,10 +212,11 @@ export class ConduitBookingToolsController {
         },
         {
           trustedIdentity: hasVerifiedIdentity(req),
-          priceOverrides: new Map(quotes.map((q) => [q.treatmentId, q.price])),
+          priceOverrides: new Map(
+            quotes.map((q) => [q.treatmentId, priceUnitsOf(q.price)]),
+          ),
         },
       );
-      const closingOffer = await this.promotionOffers.afterBooking(treatments);
       await this.teamQuotes.markUsed(
         quotes.flatMap((q) => {
           const reservation = result.reservations.find(
@@ -212,7 +227,7 @@ export class ConduitBookingToolsController {
             : [];
         }),
       );
-      return closingOffer ? { ...result, closingOffer } : result;
+      return result;
     } catch (error) {
       throw await this.withAlternatives(error, treatments, dto.scheduledStart);
     }

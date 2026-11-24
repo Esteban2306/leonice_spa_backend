@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -17,10 +18,17 @@ import {
   MAX_ORDER_ITEMS,
 } from '../../product-orders/domain/order-pricing';
 
+export const FULFILLMENTS = ['DOMICILIO', 'RECOGER'] as const;
+export const PAYMENTS = [
+  'TRANSFERENCIA',
+  'CONTRAENTREGA',
+  'EN_TIENDA',
+] as const;
+
 export class ConduitPurchaseItemDto {
   @IsString()
   @MinLength(2)
-  @MaxLength(120)
+  @MaxLength(300)
   producto!: string;
 
   @IsOptional()
@@ -60,4 +68,18 @@ export class ConduitProductPurchaseDto {
   @IsString()
   @MaxLength(600)
   notes?: string;
+
+  @IsOptional()
+  @IsIn(FULFILLMENTS)
+  entrega?: (typeof FULFILLMENTS)[number];
+
+  @IsOptional()
+  @IsIn(PAYMENTS)
+  pago?: (typeof PAYMENTS)[number];
+
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(300)
+  direccion?: string;
 }

@@ -123,3 +123,50 @@ describe('precio de un pedido de productos', () => {
     expect(parseOrderCode('pedido 42')).toBeNull();
   });
 });
+
+describe('nombres descriptivos que escribe el bot', () => {
+  const catalog = [
+    {
+      id: 'ritual',
+      name: 'Ritual Argan Boom y Blindaje Térmico',
+      productCategoryId: 'combos',
+      variants: [
+        {
+          id: 'r-v',
+          brand: 'Amazônica',
+          presentation: 'Ritual de 4 productos',
+          price: 305000,
+        },
+      ],
+    },
+    {
+      id: 'mask',
+      name: 'Mascarilla Argan Boom Amazônica',
+      productCategoryId: 'care',
+      variants: [
+        { id: 'm', brand: 'Amazônica', presentation: '250 g', price: 90000 },
+      ],
+    },
+    {
+      id: 'cond',
+      name: 'Acondicionador Argan Boom Amazônica',
+      productCategoryId: 'care',
+      variants: [
+        { id: 'c', brand: 'Amazônica', presentation: '300 ml', price: 70000 },
+      ],
+    },
+  ];
+
+  it('reconoce el producto aunque venga con su descripción, la cantidad y el precio', () => {
+    const query =
+      'Ritual Argan Boom y Blindaje Térmico (kit de 4 productos: shampoo, acondicionador, mascarilla Argan Boom y termoprotector BB Cream), cantidad 1, $305.000';
+    expect(findProduct(catalog, query)?.id).toBe('ritual');
+    const priced = priceOrder(catalog, [], [{ product: query, quantity: 1 }]);
+    expect(priced.total).toBe(305000);
+  });
+
+  it('un nombre corto sigue sin confundirse con otro producto', () => {
+    expect(findProduct(catalog, 'Mascarilla Argan Boom')?.id).toBe('mask');
+    expect(findProduct(catalog, 'Argan Boom')).toBeNull();
+  });
+});

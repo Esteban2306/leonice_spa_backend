@@ -90,6 +90,7 @@ const CLIENT_FACING_JOBS: ReadonlySet<string> = new Set([
   JOB_NAMES.NOTIFY_CLIENT_EVENT_TICKET,
   JOB_NAMES.NOTIFY_CLIENT_EVENT_WINNER,
   JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED,
+  JOB_NAMES.NOTIFY_CLIENT_PRODUCT_ORDER_READY,
 ]);
 
 const PAUSED_REASON = 'Sistema en pausa: no se envió el mensaje';
@@ -209,6 +210,11 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
           job.data as ClientProductPaymentNoticeJobData,
           ctx,
         );
+      case JOB_NAMES.NOTIFY_CLIENT_PRODUCT_ORDER_READY:
+        return this.notifications.notifyClientProductOrderReady(
+          job.data as ClientProductPaymentNoticeJobData,
+          ctx,
+        );
       case JOB_NAMES.NOTIFY_CLIENT_EVENT_TICKET:
         return this.notifications.notifyClientEventTicket(
           job.data as ClientEventTicketNoticeJobData,
@@ -320,6 +326,8 @@ export class AutomationCommunicationsProcessor extends WorkerHost {
         return AutomationExecutionType.ADMIN_PRODUCT_PAYMENT_NOTICE;
       case JOB_NAMES.NOTIFY_CLIENT_PRODUCT_PAYMENT_REJECTED:
         return AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_REJECTED_NOTICE;
+      case JOB_NAMES.NOTIFY_CLIENT_PRODUCT_ORDER_READY:
+        return AutomationExecutionType.CLIENT_PRODUCT_PAYMENT_VERIFIED_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_RECEIPT_ISSUE:
         return AutomationExecutionType.ADMIN_RECEIPT_NOTICE;
       case JOB_NAMES.NOTIFY_ADMIN_IN_PROGRESS:

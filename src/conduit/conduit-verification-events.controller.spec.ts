@@ -178,14 +178,17 @@ describe('foto del cabello', () => {
     );
   });
 
-  it('una foto dudosa también se pasa al equipo', async () => {
-    const { controller, handoffs } = build();
-    await controller.receive(
-      event({ capability: 'foto-cabello', verdict: 'NEEDS_REVIEW' }),
-      'evt-10',
-    );
-    expect(handoffs.request).toHaveBeenCalledTimes(1);
-  });
+  it.each(['NEEDS_REVIEW'])(
+    'una foto dudosa (%s) también se pasa al equipo',
+    async (verdict) => {
+      const { controller, handoffs } = build();
+      await controller.receive(
+        event({ capability: 'foto-cabello', verdict }),
+        'evt-10',
+      );
+      expect(handoffs.request).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it.each(['NOT_APPLICABLE', 'UNREADABLE', 'ERROR', 'INVALID'])(
     'con %s no avisa',

@@ -494,6 +494,20 @@ export const CONDUIT_TEMPLATE_CATALOG: readonly ConduitTemplateDefinition[] = [
     ].join('\n'),
   },
   {
+    code: 'CLIENT_PRODUCT_ORDER_READY',
+    envKey: 'CONDUIT_TEMPLATE_CLIENT_PRODUCT_ORDER_READY',
+    name: 'leonice_pedido_listo',
+    description:
+      'El equipo verificó un pedido de productos: se recoge en el spa o se lleva a domicilio, como lo pidió la clienta.',
+    audience: 'CLIENT',
+    variables: ['nombre', 'detalle'],
+    body: [
+      'Hola {{nombre}} 🌿 {{detalle}}',
+      '',
+      '¡Gracias por tu compra!',
+    ].join('\n'),
+  },
+  {
     code: 'ADMIN_IN_PROGRESS',
     envKey: 'CONDUIT_TEMPLATE_ADMIN_IN_PROGRESS',
     name: 'leonice_aviso_citas_en_curso',

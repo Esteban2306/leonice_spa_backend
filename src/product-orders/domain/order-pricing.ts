@@ -80,7 +80,25 @@ function score(query: string, name: string): number {
   return coverage === 1 ? 0.5 + precision * 0.4 : coverage * 0.5;
 }
 
+export function coreName(query: string): string {
+  return query
+    .replace(/\([^)]*\)/g, ' ')
+    .split(/[,;$]|\s[-–]\s/)[0]
+    .trim();
+}
+
 export function findProduct<P extends CatalogProduct>(
+  catalog: readonly P[],
+  query: string,
+): P | null {
+  const core = coreName(query);
+  return (
+    rankProduct(catalog, query) ??
+    (core && core !== query.trim() ? rankProduct(catalog, core) : null)
+  );
+}
+
+function rankProduct<P extends CatalogProduct>(
   catalog: readonly P[],
   query: string,
 ): P | null {

@@ -107,8 +107,9 @@ export class CreateReservationOrchestrator {
     const requestedStart = new Date(dto.scheduledStart);
     validateAdvancedWindow(requestedStart);
 
-    const activePromotions =
-      await this.promotionsService.findAllCurrentlyValid();
+    const activePromotions = (
+      await this.promotionsService.findAllCurrentlyValid()
+    ).filter((promotion) => promotion.endsAt >= requestedStart);
 
     const timingInputs: TreatmentTimingInput[] = treatments.map((t) => {
       const pricing = determineTreatmentPricing(t, client);

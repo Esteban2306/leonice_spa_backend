@@ -35,13 +35,26 @@ import { TreatmentsService } from '../catalog/treatments/treatments.service';
 import { TeamHandoffService } from './handoff/team-handoff.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import { ProductOrdersService } from '../product-orders/product-orders.service';
-import { toBotOrder } from './tools/bot-order-view';
+import {
+  DETAILS_MISSING_HINT,
+  ORDER_MISSING_HINT,
+  deliveryOptions,
+  missingDetails,
+  missingItems,
+  orderSummary,
+  paymentOptions,
+  readyHint,
+  toBotOrder,
+} from './tools/bot-order-view';
 import { ConduitPromotionOffersService } from './promotions/conduit-promotion-offers.service';
 import {
   MAX_PROMOTION_OFFERS,
   NO_PROMOTIONS_HINT,
   PROMOTIONS_HINT,
 } from './promotions/bot-promotion-offers';
+
+export const ADVICE_REASON_PREFIX =
+  'Pide que una profesional le recomiende qué le sirve (el bot espera tu respuesta en el chat y luego sigue): ';
 
 @Controller({ path: 'conduit', version: '1' })
 @ConduitTool()
@@ -174,6 +187,46 @@ export class ConduitSupportToolsController {
       };
     }
 
+    const preview = await this.productOrders.preview(items);
+    const unclear = missingItems(preview);
+    if (unclear.length > 0) {
+      return {
+        expected: true,
+        code: 'ORDER_ITEM_UNCLEAR',
+        nextStep: 'ASK_CLIENT_DATA',
+        requested: false,
+        ...orderSummary(preview),
+        missing: unclear,
+        hint: ORDER_MISSING_HINT,
+      };
+    }
+
+    const settings = await this.productOrders.fulfillmentSettings();
+    const details = {
+      entrega: dto.entrega,
+      pago: dto.pago,
+      direccion: dto.direccion?.trim() || undefined,
+    };
+    const gap = missingDetails(details, settings);
+    if (gap.missing.length > 0) {
+      return {
+        expected: true,
+        code: 'ORDER_DETAILS_MISSING',
+        nextStep: 'ASK_CLIENT_DATA',
+        requested: false,
+        ...orderSummary(preview),
+        faltan: gap.missing,
+        ...(gap.problem && { problema: gap.problem }),
+        opcionesEntrega: details.entrega
+          ? undefined
+          : deliveryOptions(settings),
+        opcionesPago: paymentOptions(details.entrega),
+        hint: DETAILS_MISSING_HINT,
+      };
+    }
+
+    const entrega = details.entrega!;
+    const pago = details.pago!;
     const placed = await this.productOrders.place({
       contact: { phone, lid },
       clientId: client?.id ?? null,
@@ -182,24 +235,36 @@ export class ConduitSupportToolsController {
       request: dto.request ?? null,
       notes: dto.notes ?? null,
       requestId: idempotencyKey ?? randomUUID(),
+      fulfillment: {
+        fulfillment: entrega,
+        paymentMethod: pago,
+        deliveryAddress: entrega === 'DOMICILIO' ? details.direccion! : null,
+      },
     });
 
-    const closingOffer =
-      placed.created && placed.teamNotified
-        ? await this.promotionOffers.afterPurchase(
-            placed.order.items.map((item) => item.productName).join(', '),
-          )
-        : null;
+    const view = toBotOrder(
+      placed.order,
+      placed.priced,
+      pago === 'TRANSFERENCIA' ? placed.paymentInstructions : null,
+    );
     return {
       requested: true,
       teamNotified: placed.teamNotified,
       updated: !placed.created,
-      ...toBotOrder(placed.order, placed.priced, placed.paymentInstructions),
+      ...view,
+      entrega,
+      pago,
+      ...(entrega === 'DOMICILIO' && { direccion: details.direccion }),
+      ...(entrega === 'RECOGER' &&
+        settings.pickupAddress && { recogerEn: settings.pickupAddress }),
+      hint: readyHint(
+        { entrega, pago, direccion: details.direccion },
+        settings,
+      ),
       ...(!placed.teamNotified && {
         message:
           'El pedido quedó guardado pero no hay nadie del equipo a quien avisar ahora; no prometas que alguien escribirá pronto.',
       }),
-      ...(closingOffer && { closingOffer }),
     };
   }
 
@@ -249,6 +314,28 @@ export class ConduitSupportToolsController {
       message: teamNotified
         ? 'Se le avisó a Leo que la clienta necesita hablar con ella; ella verá el mensaje y decidirá cómo responder. No des su número ni prometas cuándo escribirá.'
         : 'No fue posible avisarle a Leo en este momento; no prometas que ella escribirá ni des su número.',
+    };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('handoff/advice')
+  async adviceRequest(
+    @Body() dto: ConduitHandoffDto,
+    @Req() req: RequestWithConduitContact,
+    @Headers('x-conduit-idempotency-key') idempotencyKey?: string,
+  ) {
+    const teamNotified = await this.requestHandoff(
+      { ...dto, reason: `${ADVICE_REASON_PREFIX}${dto.reason}`.slice(0, 300) },
+      req,
+      'TEAM',
+      idempotencyKey,
+    );
+    return {
+      teamNotified,
+      awaitTeamAnswer: teamNotified,
+      message: teamNotified
+        ? 'Una profesional del equipo ya tiene su consulta y le responderá por este chat. Dile eso en una línea y no recomiendes tú el servicio ni el producto.'
+        : 'No hay nadie del equipo a quien consultar ahora: recomiéndale tú con recomendar_para según lo que contó.',
     };
   }
 

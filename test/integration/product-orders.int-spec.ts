@@ -102,12 +102,31 @@ describe('Pedidos de productos: del chat al panel', () => {
     resetThrottle(app);
   });
 
+  it('sin saber cómo lo recibe ni cómo paga no crea el pedido: devuelve las opciones', async () => {
+    const res = await asConduit(
+      'post',
+      '/conduit/products/purchase-request',
+    ).send({
+      items: [{ producto: 'kit jolly kids', cantidad: 2 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      expected: true,
+      code: 'ORDER_DETAILS_MISSING',
+      faltan: ['entrega', 'pago'],
+      total: '$392.000',
+    });
+    expect(await prisma.client.productOrder.count()).toBe(0);
+  });
+
   it('el bot crea el pedido con el precio de promoción, el total y la cuenta de pago', async () => {
     const res = await asConduit(
       'post',
       '/conduit/products/purchase-request',
     ).send({
       items: [{ producto: 'kit jolly kids', cantidad: 2 }],
+      entrega: 'RECOGER',
+      pago: 'TRANSFERENCIA',
     });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -125,6 +144,8 @@ describe('Pedidos de productos: del chat al panel', () => {
       '/conduit/products/purchase-request',
     ).send({
       items: [{ producto: 'Ritual Jolly Kids', cantidad: 1 }],
+      entrega: 'RECOGER',
+      pago: 'TRANSFERENCIA',
     });
     expect(res.body).toMatchObject({ updated: true, total: '$196.000' });
     expect(await prisma.client.productOrder.count()).toBe(1);
@@ -166,10 +187,7 @@ describe('Pedidos de productos: del chat al panel', () => {
   it('el panel lo muestra por verificar y lo verifica con un clic', async () => {
     const summary = await asAdmin('get', '/product-orders/summary');
     expect(summary.body).toMatchObject({ toVerify: 1 });
-    const list = await asAdmin(
-      'get',
-      '/product-orders?status=PAGO_EN_REVISION',
-    );
+    const list = await asAdmin('get', '/product-orders?view=TO_VERIFY');
     expect((list.body as { items: unknown[] }).items[0]).toMatchObject({
       id: orderId,
       amountMatches: true,

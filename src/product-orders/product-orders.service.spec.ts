@@ -75,6 +75,7 @@ function build(open: unknown = null, byNumber: unknown = null) {
       get: jest.fn().mockResolvedValue({
         productPaymentInstructions: null,
         depositInstructions: 'Nequi 310 000 1122',
+        address: 'Calle 5 # 4-20, Granada',
       }),
     } as never,
     {
@@ -205,9 +206,13 @@ describe('ProductOrdersService', () => {
     expect(repository.update).not.toHaveBeenCalled();
   });
 
-  it('verificar el pago lo marca pagado sin escribirle a la clienta', async () => {
+  it('verificar el pedido lo deja listo y le avisa a la clienta dónde recogerlo', async () => {
     const { service, repository, eventBus } = build(
-      stored({ status: ProductOrderStatus.PAGO_EN_REVISION }),
+      stored({
+        status: ProductOrderStatus.PAGO_EN_REVISION,
+        fulfillment: 'RECOGER',
+        paymentMethod: 'EN_TIENDA',
+      }),
     );
     await service.verifyPayment('o1', 'u1');
     expect(repository.update).toHaveBeenCalledWith(
@@ -217,7 +222,13 @@ describe('ProductOrdersService', () => {
         verifiedByUserId: 'u1',
       }),
     );
-    expect(eventBus.publish).not.toHaveBeenCalled();
+    const [type, payload] = eventBus.publish.mock.calls[0] as [
+      string,
+      { orderId: string; detail: string },
+    ];
+    expect(type).toBe('product_order.verified');
+    expect(payload.orderId).toBe('o1');
+    expect(payload.detail).toContain('Calle 5 # 4-20, Granada');
   });
 
   it('rechazar el pago lo devuelve a pendiente con el motivo y avisa a la clienta', async () => {
@@ -238,9 +249,15 @@ describe('ProductOrdersService', () => {
     );
   });
 
-  it('no deja entregar un pedido que no está pagado', async () => {
-    const { service } = build(stored());
-    await expect(service.markDelivered('o1')).rejects.toMatchObject({
+  it('se puede marcar entregado aunque no se haya verificado antes, pero no uno cancelado', async () => {
+    const { service, repository } = build(stored());
+    await service.markDelivered('o1');
+    expect(repository.update).toHaveBeenCalledWith(
+      'o1',
+      expect.objectContaining({ status: ProductOrderStatus.ENTREGADO }),
+    );
+    const cancelled = build(stored({ status: ProductOrderStatus.CANCELADO }));
+    await expect(cancelled.service.markDelivered('o1')).rejects.toMatchObject({
       code: 'PRODUCT_ORDER_INVALID_STATUS',
     });
   });

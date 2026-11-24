@@ -1,6 +1,7 @@
 import {
   ASSESSMENT_CHOICE,
   ConduitBookingToolsController,
+  EXPIRED_PROMOTION,
 } from './conduit-booking-tools.controller';
 
 function build(quotes: Array<{ treatmentId: string }> = []) {
@@ -8,7 +9,11 @@ function build(quotes: Array<{ treatmentId: string }> = []) {
     {
       findAll: jest.fn(() =>
         Promise.resolve([
-          { id: 'alisado', requiresPriorAssessment: true },
+          {
+            id: 'alisado',
+            requiresPriorAssessment: true,
+            activePromotion: { endsAt: new Date('2026-11-25T04:59:59Z') },
+          },
           { id: 'masaje', requiresPriorAssessment: false },
         ]),
       ),
@@ -37,6 +42,19 @@ describe('disponibilidad de un servicio que requiere valoración', () => {
       withPhone,
     );
     expect(result.valoracion).toBe(ASSESSMENT_CHOICE);
+  });
+
+  it('si la promoción vence antes del día de la cita, le dice al bot que no la mencione', async () => {
+    const later = await build().getAvailability(
+      { treatmentId: 'alisado', date: '2026-12-03' },
+      withPhone,
+    );
+    expect(later.promocion).toBe(EXPIRED_PROMOTION);
+    const within = await build().getAvailability(
+      { treatmentId: 'alisado', date: '2026-11-24' },
+      withPhone,
+    );
+    expect(within).not.toHaveProperty('promocion');
   });
 
   it('no lo dice si el servicio no requiere valoración', async () => {

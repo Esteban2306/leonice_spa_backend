@@ -63,7 +63,6 @@ describe('Precio que el equipo le dio a una clienta en el chat', () => {
       } as unknown as TreatmentsService,
       conduit as never,
       { get: () => BOT } as unknown as ConfigService,
-      { findAllCurrentlyValid: () => Promise.resolve([]) } as never,
     );
   });
 

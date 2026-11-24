@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { TreatmentsService } from '../../catalog/treatments/treatments.service';
-import { resolveApplicablePromotion } from '../../promotions/domain/resolve-applicable-promotion';
-import { PromotionsService } from '../../promotions/promotions.service';
 import { ConduitApiClient } from '../client/conduit-api.client';
 import { matchTreatment } from '../tools/treatment-matcher';
 import {
@@ -36,8 +34,6 @@ export type SaveTeamQuoteResult =
       reason:
         | 'TREATMENT_NOT_FOUND'
         | 'TREATMENT_AMBIGUOUS'
-        | 'FIXED_PRICE'
-        | 'OUT_OF_RANGE'
         | 'NOT_IN_CHAT'
         | 'CHAT_UNAVAILABLE';
       options?: string[];
@@ -68,7 +64,6 @@ export class TeamQuoteService {
     private readonly treatments: TreatmentsService,
     private readonly conduit: ConduitApiClient,
     private readonly config: ConfigService,
-    private readonly promotions: PromotionsService,
   ) {}
 
   async save(params: {
@@ -109,9 +104,7 @@ export class TeamQuoteService {
 
     const check = checkTeamQuote({
       amount: params.amount,
-      treatment,
       teamMessages: messages.map((m) => m.text),
-      discountPercent: await this.promotionDiscount(treatment),
     });
     if (!check.ok) return { saved: false, reason: check.reason };
 
@@ -194,24 +187,6 @@ export class TeamQuoteService {
         }),
       ),
     );
-  }
-
-  private async promotionDiscount(treatment: {
-    id: string;
-    categoryId: string;
-  }): Promise<number> {
-    try {
-      const promotion = resolveApplicablePromotion(
-        await this.promotions.findAllCurrentlyValid(),
-        { treatmentId: treatment.id, categoryId: treatment.categoryId },
-      );
-      return promotion ? Number(promotion.discountPercentage) : 0;
-    } catch (error) {
-      this.logger.warn(
-        `No se pudieron leer las promociones para verificar un precio: ${(error as Error).message}`,
-      );
-      return 0;
-    }
   }
 
   private async teamMessages(

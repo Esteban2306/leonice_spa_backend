@@ -123,6 +123,13 @@ const PROMOTION_END_FORMAT = new Intl.DateTimeFormat('es-CO', {
 export const formatPromotionEnd = (endsAt: Date | string): string =>
   PROMOTION_END_FORMAT.format(new Date(endsAt));
 
+const BOGOTA_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+});
+
+export const bogotaDay = (date: Date | string): string =>
+  BOGOTA_DAY.format(new Date(date));
+
 export function toBotTreatment(
   treatment: BotTreatmentSource,
   client?: BotPricingClient | null,
@@ -170,6 +177,7 @@ export function toBotTreatment(
         ...(promotionPrice && { price: promotionPrice }),
         ...(promotion.endsAt && {
           validUntil: formatPromotionEnd(promotion.endsAt),
+          onlyForAppointmentsUntil: bogotaDay(promotion.endsAt),
         }),
       },
     }),
