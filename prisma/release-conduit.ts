@@ -193,6 +193,17 @@ export const THIRD_PARTY_BOOKING_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const OPTIONAL_BIRTH_DATE_RELEASE: ReleaseManifest = {
+  id: '2026-11-28-fecha-nacimiento-opcional',
+  intents: ['booking'],
+  tools: ['registrar_cliente', 'crear_reserva_whatsapp'],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
@@ -205,6 +216,7 @@ export const RELEASES: readonly ReleaseManifest[] = [
   PRODUCT_ORDERS_RELEASE,
   ASSESSMENT_FLOW_RELEASE,
   THIRD_PARTY_BOOKING_RELEASE,
+  OPTIONAL_BIRTH_DATE_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];

@@ -326,9 +326,9 @@ describe('entrega de orientación (solo el prompt)', () => {
     });
     expect(out.plan.map((p) => p.name)).toEqual(
       expect.arrayContaining([
-        'consultar_cliente',
-        'reservas_proximas',
+        'registrar_cliente',
         'crear_reserva_whatsapp',
+        'booking',
         'prompt de conversación',
       ]),
     );
