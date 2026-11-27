@@ -1,4 +1,5 @@
-import { amountsInText, checkTeamQuote, priceUnitsOf } from './team-quote';
+import { priceUnitsOf } from '../../common/money/price-units';
+import { amountsInText, checkTeamQuote } from './team-quote';
 import { TeamQuoteService } from './team-quote.service';
 
 const alisado = {

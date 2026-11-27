@@ -12,6 +12,7 @@ import {
   seedWorld,
   World,
 } from './harness';
+import { priceUnitsOf } from 'src/common/money/price-units';
 
 const BOT = '11111111-1111-4111-8111-111111111111';
 
@@ -116,10 +117,12 @@ describe('Precio que el equipo le dio a una clienta en el chat', () => {
       },
       {
         trustedIdentity: false,
-        priceOverrides: new Map([[active.treatmentId, active.price]]),
+        priceOverrides: new Map([
+          [active.treatmentId, priceUnitsOf(active.price)],
+        ]),
       },
     );
-    expect(Number(reservations[0].finalPrice)).toBe(350000);
+    expect(Number(reservations[0].finalPrice)).toBe(350);
 
     await quotes.markUsed([
       { quoteId: active.id, reservationId: reservations[0].id },

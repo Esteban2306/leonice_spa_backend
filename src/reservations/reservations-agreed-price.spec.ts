@@ -26,7 +26,7 @@ const dto = (agreedPrices?: Array<{ treatmentId: string; price: number }>) =>
   }) as CreateReservationDto;
 
 describe('precio fijado al crear una reserva', () => {
-  it('desde el panel se agenda con el precio que eligió el administrador', async () => {
+  it('el precio en pesos del panel se agenda en miles, como el catálogo', async () => {
     const { instance, execute } = controller();
     await instance.create(dto([{ treatmentId: T1, price: 350000 }]), {
       id: 'admin',
@@ -35,8 +35,19 @@ describe('precio fijado al crear una reserva', () => {
       priceOverrides: Map<string, number>;
       trustedIdentity: boolean;
     };
-    expect(options.priceOverrides.get(T1)).toBe(350000);
+    expect(options.priceOverrides.get(T1)).toBe(350);
     expect(options.trustedIdentity).toBe(true);
+  });
+
+  it('conserva los pesos que no completan un millar', async () => {
+    const { instance, execute } = controller();
+    await instance.create(dto([{ treatmentId: T1, price: 35500 }]), {
+      id: 'admin',
+    } as never);
+    const options = execute.mock.calls[0][1] as {
+      priceOverrides: Map<string, number>;
+    };
+    expect(options.priceOverrides.get(T1)).toBe(35.5);
   });
 
   it('sin precio fijado se usa el del catálogo', async () => {

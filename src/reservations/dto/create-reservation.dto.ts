@@ -27,6 +27,7 @@ export class AgreedPriceDto {
   @IsUUID('4')
   treatmentId: string;
 
+  /** En pesos; se guarda en miles (ver `priceUnitsOf`). */
   @IsInt()
   @Min(0)
   @Max(MAX_AGREED_PRICE_COP)

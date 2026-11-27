@@ -1,4 +1,5 @@
 import { AppException } from '../common/errors/app.exception';
+import { priceUnitsOf } from '../common/money/price-units';
 import {
   Body,
   Controller,
@@ -115,7 +116,9 @@ export class ReservationsController {
     }
     return this.createOrchestrator.execute(dto, {
       trustedIdentity: user !== undefined,
-      priceOverrides: new Map(agreed.map((a) => [a.treatmentId, a.price])),
+      priceOverrides: new Map(
+        agreed.map((a) => [a.treatmentId, priceUnitsOf(a.price)]),
+      ),
     });
   }
 
