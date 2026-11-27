@@ -12,6 +12,7 @@ import {
   Reservation,
   ReservationStatus,
 } from '@prisma/client';
+import { LATEST_DEPOSIT_ORDER } from '../reservations/repositories/reservation.selects';
 import { UnrecoverableError } from 'bullmq';
 import {
   ConduitApiClient,
@@ -219,11 +220,13 @@ export class OperationalNotificationsService {
       return;
     }
 
-    const group = reservation.comboGroupId
-      ? await this.reservations.findByComboGroupId(reservation.comboGroupId)
-      : [reservation];
+    const groupIds = reservation.comboGroupId
+      ? (
+          await this.reservations.findByComboGroupId(reservation.comboGroupId)
+        ).map((r) => r.id)
+      : [reservation.id];
     const confirmed = (
-      await this.reservations.findManyByIdsWithDetails(group.map((r) => r.id))
+      await this.reservations.findManyByIdsWithDetails(groupIds)
     )
       .filter((r) => r.status === ReservationStatus.CONFIRMADA)
       .sort((a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime());
@@ -318,7 +321,7 @@ export class OperationalNotificationsService {
 
     const [latestProof] = await this.prisma.client.depositRecord.findMany({
       where: { reservationId: { in: members.map((r) => r.id) } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: LATEST_DEPOSIT_ORDER,
       take: 1,
       select: { status: true, imageUrl: true },
     });
