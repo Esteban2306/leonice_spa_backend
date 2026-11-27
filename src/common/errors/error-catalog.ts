@@ -227,8 +227,7 @@ const CLIENT = {
   },
   CLIENT_REQUIRED_FIELDS: {
     status: HttpStatus.BAD_REQUEST,
-    message:
-      'Nombre y fecha de nacimiento son obligatorios para un cliente nuevo.',
+    message: 'El nombre es obligatorio para un cliente nuevo.',
   },
   CLIENT_SEARCH_TOO_SHORT: {
     status: HttpStatus.BAD_REQUEST,

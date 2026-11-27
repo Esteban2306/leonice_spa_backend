@@ -22,8 +22,9 @@ export class CreateClientDto {
   @MaxLength(100)
   name!: string;
 
+  @IsOptional()
   @IsCalendarDate()
-  birthDate!: string;
+  birthDate?: string;
 
   @IsOptional()
   @IsString()

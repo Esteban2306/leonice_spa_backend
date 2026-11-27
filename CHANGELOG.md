@@ -1,5 +1,9 @@
 # Changelog
 
+## Sin publicar
+
+- La fecha de nacimiento de la clienta es opcional en el panel, la API de reservas y el bot. La de la persona para quien se reserva sigue siendo obligatoria.
+
 ## 0.1.0 - 2026-11-27
 
 ### Cambios de negocio
