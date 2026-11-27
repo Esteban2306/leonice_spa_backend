@@ -123,7 +123,7 @@ describe('2. Disponibilidad y concurrencia', () => {
     );
   });
 
-  it('el mismo cliente no puede duplicar categoría el mismo día aunque lance 6 peticiones a la vez', async () => {
+  it('6 peticiones a la vez del mismo servicio y hora dejan una sola reserva', async () => {
     const client = newClientDto('duplicado');
     const start = futureSlot(6, 9);
     const { ok } = await settle(
@@ -145,31 +145,17 @@ describe('2. Disponibilidad y concurrencia', () => {
     ).toBe(1);
   });
 
-  it('el mismo cliente no puede quedar en dos citas solapadas de categorías distintas lanzadas a la vez (30 rondas)', async () => {
-    const overlaps: number[] = [];
-    for (let round = 0; round < 30; round++) {
-      const client = newClientDto('solape');
-      const start = futureSlot(20 + round, 9);
-      await settle([
-        book(world.secondary.treatmentId, start, client),
-        book(world.tertiary.treatmentId, start, client),
-      ]);
-      const stored = await prisma.client.client.findUniqueOrThrow({
-        where: { phone: client.phone },
-      });
-      const rows = await prisma.client.reservation.findMany({
-        where: { clientId: stored.id },
-        orderBy: { scheduledStart: 'asc' },
-      });
-      for (let i = 1; i < rows.length; i++) {
-        if (
-          rows[i].scheduledStart.getTime() < rows[i - 1].scheduledEnd.getTime()
-        ) {
-          overlaps.push(round);
-        }
-      }
-    }
-    expect(overlaps).toEqual([]);
+  it('dos servicios distintos de la misma persona pedidos a la vez quedan a la hora pedida', async () => {
+    const client = newClientDto('solape');
+    const start = futureSlot(20, 9);
+    const { ok } = await settle([
+      book(world.secondary.treatmentId, start, client),
+      book(world.tertiary.treatmentId, start, client),
+    ]);
+
+    expect(
+      ok.map((result) => result.value.reservations[0].scheduledStart.getTime()),
+    ).toEqual([start.getTime(), start.getTime()]);
   });
 
   it('dos reprogramaciones al último hueco libre: solo una gana', async () => {

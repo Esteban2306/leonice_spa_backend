@@ -17,8 +17,6 @@ import { PlacementCheckService } from '../service/placement-check.service';
 import { placementRejectionException } from '../domain/placement-rejection.exception';
 import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { validateAdvancedWindow } from '../validators/validate-advance-window';
-import { assertNoSameDayCategoryConflict } from '../validators/assert-no-same-day-category-conflict';
-import { assertNoDuplicateCategoriesInCombo } from '../validators/assert-no-duplicate-categories-in-combo';
 import { DepositDeadlineService } from '../service/deposit-deadline.service';
 import { EventBusService } from '../../common/events/event.service';
 import { EVENT_TYPES } from '../../common/events/constants/event.types';
@@ -26,17 +24,13 @@ import { getDayBoundaries } from '../domain/day-boundaries';
 import { getCalendarDayKey } from '../domain/calendar-day-key';
 import { OperatingScheduleService } from '../service/operating-schedule.service';
 import { generateAvailableSlots } from '../domain/availability-calculator';
+import { personKey } from '../domain/person-key';
 import { minuteOfDay } from '../domain/operating-hours';
 import {
   scheduleComboTreatments,
   TreatmentTimingInput,
 } from '../domain/schedule-combo-treatments';
 import { formatLocalTime } from '../domain/format-local-time';
-import {
-  overlapsAny,
-  latestConflictEnd,
-  TimeInterval,
-} from '../domain/personal-conflict-checker';
 import { findNearestSlot } from '../domain/find-nearest-slot';
 import {
   buildBookingSummary,
@@ -109,7 +103,6 @@ export class CreateReservationOrchestrator {
         'Uno o más tratamientos no existen o no están activos',
       );
     }
-    assertNoDuplicateCategoriesInCombo(treatments.map((t) => t.categoryId));
 
     const requestedStart = new Date(dto.scheduledStart);
     validateAdvancedWindow(requestedStart);
@@ -152,17 +145,6 @@ export class CreateReservationOrchestrator {
         categoryIds,
         requestedStart,
         async (tx) => {
-          const existingIntervals: TimeInterval[] =
-            await this.reservationsRepository.findActiveIntervalsForClientOnDay(
-              client.id,
-              dayStart,
-              dayEnd,
-              tx,
-              undefined,
-              undefined,
-              dependent?.id ?? null,
-            );
-
           const resolved: BookedSegmentSummary[] = [];
           const created: Reservation[] = [];
 
@@ -187,12 +169,12 @@ export class CreateReservationOrchestrator {
                     clientId: client.id,
                     dependentId: dependent?.id ?? null,
                     categoryId: draft.categoryId,
+                    treatmentId: draft.treatmentId,
                     categoryName: draft.categoryName,
                     durationMinutes: draft.durationMinutes,
                     idealStart: draft.scheduledStart,
                     dayStart,
                     dayEnd,
-                    conflictIntervals: existingIntervals,
                     firstSegment: true,
                   })
                 : await this.placeAlongside({
@@ -200,26 +182,11 @@ export class CreateReservationOrchestrator {
                     clientId: client.id,
                     dependentId: dependent?.id ?? null,
                     categoryId: draft.categoryId,
+                    treatmentId: draft.treatmentId,
                     categoryName: draft.categoryName,
                     durationMinutes: draft.durationMinutes,
                     start: created[0].scheduledStart,
-                    comboGroupId,
                   });
-
-            const hasCategoryConflict =
-              await this.reservationsRepository.hasActiveReservationInCategoryOnDay(
-                client.id,
-                draft.categoryId,
-                dayStart,
-                dayEnd,
-                undefined,
-                tx,
-                dependent?.id ?? null,
-              );
-            assertNoSameDayCategoryConflict(
-              draft.categoryName,
-              hasCategoryConflict,
-            );
 
             const initialStatus = withoutDeposit
               ? ReservationStatus.CONFIRMADA
@@ -338,10 +305,10 @@ export class CreateReservationOrchestrator {
     clientId: string;
     dependentId: string | null;
     categoryId: string;
+    treatmentId: string;
     categoryName: string;
     durationMinutes: number;
     start: Date;
-    comboGroupId: string;
   }): Promise<{
     scheduledStart: Date;
     scheduledEnd: Date;
@@ -353,24 +320,21 @@ export class CreateReservationOrchestrator {
       clientId,
       dependentId,
       categoryId,
+      treatmentId,
       categoryName,
       start,
-      comboGroupId,
     } = params;
     const end = new Date(start.getTime() + params.durationMinutes * 60_000);
     const decision = await this.placementCheck.evaluate(tx, {
       clientId,
       dependentId,
       categoryId,
+      treatmentId,
       start,
       end,
-      comboGroupId,
     });
     if (decision.ok) {
       return { scheduledStart: start, scheduledEnd: end, wasAdjusted: false };
-    }
-    if (decision.reason === 'CATEGORY_DAY_CONFLICT') {
-      assertNoSameDayCategoryConflict(categoryName, true);
     }
     if (
       decision.reason === 'NO_CAPACITY' ||
@@ -389,12 +353,12 @@ export class CreateReservationOrchestrator {
     clientId: string;
     dependentId: string | null;
     categoryId: string;
+    treatmentId: string;
     categoryName: string;
     durationMinutes: number;
     idealStart: Date;
     dayStart: Date;
     dayEnd: Date;
-    conflictIntervals: TimeInterval[];
     firstSegment: boolean;
   }): Promise<{
     scheduledStart: Date;
@@ -407,12 +371,12 @@ export class CreateReservationOrchestrator {
       clientId,
       dependentId,
       categoryId,
+      treatmentId,
       categoryName,
       durationMinutes,
       idealStart,
       dayStart,
       dayEnd,
-      conflictIntervals,
       firstSegment,
     } = params;
 
@@ -424,21 +388,6 @@ export class CreateReservationOrchestrator {
     const startMinutes = firstSegment ? plan.startMinutes : null;
 
     let candidateStart = idealStart;
-    let wasAdjusted = false;
-    let adjustmentReason: string | undefined;
-
-    const initialConflictEnd = latestConflictEnd(
-      candidateStart,
-      new Date(candidateStart.getTime() + durationMinutes * 60_000),
-      conflictIntervals,
-    );
-    if (initialConflictEnd) {
-      candidateStart = initialConflictEnd;
-      wasAdjusted = true;
-      adjustmentReason =
-        'se ajustó para no cruzarse con otra cita tuya el mismo día';
-    }
-
     let candidateEnd = new Date(
       candidateStart.getTime() + durationMinutes * 60_000,
     );
@@ -447,6 +396,7 @@ export class CreateReservationOrchestrator {
       clientId,
       dependentId,
       categoryId,
+      treatmentId,
       start: candidateStart,
       end: candidateEnd,
     });
@@ -457,18 +407,15 @@ export class CreateReservationOrchestrator {
       return {
         scheduledStart: candidateStart,
         scheduledEnd: candidateEnd,
-        wasAdjusted,
-        adjustmentReason,
+        wasAdjusted: false,
       };
     }
 
-    if (!decision.ok && decision.reason === 'CATEGORY_DAY_CONFLICT') {
-      assertNoSameDayCategoryConflict(categoryName, true);
-      throw placementRejectionException(decision.reason);
-    }
     if (
       !decision.ok &&
-      (decision.reason === 'INVALID_RANGE' || decision.reason === 'IN_THE_PAST')
+      (decision.reason === 'INVALID_RANGE' ||
+        decision.reason === 'IN_THE_PAST' ||
+        decision.reason === 'DUPLICATE_BOOKING')
     ) {
       throw placementRejectionException(decision.reason);
     }
@@ -484,17 +431,22 @@ export class CreateReservationOrchestrator {
         dayEnd,
         tx,
       );
-    const allCandidates = generateAvailableSlots({
+    const sameTreatmentStarts = new Set(
+      (
+        await this.reservationsRepository.findActiveStartsForPersonTreatment(
+          { clientId, dependentId, treatmentId, dayStart, dayEnd },
+          tx,
+        )
+      ).map((start) => start.getTime()),
+    );
+    const person = personKey(clientId, dependentId);
+    const validCandidates = generateAvailableSlots({
       operatingWindows: plan.windows,
-      held,
+      held: held.filter((interval) => interval.personKey !== person),
       durationMinutes,
       capacity,
       startMinutes,
-    });
-    const validCandidates = allCandidates.filter((c) => {
-      const end = new Date(c.getTime() + durationMinutes * 60_000);
-      return !overlapsAny(c, end, conflictIntervals);
-    });
+    }).filter((candidate) => !sameTreatmentStarts.has(candidate.getTime()));
 
     const nearest = findNearestSlot(validCandidates, idealStart);
     if (!nearest) {

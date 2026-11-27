@@ -381,35 +381,31 @@ export class ReservationsRepository {
     });
   }
 
-  async findActiveIntervalsForClientOnDay(
-    clientId: string,
-    dayStart: Date,
-    dayEnd: Date,
+  async findActiveStartsForPersonTreatment(
+    params: {
+      clientId: string;
+      dependentId: string | null;
+      treatmentId: string;
+      dayStart: Date;
+      dayEnd: Date;
+      excludeReservationId?: string;
+    },
     client: PrismaClientOrTx = this.prisma.client,
-    excludeReservationId?: string,
-    excludeComboGroupId?: string,
-    dependentId?: string | null,
-  ): Promise<{ start: Date; end: Date }[]> {
+  ): Promise<Date[]> {
     const rows = await client.reservation.findMany({
       where: {
-        clientId,
-        ...(dependentId !== undefined ? { dependentId } : {}),
+        clientId: params.clientId,
+        dependentId: params.dependentId,
+        treatmentId: params.treatmentId,
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
-        scheduledStart: { lt: dayEnd },
-        scheduledEnd: { gt: dayStart },
-        ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
-        ...(excludeComboGroupId
-          ? {
-              OR: [
-                { comboGroupId: null },
-                { NOT: { comboGroupId: excludeComboGroupId } },
-              ],
-            }
+        scheduledStart: { gte: params.dayStart, lt: params.dayEnd },
+        ...(params.excludeReservationId
+          ? { id: { not: params.excludeReservationId } }
           : {}),
       },
-      select: { scheduledStart: true, scheduledEnd: true },
+      select: { scheduledStart: true },
     });
-    return rows.map((r) => ({ start: r.scheduledStart, end: r.scheduledEnd }));
+    return rows.map((r) => r.scheduledStart);
   }
 
   async getDashboardSummary(dayStart: Date, dayEnd: Date) {
@@ -472,28 +468,6 @@ export class ReservationsRepository {
       dailyEarnings: dailyEarnings._sum.finalPrice ?? 0,
       todayAppointments,
     };
-  }
-
-  async hasActiveReservationInCategoryOnDay(
-    clientId: string,
-    categoryId: string,
-    dayStart: Date,
-    dayEnd: Date,
-    excludeReservationId?: string,
-    client: PrismaClientOrTx = this.prisma.client,
-    dependentId?: string | null,
-  ): Promise<boolean> {
-    const count = await client.reservation.count({
-      where: {
-        clientId,
-        ...(dependentId !== undefined ? { dependentId } : {}),
-        categoryId,
-        status: { notIn: HOLDING_EXCLUDED_STATUSES },
-        scheduledStart: { gte: dayStart, lt: dayEnd },
-        ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
-      },
-    });
-    return count > 0;
   }
 
   async hasMoreRecentActivity(

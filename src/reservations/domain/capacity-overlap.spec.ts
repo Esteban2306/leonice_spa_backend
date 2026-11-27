@@ -45,8 +45,7 @@ describe('el cupo se respeta durante toda la cita, no solo a la hora de inicio',
       now: at('06:00'),
       operatingWindows: window,
       capacity: 8,
-      clientIntervals: [],
-      hasCategoryDayConflict: false,
+      hasDuplicateBooking: false,
     };
     expect(
       evaluatePlacement({ ...input, start: at('08:15'), held: seven }),
@@ -74,8 +73,7 @@ describe('el cupo se respeta durante toda la cita, no solo a la hora de inicio',
           operatingWindows: window,
           held: eightAtEight,
           capacity: 8,
-          clientIntervals: [],
-          hasCategoryDayConflict: false,
+          hasDuplicateBooking: false,
         }),
       ).toEqual({ ok: false, reason: 'NO_CAPACITY' });
     }

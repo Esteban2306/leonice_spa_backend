@@ -191,17 +191,21 @@ describe('1. Flujos de reserva de principio a fin', () => {
       }
     });
 
-    it('rechaza combos con dos tratamientos de la misma categoría y combos con tratamientos repetidos', async () => {
-      await expect(
-        create.execute({
-          client: newClientDto(),
-          treatments: [
-            world.principal.treatmentId,
-            world.principal.simpleTreatmentId,
-          ],
-          scheduledStart: futureSlot(8, 9).toISOString(),
-        }),
-      ).rejects.toThrow();
+    it('acepta dos tratamientos de la misma categoría y rechaza tratamientos repetidos', async () => {
+      const start = futureSlot(8, 9);
+      const { reservations } = await create.execute({
+        client: newClientDto(),
+        treatments: [
+          world.principal.treatmentId,
+          world.principal.simpleTreatmentId,
+        ],
+        scheduledStart: start.toISOString(),
+      });
+      expect(reservations.map((r) => r.scheduledStart.getTime())).toEqual([
+        start.getTime(),
+        start.getTime(),
+      ]);
+
       await expect(
         create.execute({
           client: newClientDto(),
@@ -209,7 +213,7 @@ describe('1. Flujos de reserva de principio a fin', () => {
             world.secondary.treatmentId,
             world.secondary.treatmentId,
           ],
-          scheduledStart: futureSlot(8, 9).toISOString(),
+          scheduledStart: start.toISOString(),
         }),
       ).rejects.toThrow();
     });

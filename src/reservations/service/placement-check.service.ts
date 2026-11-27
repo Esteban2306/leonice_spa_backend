@@ -8,16 +8,16 @@ import {
   evaluatePlacement,
   type PlacementDecision,
 } from '../domain/evaluate-placement';
+import { personKey } from '../domain/person-key';
 
 export interface PlacementCheckParams {
   clientId: string;
-  /** undefined: any person of the client; null: the client herself; id: that dependent. */
-  dependentId?: string | null;
+  dependentId: string | null;
   categoryId: string;
+  treatmentId: string;
   start: Date;
   end: Date;
   excludeReservationId?: string;
-  comboGroupId?: string | null;
   now?: Date;
 }
 
@@ -33,7 +33,15 @@ export class PlacementCheckService {
     tx: Prisma.TransactionClient,
     params: PlacementCheckParams,
   ): Promise<PlacementDecision> {
-    const { clientId, categoryId, start, end, excludeReservationId } = params;
+    const {
+      clientId,
+      dependentId,
+      categoryId,
+      treatmentId,
+      start,
+      end,
+      excludeReservationId,
+    } = params;
     const now = params.now ?? new Date();
     const { dayStart, dayEnd } = getDayBoundaries(start);
 
@@ -49,26 +57,19 @@ export class PlacementCheckService {
         tx,
         excludeReservationId,
       );
-    const clientIntervals =
-      await this.reservationsRepository.findActiveIntervalsForClientOnDay(
-        clientId,
-        dayStart,
-        dayEnd,
+    const sameTreatmentStarts =
+      await this.reservationsRepository.findActiveStartsForPersonTreatment(
+        {
+          clientId,
+          dependentId,
+          treatmentId,
+          dayStart,
+          dayEnd,
+          excludeReservationId,
+        },
         tx,
-        excludeReservationId,
-        params.comboGroupId ?? undefined,
-        params.dependentId,
       );
-    const hasCategoryDayConflict =
-      await this.reservationsRepository.hasActiveReservationInCategoryOnDay(
-        clientId,
-        categoryId,
-        dayStart,
-        dayEnd,
-        excludeReservationId,
-        tx,
-        params.dependentId,
-      );
+    const person = personKey(clientId, dependentId);
 
     const operatingWindows = await this.operatingSchedule.getWindows(
       start,
@@ -81,10 +82,11 @@ export class PlacementCheckService {
       end,
       now,
       operatingWindows,
-      held,
+      held: held.filter((interval) => interval.personKey !== person),
       capacity,
-      clientIntervals,
-      hasCategoryDayConflict,
+      hasDuplicateBooking: sameTreatmentStarts.some(
+        (taken) => taken.getTime() === start.getTime(),
+      ),
     });
   }
 }

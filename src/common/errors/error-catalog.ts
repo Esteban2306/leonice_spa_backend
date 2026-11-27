@@ -82,13 +82,9 @@ const PLACEMENT = {
     status: HttpStatus.CONFLICT,
     message: 'La fecha ya pasó. Elige un horario futuro.',
   },
-  PLACEMENT_CATEGORY_DAY_CONFLICT: {
+  PLACEMENT_DUPLICATE_BOOKING: {
     status: HttpStatus.CONFLICT,
-    message: 'Ya hay otra reserva activa de esta categoría ese día.',
-  },
-  PLACEMENT_CLIENT_OVERLAP: {
-    status: HttpStatus.CONFLICT,
-    message: 'Hay otra reserva del cliente que se cruza con este horario.',
+    message: 'Ese servicio ya está reservado para esta persona a esa hora.',
   },
   AVAILABILITY_NOT_CONSULTED: {
     status: HttpStatus.CONFLICT,
@@ -150,13 +146,9 @@ const RESERVATION = {
     status: HttpStatus.CONFLICT,
     message: 'Ya no hay cupo en el horario original de la reserva.',
   },
-  RESERVATION_REVIVE_CATEGORY_DAY_CONFLICT: {
+  RESERVATION_REVIVE_DUPLICATE_BOOKING: {
     status: HttpStatus.CONFLICT,
-    message: 'El cliente ya tiene otra reserva de esta categoría ese día.',
-  },
-  RESERVATION_REVIVE_CLIENT_OVERLAP: {
-    status: HttpStatus.CONFLICT,
-    message: 'El cliente tiene otra reserva que se cruza con ese horario.',
+    message: 'Esta persona ya tiene ese mismo servicio reservado a esa hora.',
   },
   RESERVATION_REVIVE_CONCURRENT_CHANGE: {
     status: HttpStatus.CONFLICT,

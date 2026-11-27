@@ -5,6 +5,28 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 import { HOLDING_EXCLUDED_STATUSES } from '../domain/reservation-status.constants';
 import { getCalendarDayKey } from '../domain/calendar-day-key';
+import type { HeldInterval } from '../domain/availability-calculator';
+import { personKey } from '../domain/person-key';
+
+const HOLDING_SELECT = {
+  clientId: true,
+  dependentId: true,
+  scheduledStart: true,
+  scheduledEnd: true,
+} satisfies Prisma.ReservationSelect;
+
+function toHeldInterval(row: {
+  clientId: string;
+  dependentId: string | null;
+  scheduledStart: Date;
+  scheduledEnd: Date;
+}): HeldInterval {
+  return {
+    scheduledStart: row.scheduledStart,
+    scheduledEnd: row.scheduledEnd,
+    personKey: personKey(row.clientId, row.dependentId),
+  };
+}
 
 interface AttemptToHoldSlotParams {
   categoryId: string;
@@ -38,15 +60,16 @@ export class AvailabilityRepository {
     rangeEnd: Date,
     client: PrismaClientOrTx = this.prisma.client,
   ) {
-    return client.reservation.findMany({
+    const rows = await client.reservation.findMany({
       where: {
         categoryId,
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
         scheduledStart: { gte: rangeStart },
         scheduledEnd: { lte: rangeEnd },
       },
-      select: { scheduledStart: true, scheduledEnd: true },
+      select: HOLDING_SELECT,
     });
+    return rows.map(toHeldInterval);
   }
 
   /**
@@ -60,8 +83,8 @@ export class AvailabilityRepository {
     windowEnd: Date,
     client: PrismaClientOrTx = this.prisma.client,
     excludeReservationId?: string,
-  ): Promise<{ scheduledStart: Date; scheduledEnd: Date }[]> {
-    return client.reservation.findMany({
+  ): Promise<HeldInterval[]> {
+    const rows = await client.reservation.findMany({
       where: {
         categoryId,
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
@@ -69,8 +92,9 @@ export class AvailabilityRepository {
         scheduledEnd: { gt: windowStart },
         ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
       },
-      select: { scheduledStart: true, scheduledEnd: true },
+      select: HOLDING_SELECT,
     });
+    return rows.map(toHeldInterval);
   }
 
   /*
