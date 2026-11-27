@@ -76,14 +76,9 @@ export class ClientsService {
       dto.allergies !== undefined || dto.isPregnant !== undefined;
 
     if (!client) {
-      if (!dto.name || !dto.birthDate) {
+      if (!dto.name) {
         throw new AppException('CLIENT_REQUIRED_FIELDS', {
-          details: {
-            missing: [
-              ...(dto.name ? [] : ['name']),
-              ...(dto.birthDate ? [] : ['birthDate']),
-            ],
-          },
+          details: { missing: ['name'] },
         });
       }
 
@@ -94,7 +89,9 @@ export class ClientsService {
       const created = await this.repository.create({
         phone: normalizedPhone,
         name: dto.name,
-        birthDate: calendarDateToUtcMidnight(dto.birthDate),
+        birthDate: dto.birthDate
+          ? calendarDateToUtcMidnight(dto.birthDate)
+          : null,
         whatsappJid,
         allergies: dto.allergies,
         isPregnant: dto.isPregnant || false,
@@ -107,12 +104,6 @@ export class ClientsService {
         );
       }
       return created;
-    }
-
-    if (client.birthDate === null && !dto.birthDate) {
-      throw new AppException('CLIENT_REQUIRED_FIELDS', {
-        details: { missing: ['birthDate'] },
-      });
     }
 
     if (!options.trustedIdentity) {
@@ -194,7 +185,9 @@ export class ClientsService {
     const created = await this.repository.create({
       phone,
       name: dto.name,
-      birthDate: calendarDateToUtcMidnight(dto.birthDate),
+      birthDate: dto.birthDate
+        ? calendarDateToUtcMidnight(dto.birthDate)
+        : null,
       allergies: dto.allergies,
       isPregnant: dto.isPregnant ?? false,
     });

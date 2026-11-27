@@ -19,8 +19,7 @@ const base = (overrides: Partial<PlacementInput> = {}): PlacementInput => ({
   operatingWindows: [MORNING, AFTERNOON],
   held: [],
   capacity: 1,
-  clientIntervals: [],
-  hasCategoryDayConflict: false,
+  hasDuplicateBooking: false,
   ...overrides,
 });
 
@@ -71,27 +70,11 @@ describe('evaluatePlacement', () => {
     });
   });
 
-  it('rechaza si el cliente ya tiene otra reserva activa de la categoría ese día', () => {
-    expect(evaluatePlacement(base({ hasCategoryDayConflict: true }))).toEqual({
+  it('rechaza el mismo servicio de la misma persona a la misma hora', () => {
+    expect(evaluatePlacement(base({ hasDuplicateBooking: true }))).toEqual({
       ok: false,
-      reason: 'CATEGORY_DAY_CONFLICT',
+      reason: 'DUPLICATE_BOOKING',
     });
-  });
-
-  it('rechaza si la cita se cruza con otra del cliente', () => {
-    expect(
-      evaluatePlacement(
-        base({ clientIntervals: [{ start: at(9, 30), end: at(10, 30) }] }),
-      ),
-    ).toEqual({ ok: false, reason: 'CLIENT_OVERLAP' });
-  });
-
-  it('acepta una cita del cliente contigua, no solapada', () => {
-    expect(
-      evaluatePlacement(
-        base({ clientIntervals: [{ start: at(10), end: at(11) }] }),
-      ),
-    ).toEqual({ ok: true });
   });
 
   it('rechaza sin cupo', () => {
@@ -117,6 +100,21 @@ describe('evaluatePlacement', () => {
       ok: false,
       reason: 'NO_CAPACITY',
     });
+  });
+
+  it('los servicios simultáneos de una misma persona ocupan un solo cupo', () => {
+    const ana = { ...held(9, 10), personKey: 'ana:' };
+    expect(
+      evaluatePlacement(base({ capacity: 2, held: [ana, { ...ana }] })),
+    ).toEqual({ ok: true });
+  });
+
+  it('dos personas distintas ocupan dos cupos aunque una sea dependiente', () => {
+    const ana = { ...held(9, 10), personKey: 'ana:' };
+    const hija = { ...held(9, 10), personKey: 'ana:sofia' };
+    expect(evaluatePlacement(base({ capacity: 2, held: [ana, hija] }))).toEqual(
+      { ok: false, reason: 'NO_CAPACITY' },
+    );
   });
 
   it('el horario se evalúa antes que el cupo', () => {

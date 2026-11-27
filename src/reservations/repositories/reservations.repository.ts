@@ -11,7 +11,16 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
   HOLDING_EXCLUDED_STATUSES,
   UNATTENDED_STATUSES,
+  UNRESOLVED_DEPOSIT_STATUSES,
 } from '../domain/reservation-status.constants';
+import {
+  APPOINTMENT_SELECT,
+  GROUPED_APPOINTMENT_SELECT,
+  LATEST_DEPOSIT_ORDER,
+  RESERVATION_DETAIL_SELECT,
+  RESERVATION_OWNER_SELECT,
+  SCHEDULE_ORDER,
+} from './reservation.selects';
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
 
@@ -34,6 +43,7 @@ export interface ReservationFilters {
   cancellationSources?: readonly CancellationSource[];
   categoryId?: string;
   clientId?: string;
+  unresolvedDepositOnly?: boolean;
 }
 
 export interface ReservationPagination {
@@ -57,42 +67,14 @@ export class ReservationsRepository {
   ) {
     return client.reservation.findMany({
       where: { comboGroupId },
-      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+      orderBy: SCHEDULE_ORDER,
     });
   }
 
-  async findByIdWithDetails(id: string) {
+  findByIdWithDetails(id: string) {
     return this.prisma.client.reservation.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        dependent: { select: { name: true } },
-        client: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          },
-        },
-        treatment: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        deposit: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-      },
+      where: { id },
+      select: RESERVATION_DETAIL_SELECT,
     });
   }
 
@@ -109,21 +91,21 @@ export class ReservationsRepository {
         status,
         scheduledStart: { gte: dayStart, lt: dayEnd },
       },
-      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+      orderBy: SCHEDULE_ORDER,
     });
   }
 
   findGroupingProjection(filters: ReservationFilters) {
     return this.prisma.client.reservation.findMany({
       where: this.buildWhere(filters),
-      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+      orderBy: SCHEDULE_ORDER,
       select: {
         id: true,
         clientId: true,
         status: true,
         scheduledStart: true,
         deposit: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: LATEST_DEPOSIT_ORDER,
           take: 1,
           select: { status: true },
         },
@@ -148,78 +130,16 @@ export class ReservationsRepository {
   findManyByIdsWithDetails(ids: string[]) {
     return this.prisma.client.reservation.findMany({
       where: { id: { in: ids } },
-      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
-      include: {
-        dependent: { select: { name: true } },
-        client: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            hairLength: true,
-            hairColor: true,
-            hairProfileUpdatedAt: true,
-          },
-        },
-        treatment: {
-          select: {
-            id: true,
-            name: true,
-            requiresPriorAssessment: true,
-            hasHairVariablePricing: true,
-          },
-        },
-        category: { select: { id: true, name: true } },
-        deposit: { orderBy: { createdAt: 'desc' }, take: 1 },
-        appliedDeposits: { select: { id: true, amount: true } },
-      },
+      orderBy: SCHEDULE_ORDER,
+      select: GROUPED_APPOINTMENT_SELECT,
     });
   }
 
-  async findManyForCalendar(dayStart: Date, dayEnd: Date) {
+  findManyForCalendar(dayStart: Date, dayEnd: Date) {
     return this.prisma.client.reservation.findMany({
-      where: {
-        scheduledStart: {
-          gte: dayStart,
-          lt: dayEnd,
-        },
-      },
-      orderBy: {
-        scheduledStart: 'asc',
-      },
-      include: {
-        dependent: { select: { name: true } },
-        client: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            hairLength: true,
-            hairColor: true,
-            hairProfileUpdatedAt: true,
-          },
-        },
-        treatment: {
-          select: {
-            id: true,
-            name: true,
-            requiresPriorAssessment: true,
-            hasHairVariablePricing: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        deposit: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 1,
-        },
-      },
+      where: { scheduledStart: { gte: dayStart, lt: dayEnd } },
+      orderBy: SCHEDULE_ORDER,
+      select: APPOINTMENT_SELECT,
     });
   }
 
@@ -305,7 +225,7 @@ export class ReservationsRepository {
         status: { in: [...params.statuses] },
         scheduledStart: { gt: params.from },
       },
-      orderBy: { scheduledStart: 'asc' },
+      orderBy: SCHEDULE_ORDER,
       take: 50,
       select: {
         id: true,
@@ -328,7 +248,7 @@ export class ReservationsRepository {
         clientId: params.clientId,
         scheduledStart: { gte: params.dayStart, lt: params.dayEnd },
       },
-      orderBy: { scheduledStart: 'asc' },
+      orderBy: SCHEDULE_ORDER,
       select: {
         id: true,
         status: true,
@@ -451,76 +371,41 @@ export class ReservationsRepository {
     return result.count === 1;
   }
 
-  async findByIdWithClientPhone(
+  findByIdWithClientPhone(
     id: string,
     client: PrismaClientOrTx = this.prisma.client,
   ) {
     return client.reservation.findUnique({
       where: { id },
-      include: {
-        client: { select: { phone: true, name: true } },
-        dependent: { select: { name: true } },
-      },
+      select: RESERVATION_OWNER_SELECT,
     });
   }
 
-  async findActiveIntervalsForClientOnDay(
-    clientId: string,
-    dayStart: Date,
-    dayEnd: Date,
+  async findActiveStartsForPersonTreatment(
+    params: {
+      clientId: string;
+      dependentId: string | null;
+      treatmentId: string;
+      dayStart: Date;
+      dayEnd: Date;
+      excludeReservationId?: string;
+    },
     client: PrismaClientOrTx = this.prisma.client,
-    excludeReservationId?: string,
-    excludeComboGroupId?: string,
-    dependentId?: string | null,
-  ): Promise<{ start: Date; end: Date }[]> {
+  ): Promise<Date[]> {
     const rows = await client.reservation.findMany({
       where: {
-        clientId,
-        ...(dependentId !== undefined ? { dependentId } : {}),
+        clientId: params.clientId,
+        dependentId: params.dependentId,
+        treatmentId: params.treatmentId,
         status: { notIn: HOLDING_EXCLUDED_STATUSES },
-        scheduledStart: { lt: dayEnd },
-        scheduledEnd: { gt: dayStart },
-        ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
-        ...(excludeComboGroupId
-          ? {
-              OR: [
-                { comboGroupId: null },
-                { NOT: { comboGroupId: excludeComboGroupId } },
-              ],
-            }
+        scheduledStart: { gte: params.dayStart, lt: params.dayEnd },
+        ...(params.excludeReservationId
+          ? { id: { not: params.excludeReservationId } }
           : {}),
       },
-      select: { scheduledStart: true, scheduledEnd: true },
+      select: { scheduledStart: true },
     });
-    return rows.map((r) => ({ start: r.scheduledStart, end: r.scheduledEnd }));
-  }
-
-  async findMany(filters: {
-    dayStart?: Date;
-    dayEnd?: Date;
-    status?: ReservationStatus;
-    categoryId?: string;
-    clientId?: string;
-  }) {
-    return this.prisma.client.reservation.findMany({
-      where: {
-        ...(filters.dayStart && filters.dayEnd
-          ? { scheduledStart: { gte: filters.dayStart, lt: filters.dayEnd } }
-          : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-        ...(filters.clientId ? { clientId: filters.clientId } : {}),
-      },
-      orderBy: { scheduledStart: 'asc' },
-      take: 200,
-      include: {
-        dependent: { select: { name: true } },
-        client: { select: { id: true, name: true, phone: true } },
-        treatment: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true } },
-        deposit: { orderBy: { createdAt: 'desc' }, take: 1 },
-      },
-    });
+    return rows.map((r) => r.scheduledStart);
   }
 
   async getDashboardSummary(dayStart: Date, dayEnd: Date) {
@@ -583,28 +468,6 @@ export class ReservationsRepository {
       dailyEarnings: dailyEarnings._sum.finalPrice ?? 0,
       todayAppointments,
     };
-  }
-
-  async hasActiveReservationInCategoryOnDay(
-    clientId: string,
-    categoryId: string,
-    dayStart: Date,
-    dayEnd: Date,
-    excludeReservationId?: string,
-    client: PrismaClientOrTx = this.prisma.client,
-    dependentId?: string | null,
-  ): Promise<boolean> {
-    const count = await client.reservation.count({
-      where: {
-        clientId,
-        ...(dependentId !== undefined ? { dependentId } : {}),
-        categoryId,
-        status: { notIn: HOLDING_EXCLUDED_STATUSES },
-        scheduledStart: { gte: dayStart, lt: dayEnd },
-        ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
-      },
-    });
-    return count > 0;
   }
 
   async hasMoreRecentActivity(
@@ -679,6 +542,14 @@ export class ReservationsRepository {
         : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
+      ...(filters.unresolvedDepositOnly
+        ? {
+            AND: [
+              { status: { in: [...UNRESOLVED_DEPOSIT_STATUSES] } },
+              { deposit: { some: { status: DepositStatus.CONFIRMADO } } },
+            ],
+          }
+        : {}),
     };
   }
 }

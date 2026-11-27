@@ -1,14 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { JOB_NAMES } from '../../infrastructure/queue/queue.constants';
-import {
-  DEFAULT_WEEKLY_WINDOWS,
-  type DayException,
-} from '../domain/operating-hours';
-import {
-  OperatingScheduleRepository,
-  type DayOverrideRecord,
-} from '../repositories/operating-schedule.repository';
+import { OperatingScheduleRepository } from '../repositories/operating-schedule.repository';
 import { ReservationsRepository } from '../repositories/reservations.repository';
 import { DepositDeadlineService } from './deposit-deadline.service';
 
@@ -23,8 +16,6 @@ interface RunningDeadline {
 }
 
 const buildFixture = (options: {
-  exceptions?: Array<DayException & { dayKey: string }>;
-  overrides?: DayOverrideRecord[];
   running?: RunningDeadline[];
   casFailsFor?: string[];
   queueError?: Error;
@@ -32,12 +23,7 @@ const buildFixture = (options: {
   const updates: Array<{ id: string; previous: Date; next: Date }> = [];
   const enqueued: Array<{ name: string; delay: number | undefined }> = [];
 
-  const scheduleRepository = {
-    findWeeklyWindows: () => Promise.resolve(DEFAULT_WEEKLY_WINDOWS),
-    findGlobalExceptionsBetween: () =>
-      Promise.resolve(options.exceptions ?? []),
-    findOverridesBetween: () => Promise.resolve(options.overrides ?? []),
-  };
+  const scheduleRepository = {};
   const reservationsRepository = {
     findDepositDeadlinesRunningDuring: () =>
       Promise.resolve(options.running ?? []),
@@ -70,35 +56,18 @@ const buildFixture = (options: {
 
 const tx = {} as Prisma.TransactionClient;
 
-const fridayBlocked: DayException & { dayKey: string } = {
-  dayKey: '2026-10-23',
-  type: 'BLOCK',
-  categoryId: null,
-  startMinute: null,
-  endMinute: null,
-};
-
 describe('DepositDeadlineService.computeExpiry', () => {
-  it('aplica los bloqueos globales del rango al reloj hábil', async () => {
-    const { service } = buildFixture({ exceptions: [fridayBlocked] });
+  it('da 24 horas desde que se reservó', async () => {
+    const { service } = buildFixture({});
     await expect(service.computeExpiry(at(22, 20), at(31, 9))).resolves.toEqual(
-      at(24, 9),
+      at(23, 20),
     );
   });
 
-  it('un horario especial cerrado detiene el reloj hábil igual que un bloqueo', async () => {
-    const { service } = buildFixture({
-      overrides: [
-        {
-          dayKey: fridayBlocked.dayKey,
-          windows: [],
-          startMinutes: [],
-          reason: 'Cerrado',
-        },
-      ],
-    });
-    await expect(service.computeExpiry(at(22, 20), at(31, 9))).resolves.toEqual(
-      at(24, 9),
+  it('nunca vence después de la cita', async () => {
+    const { service } = buildFixture({});
+    await expect(service.computeExpiry(at(22, 20), at(23, 9))).resolves.toEqual(
+      at(23, 9),
     );
   });
 });
@@ -111,19 +80,18 @@ describe('DepositDeadlineService.extendForScheduleChange', () => {
     depositExpiresAt,
   });
 
-  it('extiende el plazo cuando un bloqueo nuevo cae dentro del plazo en curso', async () => {
+  it('alarga a 24 horas un plazo en curso que era más corto', async () => {
     const { service, updates } = buildFixture({
-      exceptions: [fridayBlocked],
       running: [running('r1', at(23, 10))],
     });
 
     const extended = await service.extendForScheduleChange(at(23, 0), tx);
 
     expect(extended).toEqual([
-      { reservationId: 'r1', depositExpiresAt: at(24, 9) },
+      { reservationId: 'r1', depositExpiresAt: at(23, 20) },
     ]);
     expect(updates).toEqual([
-      { id: 'r1', previous: at(23, 10), next: at(24, 9) },
+      { id: 'r1', previous: at(23, 10), next: at(23, 20) },
     ]);
   });
 
@@ -140,7 +108,6 @@ describe('DepositDeadlineService.extendForScheduleChange', () => {
 
   it('omite la reserva si su plazo cambió en paralelo', async () => {
     const { service } = buildFixture({
-      exceptions: [fridayBlocked],
       running: [running('r1', at(23, 10)), running('r2', at(23, 10))],
       casFailsFor: ['r1'],
     });

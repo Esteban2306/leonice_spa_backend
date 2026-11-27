@@ -65,8 +65,18 @@ export class PendingDepositLookupService {
           clientId: client.id,
           status: ReservationStatus.PENDIENTE_DEPOSITO,
         },
-        include: { treatment: { select: { name: true } } },
-        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          scheduledStart: true,
+          depositExpiresAt: true,
+          finalPrice: true,
+          treatment: { select: { name: true } },
+        },
+        orderBy: [
+          { createdAt: 'desc' },
+          { scheduledStart: 'asc' },
+          { id: 'asc' },
+        ],
       }),
       this.prisma.client.reservation.findFirst({
         where: {
@@ -78,8 +88,13 @@ export class PendingDepositLookupService {
             gte: new Date(now.getTime() - RELEASED_LOOKBACK_DAYS * 86_400_000),
           },
         },
-        include: { treatment: { select: { name: true } } },
-        orderBy: { cancelledAt: 'desc' },
+        select: {
+          id: true,
+          scheduledStart: true,
+          cancelledAt: true,
+          treatment: { select: { name: true } },
+        },
+        orderBy: [{ cancelledAt: 'desc' }, { id: 'asc' }],
       }),
     ]);
 

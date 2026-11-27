@@ -4,6 +4,7 @@ import { minuteToDate } from './operating-hours';
 export interface HeldInterval {
   scheduledStart: Date;
   scheduledEnd: Date;
+  personKey?: string;
 }
 
 export function maxConcurrentInWindow(
@@ -22,11 +23,12 @@ export function maxConcurrentInWindow(
   let max = 0;
 
   for (const point of criticalPoints) {
-    const activateCount = held.filter(
+    const active = held.filter(
       (i) =>
         i.scheduledStart.getTime() <= point && i.scheduledEnd.getTime() > point,
-    ).length;
-    max = Math.max(max, activateCount);
+    );
+    const people = new Set(active.map((i) => i.personKey ?? i));
+    max = Math.max(max, people.size);
   }
   return max;
 }

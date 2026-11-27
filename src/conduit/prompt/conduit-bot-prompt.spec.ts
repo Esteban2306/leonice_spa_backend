@@ -108,7 +108,8 @@ describe('prompt del asistente de Leonice', () => {
     expect(CONDUIT_BOT_SETTINGS.agentName).toBe('Sofía');
     expect(t).toMatch(/Hola, soy \{\{agentName\}\} de \{\{companyName\}\}/);
     expect(t).toMatch(/nombre y apellido y su fecha de nacimiento/);
-    expect(t).toMatch(/sin apellido o sin fecha no reserves/);
+    expect(t).toMatch(/opcional: sin apellido no reserves; sin fecha sí/);
+    expect(t).toMatch(/si pregunta por qué: futuros descuentos de cumpleaños/);
     expect(t.indexOf('registrar_cliente con name')).toBeGreaterThan(-1);
     expect(t.indexOf('registrar_cliente con name')).toBeLessThan(
       t.indexOf('crear_reserva_whatsapp una sola vez'),
@@ -121,7 +122,7 @@ describe('prompt del asistente de Leonice', () => {
     expect(t).toMatch(/Lo primero.*consultar_cliente/);
     expect(t).toMatch(/con su primer nombre \("Hola, Diana, soy/);
     expect(t).toMatch(
-      /registered true, ya los tenemos \(si missingBirthDate, pide solo la fecha\); no le pidas nombre/,
+      /registered true, ya los tenemos \(aunque haya missingBirthDate\); no le pidas nombre/,
     );
     expect(t).toMatch(/termsAccepted/);
   });

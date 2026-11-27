@@ -301,7 +301,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
   {
     name: 'registrar_cliente',
     description:
-      'Registra a una clienta nueva (nombre completo y fecha de nacimiento) o actualiza sus consentimientos. Úsala al inicio si no sabes si ya es clienta. Si una interesada sin cita quiere dejar sus datos para escribir después, basta su nombre completo.',
+      'Registra a una clienta nueva (nombre completo; la fecha de nacimiento es opcional) o actualiza sus consentimientos. Úsala al inicio si no sabes si ya es clienta. Si una interesada sin cita quiere dejar sus datos para escribir después, basta su nombre completo.',
     httpMethod: 'POST',
     path: '/conduit/clients',
     injectPhoneParamName: 'phone',
@@ -311,7 +311,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
       properties: {
         phone: PHONE,
         name: { type: 'string', description: 'Nombre completo' },
-        birthDate: DATE('Fecha de nacimiento'),
+        birthDate: DATE('Fecha de nacimiento (opcional)'),
         isPregnant: {
           type: 'boolean',
           description: 'Solo con consentimiento DATOS_SALUD',
@@ -362,9 +362,7 @@ export const CONDUIT_TOOL_CATALOG: readonly ConduitToolDefinition[] = [
               type: 'string',
               description: 'Obligatorio si es clienta nueva',
             },
-            birthDate: DATE(
-              'Obligatoria si es clienta nueva o si consultar_cliente dio missingBirthDate',
-            ),
+            birthDate: DATE('Opcional: envíala solo si ella la dio'),
             isPregnant: { type: 'boolean' },
             allergies: { type: 'string' },
             consent: {

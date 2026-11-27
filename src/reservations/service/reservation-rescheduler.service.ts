@@ -73,10 +73,10 @@ export class ReservationRescheduler {
           clientId: current.clientId,
           dependentId: current.dependentId,
           categoryId: current.categoryId,
+          treatmentId: current.treatmentId,
           start: newScheduledStart,
           end: newScheduledEnd,
           excludeReservationId: current.id,
-          comboGroupId: current.comboGroupId,
         });
         if (!decision.ok) throw placementRejectionException(decision.reason);
 

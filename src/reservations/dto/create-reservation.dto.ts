@@ -20,16 +20,20 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ReservationChannel } from '@prisma/client';
-
-export const MAX_AGREED_PRICE_COP = 10_000_000;
+import {
+  MAX_PRICE_COP,
+  MIN_PRICE_COP,
+  PRICE_RANGE_MESSAGE,
+} from '../../common/money/price-units';
 
 export class AgreedPriceDto {
   @IsUUID('4')
   treatmentId: string;
 
+  /** En pesos; se guarda en miles (ver `priceUnitsOf`). */
   @IsInt()
-  @Min(0)
-  @Max(MAX_AGREED_PRICE_COP)
+  @Min(MIN_PRICE_COP, { message: PRICE_RANGE_MESSAGE })
+  @Max(MAX_PRICE_COP, { message: PRICE_RANGE_MESSAGE })
   price: number;
 }
 

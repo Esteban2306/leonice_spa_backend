@@ -193,6 +193,17 @@ export const THIRD_PARTY_BOOKING_RELEASE: ReleaseManifest = {
   strayIntents: [],
 };
 
+export const OPTIONAL_BIRTH_DATE_RELEASE: ReleaseManifest = {
+  id: '2026-11-28-fecha-nacimiento-opcional',
+  intents: ['booking'],
+  tools: ['registrar_cliente', 'crear_reserva_whatsapp'],
+  templates: [],
+  prompt: true,
+  mapping: false,
+  retiredVariables: [],
+  strayIntents: [],
+};
+
 export const RELEASES: readonly ReleaseManifest[] = [
   SOFIA_RELEASE,
   GUIDANCE_RELEASE,
@@ -205,12 +216,29 @@ export const RELEASES: readonly ReleaseManifest[] = [
   PRODUCT_ORDERS_RELEASE,
   ASSESSMENT_FLOW_RELEASE,
   THIRD_PARTY_BOOKING_RELEASE,
+  OPTIONAL_BIRTH_DATE_RELEASE,
 ];
 
 export const RELEASE = RELEASES[RELEASES.length - 1];
 
+const everyReleased = (pick: (release: ReleaseManifest) => string[]) => [
+  ...new Set(RELEASES.flatMap(pick)),
+];
+
+export const SYNC_RELEASE: ReleaseManifest = {
+  id: 'al-dia',
+  intents: everyReleased((release) => release.intents),
+  tools: everyReleased((release) => release.tools),
+  templates: everyReleased((release) => release.templates),
+  prompt: true,
+  mapping: true,
+  retiredVariables: everyReleased((release) => release.retiredVariables),
+  strayIntents: everyReleased((release) => release.strayIntents),
+};
+
 export function releaseById(id: string | undefined): ReleaseManifest {
   if (!id) return RELEASE;
+  if (id === SYNC_RELEASE.id) return SYNC_RELEASE;
   const found = RELEASES.find((release) => release.id === id);
   if (!found) {
     throw new Error(
@@ -288,11 +316,13 @@ export function sameFields(
 export function classify(
   remote: Record<string, unknown> | undefined,
   next: Record<string, unknown>,
-  previous: Record<string, unknown> | undefined,
+  ...published: Array<Record<string, unknown> | undefined>
 ): ItemState {
   if (!remote) return 'new';
   if (sameFields(remote, next)) return 'current';
-  if (previous && sameFields(remote, previous)) return 'pristine';
+  if (published.some((version) => version && sameFields(remote, version))) {
+    return 'pristine';
+  }
   return 'customized';
 }
 
@@ -392,7 +422,11 @@ export async function releaseConduit(
   if (missing.length > 0) {
     throw new Error(`Faltan variables: ${missing.join(', ')}`);
   }
-  const baseline = options.baseline ?? loadBaseline(manifest.id);
+  const baselines = options.baseline
+    ? [options.baseline]
+    : manifest.id === SYNC_RELEASE.id
+      ? RELEASES.map((release) => loadBaseline(release.id))
+      : [loadBaseline(manifest.id)];
   const botId = env.CONDUIT_DEFAULT_BOT_ID!;
   const apply = env.CONDUIT_RELEASE_APPLY === 'true';
   const forced = new Set(
@@ -515,7 +549,7 @@ export async function releaseConduit(
       return add(
         'herramienta',
         tool.name,
-        classify(remote, next, baseline.tools[tool.name]),
+        classify(remote, next, ...baselines.map((b) => b.tools[tool.name])),
         remote,
         next,
       );
@@ -529,7 +563,7 @@ export async function releaseConduit(
       classify(
         intentByKey.get(intent.key),
         intentDefinition(intent),
-        baseline.intents[intent.key],
+        ...baselines.map((b) => b.intents[intent.key]),
       ),
       intentByKey.get(intent.key),
       intentDefinition(intent),
@@ -548,7 +582,7 @@ export async function releaseConduit(
         classify(
           remote,
           templateDefinition(template),
-          baseline.templates[template.name],
+          ...baselines.map((b) => b.templates[template.name]),
         ),
         remote,
         templateDefinition(template),
@@ -561,7 +595,7 @@ export async function releaseConduit(
         'prompt de conversación',
         prompt.content === CONDUIT_BOT_PROMPT_TEMPLATE
           ? 'current'
-          : prompt.content === baseline.prompt
+          : baselines.some((b) => b.prompt === prompt.content)
             ? 'pristine'
             : 'customized',
       )
@@ -576,7 +610,9 @@ export async function releaseConduit(
           ? 'new'
           : sameRules(mapping.rules) === sameRules(BUSINESS_INFO_MAPPING_RULES)
             ? 'current'
-            : sameRules(mapping.rules) === sameRules(baseline.mappingRules)
+            : baselines.some(
+                  (b) => sameRules(mapping.rules) === sameRules(b.mappingRules),
+                )
               ? 'pristine'
               : 'customized',
       )

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateDepositData } from '../types/deposits.types';
+import { LATEST_DEPOSIT_ORDER } from '../../reservations/repositories/reservation.selects';
 import {
   DepositCoverage,
   DepositStatus,
@@ -40,7 +41,7 @@ export class DepositsRepository {
   ) {
     return client.depositRecord.findFirst({
       where: { reservationId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: LATEST_DEPOSIT_ORDER,
     });
   }
 
@@ -49,9 +50,7 @@ export class DepositsRepository {
       where: {
         reservationId,
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: LATEST_DEPOSIT_ORDER,
       select: {
         id: true,
         reservationId: true,
@@ -118,35 +117,18 @@ export class DepositsRepository {
     const [deposits, total] = await this.prisma.client.$transaction([
       this.prisma.client.depositRecord.findMany({
         where,
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: LATEST_DEPOSIT_ORDER,
         skip,
         take: pageSize,
         include: {
           reservation: {
-            include: {
-              client: {
-                select: {
-                  id: true,
-                  name: true,
-                  phone: true,
-                },
-              },
-
-              treatment: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-
-              category: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
+            select: {
+              id: true,
+              status: true,
+              scheduledStart: true,
+              client: { select: { id: true, name: true, phone: true } },
+              treatment: { select: { id: true, name: true } },
+              category: { select: { id: true, name: true } },
             },
           },
         },

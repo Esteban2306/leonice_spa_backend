@@ -1,13 +1,11 @@
 import { HeldInterval, maxConcurrentInWindow } from './availability-calculator';
-import { overlapsAny, TimeInterval } from './personal-conflict-checker';
 import type { TimeWindow } from './operating-hours';
 
 export type PlacementRejection =
   | 'INVALID_RANGE'
   | 'IN_THE_PAST'
   | 'OUTSIDE_OPERATING_HOURS'
-  | 'CATEGORY_DAY_CONFLICT'
-  | 'CLIENT_OVERLAP'
+  | 'DUPLICATE_BOOKING'
   | 'NO_CAPACITY';
 
 export type PlacementDecision =
@@ -20,8 +18,7 @@ export interface PlacementInput {
   operatingWindows: TimeWindow[];
   held: HeldInterval[];
   capacity: number;
-  clientIntervals: TimeInterval[];
-  hasCategoryDayConflict: boolean;
+  hasDuplicateBooking: boolean;
 }
 
 const reject = (reason: PlacementRejection): PlacementDecision => ({
@@ -37,8 +34,7 @@ export function evaluatePlacement(input: PlacementInput): PlacementDecision {
     operatingWindows,
     held,
     capacity,
-    clientIntervals,
-    hasCategoryDayConflict,
+    hasDuplicateBooking,
   } = input;
 
   if (end.getTime() <= start.getTime()) return reject('INVALID_RANGE');
@@ -50,8 +46,7 @@ export function evaluatePlacement(input: PlacementInput): PlacementDecision {
   );
   if (!fitsInOneWindow) return reject('OUTSIDE_OPERATING_HOURS');
 
-  if (hasCategoryDayConflict) return reject('CATEGORY_DAY_CONFLICT');
-  if (overlapsAny(start, end, clientIntervals)) return reject('CLIENT_OVERLAP');
+  if (hasDuplicateBooking) return reject('DUPLICATE_BOOKING');
 
   if (maxConcurrentInWindow(held, start, end) >= capacity) {
     return reject('NO_CAPACITY');

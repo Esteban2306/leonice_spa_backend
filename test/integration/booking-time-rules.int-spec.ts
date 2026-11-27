@@ -208,7 +208,7 @@ describe('Reglas de tiempo al agendar', () => {
       expect(hhmm(reservation.scheduledStart)).toBe('11:30');
     });
 
-    it('el combo sigue sin poder cruzarse con otra cita de la misma clienta', async () => {
+    it('un combo puede cruzarse con otra cita de la misma clienta', async () => {
       const client = newClientDto('otra-cita');
       await create.execute({
         client,
@@ -224,8 +224,8 @@ describe('Reglas de tiempo al agendar', () => {
         scheduledStart: at(8, 30).toISOString(),
       });
       expect(created.map((r) => hhmm(r.scheduledStart))).toEqual([
-        '9:00',
-        '9:00',
+        '8:30',
+        '8:30',
       ]);
     });
   });

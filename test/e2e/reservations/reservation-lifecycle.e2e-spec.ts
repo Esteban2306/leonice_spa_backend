@@ -275,32 +275,21 @@ describe('Reservation lifecycle (e2e)', () => {
     );
   });
 
-  it('rechaza misma categoría el mismo día, pero permite días distintos', async () => {
-    const day1 = futureDate(20, 8);
-    const day1Tarde = futureDate(20, 14);
-    const day2 = futureDate(21, 8);
-
-    await createO.execute({
-      client: clientFor('LIFECYCLE5'),
-      treatments: [treatmentSimpleId],
-      scheduledStart: day1.toISOString(),
-    });
-
-    await expect(
+  it('permite la misma categoría a la misma hora, pero no repetir el mismo servicio', async () => {
+    const slot = futureDate(20, 8);
+    const book = (treatmentId: string) =>
       createO.execute({
         client: clientFor('LIFECYCLE5'),
-        treatments: [treatmentPrincipalId],
-        scheduledStart: day1Tarde.toISOString(),
-      }),
-    ).rejects.toThrow();
+        treatments: [treatmentId],
+        scheduledStart: slot.toISOString(),
+      });
 
-    const nextDay = await createO.execute({
-      client: clientFor('LIFECYCLE5'),
-      treatments: [treatmentPrincipalId],
-      scheduledStart: day2.toISOString(),
-    });
-    expect(nextDay.reservations[0].status).toBe(
-      ReservationStatus.PENDIENTE_DEPOSITO,
+    await book(treatmentSimpleId);
+    const second = await book(treatmentPrincipalId);
+
+    expect(second.reservations[0].scheduledStart).toEqual(slot);
+    await expect(book(treatmentSimpleId)).rejects.toThrow(
+      'Ese servicio ya está reservado',
     );
   });
 
@@ -329,37 +318,38 @@ describe('Reservation lifecycle (e2e)', () => {
     expect(principal.comboGroupId).toBe(acompanante.comboGroupId);
   });
 
-  it('rechaza un combo con dos tratamientos de la misma categoría', async () => {
-    await expect(
-      createO.execute({
-        client: clientFor('COMBO2'),
-        treatments: [treatmentSimpleId, treatmentPrincipalId],
-        scheduledStart: futureDate(51, 8).toISOString(),
-      }),
-    ).rejects.toThrow();
+  it('acepta un combo con dos tratamientos de la misma categoría a la misma hora', async () => {
+    const start = futureDate(51, 8);
+
+    const result = await createO.execute({
+      client: clientFor('COMBO2'),
+      treatments: [treatmentSimpleId, treatmentPrincipalId],
+      scheduledStart: start.toISOString(),
+    });
+
+    expect(result.reservations.map((r) => r.scheduledStart)).toEqual([
+      start,
+      start,
+    ]);
   });
 
-  it('una petición separada que choca con una reserva existente se reubica sola, no se rechaza', async () => {
+  it('una petición separada que se cruza con otra de la misma persona conserva su hora', async () => {
     const day = futureDate(55, 8);
 
-    const first = await createO.execute({
+    await createO.execute({
       client: clientFor('SMART1'),
       treatments: [treatmentSimpleId],
       scheduledStart: day.toISOString(),
     });
 
-    const clashingRequest = new Date(day.getTime() + 30 * 60_000);
+    const overlapping = new Date(day.getTime() + 30 * 60_000);
     const second = await createO.execute({
       client: clientFor('SMART1'),
       treatments: [treatmentSecondaryId],
-      scheduledStart: clashingRequest.toISOString(),
+      scheduledStart: overlapping.toISOString(),
     });
 
-    expect(second.reservations).toHaveLength(1);
-    expect(second.summary).toContain('se ajustó');
-    expect(second.reservations[0].scheduledStart).toEqual(
-      first.reservations[0].scheduledEnd,
-    );
+    expect(second.reservations[0].scheduledStart).toEqual(overlapping);
   });
 
   it('si el horario justo después del conflicto tampoco tiene cupo, busca el más cercano ese mismo día', async () => {

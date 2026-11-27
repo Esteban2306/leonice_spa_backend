@@ -30,7 +30,7 @@ import {
 } from './tools/bot-treatment-view';
 import { matchTreatment } from './tools/treatment-matcher';
 import { TreatmentsService } from '../catalog/treatments/treatments.service';
-import { priceUnitsOf } from './quotes/team-quote';
+import { priceUnitsOf } from '../common/money/price-units';
 import { bogotaDay } from './tools/bot-treatment-view';
 import { TeamQuoteService } from './quotes/team-quote.service';
 import { ClientsRepository } from '../clients/repositories/clients.repository';
@@ -49,8 +49,6 @@ import {
 const SLOT_ERRORS = new Set<string>([
   'PLACEMENT_NO_SLOT_THAT_DAY',
   'PLACEMENT_NO_CAPACITY',
-  'PLACEMENT_CATEGORY_DAY_CONFLICT',
-  'PLACEMENT_CLIENT_OVERLAP',
 ]);
 
 export const ASSESSMENT_CHOICE =

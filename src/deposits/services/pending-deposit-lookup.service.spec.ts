@@ -37,7 +37,13 @@ describe('anticipos pendientes de la clienta', () => {
     ]);
     const out = await service.findCandidates('+573001112233', NOW);
     expect(prisma.client.reservation.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+      expect.objectContaining({
+        orderBy: [
+          { createdAt: 'desc' },
+          { scheduledStart: 'asc' },
+          { id: 'asc' },
+        ],
+      }),
     );
     expect(out.candidates[0]).toMatchObject({
       reservationId: 'reciente',

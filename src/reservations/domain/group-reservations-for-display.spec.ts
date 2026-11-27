@@ -2,11 +2,11 @@ import {
   DepositRecord,
   DepositStatus,
   DepositVerificationMethod,
-  ReservationChannel,
   ReservationStatus,
 } from '@prisma/client';
 import {
   groupReservationsForDisplay,
+  paginateReservationGroups,
   ReservationWithRelations,
 } from './group-reservations-for-display';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -50,30 +50,17 @@ function fakeReservation(
   return {
     id: overrides.id,
     clientId,
-    dependentId: null,
-    categoryId: 'c1',
-    treatmentId: 't1',
     status: overrides.status ?? ReservationStatus.CONFIRMADA,
-    channel: ReservationChannel.WEB,
     comboGroupId: overrides.comboGroupId ?? null,
     coveredByDepositId: null,
     scheduledStart: overrides.scheduledStart,
     scheduledEnd: overrides.scheduledEnd,
     finalPrice: new Decimal(100),
-    finalDurationMinutes: 60,
-    valoracionPhotoReference: null,
-    valoracionRespondedAt: null,
     checkedInAt: null,
-    completedAt: null,
     cancelledAt: null,
     cancellationReason: null,
     cancellationSource: null,
-    noShowFromStatus: null,
-    rescheduledFromId: null,
     depositExpiresAt: null,
-    depositClockStartedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
     client: { id: clientId, name: 'Test', phone: '123' },
     treatment: { id: 't1', name: 'Tratamiento' },
     category: { id: 'c1', name: 'Categoría' },
@@ -213,5 +200,30 @@ describe('groupReservationsForDisplay', () => {
     expect(underReview?.isProofUnderReview).toBe(true);
     expect(rejected?.isProofUnderReview).toBe(false);
     expect(withoutProof?.isProofUnderReview).toBe(false);
+  });
+});
+
+describe('paginateReservationGroups con anticipos sin resolver', () => {
+  it('deja solo las citas que no ocurrieron y cuyo último anticipo se aceptó', () => {
+    const row = (id: string, latest: DepositStatus) => ({
+      id,
+      clientId: id,
+      status: ReservationStatus.CANCELADA,
+      scheduledStart: new Date('2026-01-01T08:00'),
+      deposit: [{ status: latest }],
+    });
+
+    const page = paginateReservationGroups(
+      [
+        row('aceptado', DepositStatus.CONFIRMADO),
+        row('rechazado', DepositStatus.RECHAZADO),
+        row('pendiente', DepositStatus.PENDIENTE),
+      ],
+      { page: 1, pageSize: 10 },
+      { onlyUnresolvedDeposit: true },
+    );
+
+    expect(page.reservationIds).toEqual(['aceptado']);
+    expect(page.total).toBe(1);
   });
 });

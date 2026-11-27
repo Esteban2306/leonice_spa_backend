@@ -6,6 +6,11 @@ export const HOLDING_EXCLUDED_STATUSES: ReservationStatus[] = [
   ReservationStatus.REPROGRAMADA,
 ];
 
+export const UNRESOLVED_DEPOSIT_STATUSES: readonly ReservationStatus[] = [
+  ReservationStatus.NO_SHOW,
+  ReservationStatus.CANCELADA,
+];
+
 export const UNATTENDED_STATUSES: readonly ReservationStatus[] = [
   ReservationStatus.SOLICITUD_INICIADA,
   ReservationStatus.PENDIENTE_VALORACION,

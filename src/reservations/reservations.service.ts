@@ -205,6 +205,7 @@ export class ReservationsService {
       cancellationSources: query.cancellationSources,
       categoryId: query.categoryId,
       clientId: query.clientId,
+      unresolvedDepositOnly: query.hasUnresolvedDeposit === true,
     });
 
     const groupsPage = paginateReservationGroups(

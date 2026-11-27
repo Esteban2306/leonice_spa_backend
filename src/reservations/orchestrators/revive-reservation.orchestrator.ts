@@ -89,10 +89,10 @@ export class ReviveReservationOrchestrator {
             clientId: fresh.clientId,
             dependentId: fresh.dependentId,
             categoryId: fresh.categoryId,
+            treatmentId: fresh.treatmentId,
             start: fresh.scheduledStart,
             end: fresh.scheduledEnd,
             excludeReservationId: fresh.id,
-            comboGroupId: fresh.comboGroupId,
             now,
           });
           if (!decision.ok) {
@@ -163,16 +163,10 @@ export class ReviveReservationOrchestrator {
           'Ya no hay cupo en ese horario; reagenda la reserva.',
           reservationId,
         );
-      case 'CATEGORY_DAY_CONFLICT':
+      case 'DUPLICATE_BOOKING':
         return new ReviveReservationException(
-          REVIVE_ERROR_CODES.CATEGORY_DAY_CONFLICT,
-          'El cliente ya tiene otra reserva activa en esta categoría ese día.',
-          reservationId,
-        );
-      case 'CLIENT_OVERLAP':
-        return new ReviveReservationException(
-          REVIVE_ERROR_CODES.CLIENT_OVERLAP,
-          'El cliente tiene otra cita que se cruza con este horario.',
+          REVIVE_ERROR_CODES.DUPLICATE_BOOKING,
+          'El cliente ya tiene ese mismo servicio reservado a esa hora.',
           reservationId,
         );
       case 'INVALID_RANGE':

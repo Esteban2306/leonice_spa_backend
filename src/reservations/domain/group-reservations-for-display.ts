@@ -12,9 +12,29 @@ import {
   resolveReservationAssessment,
   type ReservationAssessment,
 } from './reservation-assessment';
+import { UNRESOLVED_DEPOSIT_STATUSES } from './reservation-status.constants';
 import { getCalendarDayKey } from './calendar-day-key';
 
-export type ReservationWithRelations = Reservation & {
+type LatestDeposit = Pick<
+  DepositRecord,
+  'status' | 'coverage' | 'imageUrl' | 'amount'
+>;
+
+export type ReservationWithRelations = Pick<
+  Reservation,
+  | 'id'
+  | 'clientId'
+  | 'comboGroupId'
+  | 'status'
+  | 'scheduledStart'
+  | 'scheduledEnd'
+  | 'finalPrice'
+  | 'coveredByDepositId'
+  | 'checkedInAt'
+  | 'cancelledAt'
+  | 'cancellationSource'
+  | 'cancellationReason'
+> & {
   dependent?: { name: string } | null;
   client: { id: string; name: string; phone: string } & Partial<
     Pick<Client, 'hairLength' | 'hairColor' | 'hairProfileUpdatedAt'>
@@ -23,7 +43,7 @@ export type ReservationWithRelations = Reservation & {
     Pick<Treatment, 'requiresPriorAssessment' | 'hasHairVariablePricing'>
   >;
   category: { id: string; name: string };
-  deposit: DepositRecord[];
+  deposit: LatestDeposit[];
   depositExpiresAt: Date | null;
   appliedDeposits?: Array<Pick<DepositRecord, 'id' | 'amount'>>;
 };
@@ -91,7 +111,7 @@ function getReservationGroupKey(r: {
 }
 
 export function toLatestDepositSummary(
-  deposits: DepositRecord[],
+  deposits: LatestDeposit[],
 ): LatestDepositSummary | null {
   const [latest] = deposits;
   return latest
@@ -129,9 +149,7 @@ export function computeHasUnresolvedDeposit(
 ): boolean {
   const [latest] = deposits;
   if (!latest) return false;
-  const reservationDidNotHappen =
-    status === ReservationStatus.NO_SHOW ||
-    status === ReservationStatus.CANCELADA;
+  const reservationDidNotHappen = UNRESOLVED_DEPOSIT_STATUSES.includes(status);
   const moneyWasAccepted = latest.status === DepositStatus.CONFIRMADO;
   return reservationDidNotHappen && moneyWasAccepted;
 }
