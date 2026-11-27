@@ -8,7 +8,7 @@
 -- Origen posible, por fecha de commit (el despliegue pudo ser después): precio acordado
 -- del panel desde 2026-11-20; precio del equipo por el bot, entre 2026-11-20 y 2026-11-23.
 --
--- SEGURO:   final_price > 10000, más que el máximo acordable ($10.000.000).
+-- SEGURO:   final_price > 10000, más que el máximo que se podía acordar entonces ($10.000.000).
 -- PROBABLE: más de 100 veces el precio máximo de catálogo del servicio.
 -- precio_si_es_error es lo que habría debido quedar; confirmar con el spa antes de corregir.
 -- Un pago registrado o un envío a Siigo pueden haber copiado el mismo valor; corregir

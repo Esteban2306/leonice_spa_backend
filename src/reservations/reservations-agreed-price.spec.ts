@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { AppException } from '../common/errors/app.exception';
+import { ConfirmValoracionDto } from './dto/confirm-valoracion.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ReservationsController } from './reservations.controller';
 
@@ -77,22 +78,39 @@ describe('precio fijado al crear una reserva', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('el precio debe ser un entero en pesos dentro del límite', async () => {
-    const pipe = new ValidationPipe({
+  const validate = (body: unknown, metatype: new () => object) =>
+    new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+    }).transform(body, { type: 'body', metatype });
+
+  it.each([1_000, 350_000, 1_000_000])('acepta $%d desde el panel', (price) =>
+    expect(
+      validate(dto([{ treatmentId: T1, price }]), CreateReservationDto),
+    ).resolves.toBeDefined(),
+  );
+
+  it.each([-1, 0, 350, 999, 1_000_001, 350_000_000, 350_000.5])(
+    'rechaza $%d desde el panel',
+    (price) =>
+      expect(
+        validate(dto([{ treatmentId: T1, price }]), CreateReservationDto),
+      ).rejects.toBeDefined(),
+  );
+
+  it('la valoración se confirma en miles y dentro del mismo rango', async () => {
+    const body = (finalPrice: number) => ({
+      finalPrice,
+      finalDurationMinutes: 60,
     });
-    const transform = (body: unknown) =>
-      pipe.transform(body, { type: 'body', metatype: CreateReservationDto });
     await expect(
-      transform(dto([{ treatmentId: T1, price: 350000 }])),
+      validate(body(350), ConfirmValoracionDto),
     ).resolves.toBeDefined();
-    await expect(
-      transform(dto([{ treatmentId: T1, price: 350000.5 }])),
-    ).rejects.toBeDefined();
-    await expect(
-      transform(dto([{ treatmentId: T1, price: -1 }])),
-    ).rejects.toBeDefined();
+    for (const price of [0, 0.5, 1_001, 350_000]) {
+      await expect(
+        validate(body(price), ConfirmValoracionDto),
+      ).rejects.toBeDefined();
+    }
   });
 });

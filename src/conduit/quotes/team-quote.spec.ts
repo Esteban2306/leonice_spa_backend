@@ -17,7 +17,8 @@ describe('montos en un mensaje del equipo', () => {
     ['Te queda en $350.000', [350000]],
     ['350 mil', [350000]],
     ['son 350000', [350000]],
-    ['$ 1.200.000 el paquete', [1200000]],
+    ['$ 950.000 el paquete', [950000]],
+    ['$ 1.200.000 el paquete', []],
   ])('%s', (text, expected) => {
     expect(amountsInText(text)).toEqual(expected);
   });

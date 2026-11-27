@@ -1,7 +1,9 @@
+import { MAX_PRICE_COP } from '../../common/money/price-units';
+
 export const TEAM_QUOTE_VALID_DAYS = 30;
 export const TEAM_QUOTE_LOOKBACK_DAYS = 14;
 export const MIN_QUOTE_COP = 10_000;
-export const MAX_QUOTE_COP = 10_000_000;
+export const MAX_QUOTE_COP = MAX_PRICE_COP;
 
 const GROUPED = /\d{1,3}(?:[.,\s]\d{3})+/g;
 const PLAIN = /\b\d{5,8}\b/g;
