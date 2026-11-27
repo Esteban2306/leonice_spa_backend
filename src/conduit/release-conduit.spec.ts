@@ -11,6 +11,7 @@ import {
   PRODUCT_PROMOTIONS_RELEASE,
   PRODUCT_ORDERS_RELEASE,
   RELEASES,
+  SYNC_RELEASE,
   SOFIA_RELEASE as RELEASE,
   intentDefinition,
   loadBaseline,
@@ -759,6 +760,32 @@ describe('entrega de pedidos de productos', () => {
       .map((w) => (w.body as { name: string }).name);
     expect(created).toEqual(
       expect.arrayContaining(['promociones_vigentes', 'registrar_pago_pedido']),
+    );
+  });
+});
+
+describe('entrega al día (bot que se saltó entregas)', () => {
+  const old = loadBaseline(PRODUCT_ORDERS_RELEASE.id);
+  const promptState = async (content: string) => {
+    const state = productionLike();
+    state.prompt = content;
+    const { request } = fakeConduit(state);
+    const out = await releaseConduit({
+      manifest: SYNC_RELEASE,
+      env: env(),
+      request: request as never,
+      log: () => undefined,
+    });
+    return out.plan.find((item) => item.kind === 'prompt')?.state;
+  };
+
+  it('actualiza un prompt que quedó en cualquier versión publicada', async () => {
+    await expect(promptState(old.prompt)).resolves.toBe('pristine');
+  });
+
+  it('sigue sin pisar un prompt editado en el panel', async () => {
+    await expect(promptState(`${old.prompt} extra`)).resolves.toBe(
+      'customized',
     );
   });
 });
